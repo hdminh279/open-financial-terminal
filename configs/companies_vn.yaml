@@ -1,0 +1,431 @@
+# ==============================================================================
+# VN30 Constituent Registry — Corporate Filing Intelligence
+# Official VN30-INDEX basket constituents listed on Ho Chi Minh City Stock Exchange (HOSE)
+# Legal source: Decision of Ho Chi Minh Stock Exchange on VN30 constituent portfolio
+# ==============================================================================
+
+version: "1.0"
+market: "VN"
+exchange: "HOSE"
+total_companies: 30
+
+companies:
+  # ----------------------------------------------------------------------------
+  # 1. Technology & Telecommunications
+  # ----------------------------------------------------------------------------
+  - ticker: "FPT"
+    name: "Công ty Cổ phần FPT"
+    english_name: "FPT Corporation"
+    sector: "Technology"
+    industry: "IT Services, Cloud, Telecom & Education"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "INFY"
+    founded_year: 1988
+    listing_year: 2006
+
+  # ----------------------------------------------------------------------------
+  # 2. Consumer Goods, Dairy & Packaged Foods
+  # ----------------------------------------------------------------------------
+  - ticker: "VNM"
+    name: "Công ty Cổ phần Sữa Việt Nam"
+    english_name: "Vietnam Dairy Products Joint Stock Company (Vinamilk)"
+    sector: "Consumer Goods"
+    industry: "Dairy & Nutritional Products"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "PG"
+    founded_year: 1976
+    listing_year: 2006
+
+  - ticker: "MSN"
+    name: "Công ty Cổ phần Tập đoàn Masan"
+    english_name: "Masan Group Corporation"
+    sector: "Consumer Goods"
+    industry: "FMCG, Meat Processing & Consumer Retailing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "PG"
+    founded_year: 1996
+    listing_year: 2009
+
+  - ticker: "SAB"
+    name: "Tổng CTCP Bia - Rượu - Nước giải khát Sài Gòn"
+    english_name: "Saigon Beer-Alcohol-Beverage Corporation (Sabeco)"
+    sector: "Consumer Goods"
+    industry: "Beer & Alcoholic Beverages"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "KO"
+    founded_year: 1875
+    listing_year: 2016
+
+  # ----------------------------------------------------------------------------
+  # 3. Retail & Distribution
+  # ----------------------------------------------------------------------------
+  - ticker: "MWG"
+    name: "Công ty Cổ phần Đầu tư Thế Giới Di Động"
+    english_name: "Mobile World Investment Corporation"
+    sector: "Retail"
+    industry: "Consumer Electronics, Mobile Devices & Grocery Retailing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "WMT"
+    founded_year: 2004
+    listing_year: 2014
+
+  - ticker: "PLX"
+    name: "Tập đoàn Xăng Dầu Việt Nam"
+    english_name: "Vietnam National Petroleum Group (Petrolimex)"
+    sector: "Energy"
+    industry: "Petroleum Retailing, Storage & Logistics"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CVX"
+    founded_year: 1956
+    listing_year: 2017
+
+  # ----------------------------------------------------------------------------
+  # 4. Materials, Steel & Industrial Manufacturing
+  # ----------------------------------------------------------------------------
+  - ticker: "HPG"
+    name: "Công ty Cổ phần Tập đoàn Hòa Phát"
+    english_name: "Hoa Phat Group Joint Stock Company"
+    sector: "Materials"
+    industry: "Crude Steel, Construction Steel & Heavy Machinery"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CAT"
+    founded_year: 1992
+    listing_year: 2007
+
+  - ticker: "GVR"
+    name: "Tập đoàn Công nghiệp Cao su Việt Nam - CTCP"
+    english_name: "Vietnam Rubber Group - Joint Stock Company"
+    sector: "Materials"
+    industry: "Natural Rubber, Wood Processing & Industrial Parks"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CAT"
+    founded_year: 1975
+    listing_year: 2020
+
+  # ----------------------------------------------------------------------------
+  # 5. Banking & Commercial Credit (VAS-BANK: Circular 49/2014/TT-NHNN)
+  # ----------------------------------------------------------------------------
+  - ticker: "VCB"
+    name: "Ngân hàng TMCP Ngoại thương Việt Nam"
+    english_name: "Joint Stock Commercial Bank for Foreign Trade of Vietnam (Vietcombank)"
+    sector: "Financials"
+    industry: "Commercial Banking & Foreign Exchange"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "JPM"
+    founded_year: 1963
+    listing_year: 2009
+
+  - ticker: "CTG"
+    name: "Ngân hàng TMCP Công Thương Việt Nam"
+    english_name: "Vietnam Joint Stock Commercial Bank for Industry and Trade (VietinBank)"
+    sector: "Financials"
+    industry: "Commercial & Corporate Banking"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "JPM"
+    founded_year: 1988
+    listing_year: 2009
+
+  - ticker: "BID"
+    name: "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam"
+    english_name: "Joint Stock Commercial Bank for Investment and Development of Vietnam (BIDV)"
+    sector: "Financials"
+    industry: "Commercial Banking, Project Financing & Retail"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "JPM"
+    founded_year: 1957
+    listing_year: 2014
+
+  - ticker: "TCB"
+    name: "Ngân hàng TMCP Kỹ Thương Việt Nam"
+    english_name: "Technological and Commercial Joint Stock Bank (Techcombank)"
+    sector: "Financials"
+    industry: "Commercial Banking & Wealth Management"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1993
+    listing_year: 2018
+
+  - ticker: "MBB"
+    name: "Ngân hàng TMCP Quân đội"
+    english_name: "Military Commercial Joint Stock Bank (MBBank)"
+    sector: "Financials"
+    industry: "Commercial Banking, Consumer Credit & Insurance"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1994
+    listing_year: 2011
+
+  - ticker: "ACB"
+    name: "Ngân hàng TMCP Á Châu"
+    english_name: "Asia Commercial Joint Stock Bank"
+    sector: "Financials"
+    industry: "Retail Banking & SME Financing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "JPM"
+    founded_year: 1993
+    listing_year: 2006
+
+  - ticker: "STB"
+    name: "Ngân hàng TMCP Sài Gòn Thương Tín"
+    english_name: "Saigon Thuong Tin Commercial Joint Stock Bank (Sacombank)"
+    sector: "Financials"
+    industry: "Retail Banking & Commercial Credit"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1991
+    listing_year: 2006
+
+  - ticker: "HDB"
+    name: "Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh"
+    english_name: "Ho Chi Minh City Development Joint Stock Commercial Bank (HDBank)"
+    sector: "Financials"
+    industry: "Retail Banking, Consumer Finance & Aviation Finance"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1989
+    listing_year: 2018
+
+  - ticker: "TPB"
+    name: "Ngân hàng TMCP Tiên Phong"
+    english_name: "Tien Phong Commercial Joint Stock Bank (TPBank)"
+    sector: "Financials"
+    industry: "Digital Banking & Retail Commercial Credit"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 2008
+    listing_year: 2018
+
+  - ticker: "VIB"
+    name: "Ngân hàng TMCP Quốc tế Việt Nam"
+    english_name: "Vietnam International Commercial Joint Stock Bank"
+    sector: "Financials"
+    industry: "Retail Banking, Auto Loans & Bancassurance"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1996
+    listing_year: 2020
+
+  - ticker: "SHB"
+    name: "Ngân hàng TMCP Sài Gòn - Hà Nội"
+    english_name: "Saigon - Hanoi Commercial Joint Stock Bank"
+    sector: "Financials"
+    industry: "Commercial Banking & Corporate Infrastructure Lending"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1993
+    listing_year: 2009
+
+  - ticker: "SSB"
+    name: "Ngân hàng TMCP Đông Nam Á"
+    english_name: "Southeast Asia Commercial Joint Stock Bank (SeABank)"
+    sector: "Financials"
+    industry: "Retail Banking & SME Commercial Lending"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 1994
+    listing_year: 2021
+
+  - ticker: "LPB"
+    name: "Ngân hàng TMCP Lộc Phát Việt Nam"
+    english_name: "Loc Phat Vietnam Commercial Joint Stock Bank (LPBank)"
+    sector: "Financials"
+    industry: "Commercial Banking & Nationwide Postal Network"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    founded_year: 2008
+    listing_year: 2020
+
+  # ----------------------------------------------------------------------------
+  # 6. Securities & Financial Services (Circular 125/2016/TT-BTC)
+  # ----------------------------------------------------------------------------
+  - ticker: "SSI"
+    name: "Công ty Cổ phần Chứng khoán SSI"
+    english_name: "SSI Securities Corporation"
+    sector: "Financials"
+    industry: "Securities Brokerage, Margin Lending & Investment Banking"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-SECURITIES"
+    regulatory_circular: "Circular 125/2016/TT-BTC"
+    peer_benchmark: "MS"
+    founded_year: 1999
+    listing_year: 2006
+
+  # ----------------------------------------------------------------------------
+  # 7. Insurance & Wealth Management (Circular 199/2014/TT-BTC)
+  # ----------------------------------------------------------------------------
+  - ticker: "BVH"
+    name: "Tập đoàn Bảo Việt"
+    english_name: "Baoviet Holdings"
+    sector: "Financials"
+    industry: "Life Insurance, General Insurance & Asset Management"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-INSURANCE"
+    regulatory_circular: "Circular 199/2014/TT-BTC"
+    peer_benchmark: "BRK"
+    founded_year: 1964
+    listing_year: 2009
+
+  # ----------------------------------------------------------------------------
+  # 8. Real Estate & Infrastructure Development
+  # ----------------------------------------------------------------------------
+  - ticker: "VIC"
+    name: "Tập đoàn Vingroup - Công ty Cổ phần"
+    english_name: "Vingroup Joint Stock Company"
+    sector: "Real Estate & Conglomerate"
+    industry: "Urban Township Development, Electric Vehicles & Healthcare"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "TM"
+    founded_year: 1993
+    listing_year: 2007
+
+  - ticker: "VHM"
+    name: "Công ty Cổ phần Vinhomes"
+    english_name: "Vinhomes Joint Stock Company"
+    sector: "Real Estate"
+    industry: "Master-Planned Residential Communities"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CAT"
+    founded_year: 2008
+    listing_year: 2018
+
+  - ticker: "VRE"
+    name: "Công ty Cổ phần Vincom Retail"
+    english_name: "Vincom Retail Joint Stock Company"
+    sector: "Real Estate"
+    industry: "Retail Shopping Mall Development & Leasing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "SPG"
+    founded_year: 2012
+    listing_year: 2017
+
+  - ticker: "BCM"
+    name: "Tổng Công ty Đầu tư và Phát triển Công nghiệp - CTCP"
+    english_name: "Investment and Industrial Development Joint Stock Corporation (Becamex IDC)"
+    sector: "Real Estate"
+    industry: "Industrial Parks, Logistics & Urban Infrastructure"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "PLD"
+    founded_year: 1976
+    listing_year: 2020
+
+  # ----------------------------------------------------------------------------
+  # 9. Utilities, Energy & Power Generation
+  # ----------------------------------------------------------------------------
+  - ticker: "GAS"
+    name: "Tổng Công ty Khí Việt Nam - Công ty Cổ phần"
+    english_name: "Petrovietnam Gas Joint Stock Corporation (PV GAS)"
+    sector: "Utilities"
+    industry: "Dry Gas Transmission, LPG Distribution & LNG Import"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "XOM"
+    founded_year: 1990
+    listing_year: 2012
+
+  - ticker: "POW"
+    name: "Tổng Công ty Điện lực Dầu khí Việt Nam - CTCP"
+    english_name: "Petrovietnam Power Corporation (PV Power)"
+    sector: "Utilities"
+    industry: "Gas-Fired & Coal Thermal Power Generation"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "NEE"
+    founded_year: 2007
+    listing_year: 2019
+
+  # ----------------------------------------------------------------------------
+  # 10. Transportation & Aviation
+  # ----------------------------------------------------------------------------
+  - ticker: "VJC"
+    name: "Công ty Cổ phần Hàng không VietJet"
+    english_name: "Vietjet Aviation Joint Stock Company"
+    sector: "Industrials"
+    industry: "Low-Cost Commercial Airline Carrier & Air Cargo"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "DAL"
+    founded_year: 2007
+    listing_year: 2017

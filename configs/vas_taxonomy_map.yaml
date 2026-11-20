@@ -1,0 +1,786 @@
+# ==============================================================================
+# Vietnamese Accounting Standards (VAS) Taxonomy Mapping
+# Legal Authorities:
+# 1. Circular 200/2014/TT-BTC: Ministry of Finance guidelines on Enterprise Accounting Regime
+# 2. Circular 49/2014/TT-NHNN & Decision 16/2007/QD-NHNN: State Bank of Vietnam Credit Institutions Regime
+# 3. Circular 125/2016/TT-BTC & Circular 334/2016/TT-BTC: Securities Companies Regime
+# 4. Circular 199/2014/TT-BTC: Insurance Enterprises Accounting Regime
+# ==============================================================================
+
+version: "1.0"
+market: "VN"
+description: "Authoritative VAS Taxonomy mapping, standard code dictionary, and metric alignment"
+
+# Standard validation constraints
+constraints:
+  allowed_units:
+    - "VND"
+    - "VND/shares"
+    - "%"
+  value_datatype: "DECIMAL(28, 2)"  # High-precision fixed-point to prevent IEEE-754 floating-point errors
+  accounting_equations:
+    corporate_balance_sheet:
+      formula: "total_assets == total_liabilities + stockholders_equity_total"
+      type: "soft_check"
+      tolerance_vnd: 1000000.0  # 1 million VND tolerance for rounding
+    corporate_gross_profit:
+      formula: "gross_profit == revenues - cost_of_goods_sold"
+      type: "arithmetic_check"
+    corporate_net_income:
+      formula: "net_income == profit_before_tax - income_tax_expense"
+      type: "arithmetic_check"
+    banking_net_interest_income:
+      formula: "net_interest_income == interest_income - interest_expense"
+      type: "arithmetic_check"
+
+# ==============================================================================
+# Comprehensive Standardized Financial Metrics Registry (VAS -> Canonical)
+# ==============================================================================
+metrics:
+
+  # ----------------------------------------------------------------------------
+  # SECTION 1: Corporate Income Statement (Circular 200/2014/TT-BTC Form B 02 - DN)
+  # ----------------------------------------------------------------------------
+  revenues:
+    display_name: "Doanh thu thuần về bán hàng và cung cấp dịch vụ"
+    english_name: "Net Revenue from Sales and Services"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "10"
+    formula: "Mã 01 - Mã 02"
+    description: "Doanh thu thuần sau khi trừ các khoản giảm trừ doanh thu (chiết khấu thương mại, giảm giá, hàng bán bị trả lại)."
+    synonyms:
+      - "doanh thu thuần"
+      - "doanh thu"
+      - "doanh số thuần"
+      - "tổng doanh thu"
+      - "net revenue"
+      - "sales"
+      - "net sales"
+      - "revenues"
+    data_sources:
+      tcbs_field: "revenue"
+      vietstock_field: "DoanhThuThuan"
+      vnstock_field: "doanh_thu_thuan"
+
+  cost_of_goods_sold:
+    display_name: "Giá vốn hàng bán"
+    english_name: "Cost of Goods Sold"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "11"
+    description: "Tổng chi phí sản xuất, giá vốn hàng hóa, dịch vụ đã tiêu thụ trong kỳ."
+    synonyms:
+      - "giá vốn hàng bán"
+      - "giá vốn"
+      - "chi phí giá vốn"
+      - "cost of goods sold"
+      - "cogs"
+    data_sources:
+      tcbs_field: "costOfGoodSold"
+      vietstock_field: "GiaVonHangBan"
+      vnstock_field: "gia_von_hang_ban"
+
+  gross_profit:
+    display_name: "Lợi nhuận gộp về bán hàng và cung cấp dịch vụ"
+    english_name: "Gross Profit"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "20"
+    formula: "Mã 10 - Mã 11"
+    description: "Chênh lệch giữa Doanh thu thuần và Giá vốn hàng bán."
+    synonyms:
+      - "lợi nhuận gộp"
+      - "lãi gộp"
+      - "gross profit"
+    data_sources:
+      tcbs_field: "grossProfit"
+      vietstock_field: "LoiNhuanGop"
+      vnstock_field: "loi_nhuan_gop"
+
+  financial_income:
+    display_name: "Doanh thu hoạt động tài chính"
+    english_name: "Financial Income"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "21"
+    description: "Tiền lãi, cổ tức, lợi nhuận được chia và doanh thu tài chính khác."
+    synonyms:
+      - "doanh thu hoạt động tài chính"
+      - "doanh thu tài chính"
+      - "financial income"
+
+  financial_expenses:
+    display_name: "Chi phí tài chính"
+    english_name: "Financial Expenses"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "22"
+    description: "Chi phí lãi vay, lỗ chênh lệch tỷ giá và chi phí tài chính khác."
+    synonyms:
+      - "chi phí tài chính"
+      - "financial expenses"
+
+  interest_expense:
+    display_name: "Chi phí lãi vay"
+    english_name: "Interest Expense"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "23"
+    description: "Chi phí lãi tiền vay phải trả phát sinh trong kỳ thuộc chi phí tài chính."
+    synonyms:
+      - "chi phí lãi vay"
+      - "lãi vay"
+      - "interest expense"
+
+  selling_expenses:
+    display_name: "Chi phí bán hàng"
+    english_name: "Selling Expenses"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "25"
+    description: "Chi phí phát sinh trong quá trình bán sản phẩm, hàng hóa, cung cấp dịch vụ."
+    synonyms:
+      - "chi phí bán hàng"
+      - "selling expenses"
+
+  administrative_expenses:
+    display_name: "Chi phí quản lý doanh nghiệp"
+    english_name: "General and Administrative Expenses"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "26"
+    description: "Toàn bộ chi phí liên quan đến quản lý chung của toàn doanh nghiệp."
+    synonyms:
+      - "chi phí quản lý doanh nghiệp"
+      - "chi phí quản lý"
+      - "chi phí QLDN"
+      - "administrative expenses"
+      - "g&a expenses"
+
+  operating_income:
+    display_name: "Lợi nhuận thuần từ hoạt động kinh doanh"
+    english_name: "Operating Income"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "30"
+    formula: "Mã 20 + Mã 21 - Mã 22 - Mã 25 - Mã 26"
+    description: "Hiệu quả hoạt động sản xuất kinh doanh chính của doanh nghiệp."
+    synonyms:
+      - "lợi nhuận thuần từ hoạt động kinh doanh"
+      - "lợi nhuận kinh doanh"
+      - "lợi nhuận hoạt động"
+      - "operating income"
+      - "operating profit"
+    data_sources:
+      tcbs_field: "operatingProfit"
+      vietstock_field: "LoiNhuanThuanTuHDKD"
+      vnstock_field: "loi_nhuan_thuan_tu_hdkd"
+
+  profit_before_tax:
+    display_name: "Tổng lợi nhuận kế toán trước thuế"
+    english_name: "Profit Before Tax (EBT)"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "50"
+    formula: "Mã 30 + Mã 40"
+    description: "Tổng lợi nhuận kế toán thực hiện trong kỳ trước khi tính thuế thu nhập doanh nghiệp."
+    synonyms:
+      - "lợi nhuận trước thuế"
+      - "lãi trước thuế"
+      - "tổng lợi nhuận trước thuế"
+      - "profit before tax"
+      - "ebt"
+    data_sources:
+      tcbs_field: "profitBeforeTax"
+      vietstock_field: "TongLoiNhuanTruocThue"
+      vnstock_field: "loi_nhuan_truoc_thue"
+
+  income_tax_expense:
+    display_name: "Chi phí thuế thu nhập doanh nghiệp"
+    english_name: "Income Tax Expense"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "51 + 52"
+    description: "Tổng chi phí thuế TNDN hiện hành (Mã 51) và chi phí thuế TNDN hoãn lại (Mã 52)."
+    synonyms:
+      - "chi phí thuế thu nhập doanh nghiệp"
+      - "chi phí thuế TNDN"
+      - "thuế thu nhập doanh nghiệp"
+      - "income tax expense"
+
+  net_income:
+    display_name: "Lợi nhuận sau thuế thu nhập doanh nghiệp"
+    english_name: "Net Income / Profit After Tax"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "60"
+    formula: "Mã 50 - Mã 51 - Mã 52"
+    description: "Tổng lợi nhuận sau thuế thu nhập doanh nghiệp thực hiện trong kỳ báo cáo."
+    synonyms:
+      - "lợi nhuận sau thuế"
+      - "lãi sau thuế"
+      - "lợi nhuận ròng"
+      - "LNST"
+      - "net income"
+      - "net profit"
+      - "profit after tax"
+      - "npat"
+    data_sources:
+      tcbs_field: "postTaxProfit"
+      vietstock_field: "LoiNhuanSauThue"
+      vnstock_field: "loi_nhuan_sau_thue"
+
+  net_income_parent:
+    display_name: "Lợi nhuận sau thuế của cổ đông công ty mẹ"
+    english_name: "Net Profit Attributable to Parent Company Shareholders"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "61"
+    description: "Phần lợi nhuận sau thuế thuộc về chủ sở hữu công ty mẹ trên báo cáo hợp nhất."
+    synonyms:
+      - "lợi nhuận sau thuế công ty mẹ"
+      - "LNST cổ đông công ty mẹ"
+      - "lãi ròng công ty mẹ"
+      - "net income to parent"
+    data_sources:
+      tcbs_field: "shareHolderIncome"
+      vietstock_field: "LNSTCuaCoDongCongTyMe"
+      vnstock_field: "lnst_co_dong_cong_ty_me"
+
+  eps_diluted:
+    display_name: "Lãi cơ bản / pha loãng trên cổ phiếu"
+    english_name: "Earnings Per Share (EPS / Diluted EPS)"
+    category: "income_statement"
+    period_type: "duration"
+    default_unit: "VND/shares"
+    storage_layer: "sql_gold"
+    vas_code: "70 / 71"
+    description: "Lãi cơ bản trên cổ phiếu (Mã 70) hoặc Lãi suy giảm trên cổ phiếu (Mã 71)."
+    synonyms:
+      - "lãi cơ bản trên cổ phiếu"
+      - "lãi suy giảm trên cổ phiếu"
+      - "thu nhập trên mỗi cổ phần"
+      - "eps"
+      - "eps diluted"
+      - "diluted eps"
+      - "earnings per share"
+    data_sources:
+      tcbs_field: "eps"
+      vietstock_field: "LaiCoBanTrenCoPhieu"
+      vnstock_field: "eps"
+
+  # ----------------------------------------------------------------------------
+  # SECTION 2: Corporate Balance Sheet (Circular 200/2014/TT-BTC Form B 01 - DN)
+  # ----------------------------------------------------------------------------
+  total_assets:
+    display_name: "Tổng cộng tài sản"
+    english_name: "Total Assets"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "270"
+    formula: "Mã 100 + Mã 200"
+    description: "Tổng giá trị tài sản hiện có của doanh nghiệp tại thời điểm lập báo cáo."
+    synonyms:
+      - "tổng tài sản"
+      - "tổng cộng tài sản"
+      - "quy mô tài sản"
+      - "total assets"
+    data_sources:
+      tcbs_field: "asset"
+      vietstock_field: "TongCongTaiSan"
+      vnstock_field: "tong_tai_san"
+
+  current_assets:
+    display_name: "Tài sản ngắn hạn"
+    english_name: "Current Assets"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "100"
+    description: "Tổng giá trị tiền, các khoản tương đương tiền, đầu tư tài chính ngắn hạn, phải thu và tồn kho."
+    synonyms:
+      - "tài sản ngắn hạn"
+      - "current assets"
+    data_sources:
+      tcbs_field: "shortAsset"
+      vietstock_field: "TaiSanNganHan"
+      vnstock_field: "tai_san_ngan_han"
+
+  cash_and_cash_equivalents:
+    display_name: "Tiền và các khoản tương đương tiền"
+    english_name: "Cash and Cash Equivalents"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "110"
+    description: "Tiền mặt, tiền gửi ngân hàng không kỳ hạn và các khoản đầu tư ngắn hạn có thời hạn thu hồi dưới 3 tháng."
+    synonyms:
+      - "tiền và tương đương tiền"
+      - "tiền mặt"
+      - "tiền và các khoản tương đương tiền"
+      - "cash and cash equivalents"
+    data_sources:
+      tcbs_field: "cash"
+      vietstock_field: "TienVaTuongDuongTien"
+      vnstock_field: "tien_va_tuong_duong_tien"
+
+  short_term_investments:
+    display_name: "Đầu tư tài chính ngắn hạn"
+    english_name: "Short-term Financial Investments"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "120"
+    description: "Tiền gửi ngân hàng có kỳ hạn và chứng khoán kinh doanh ngắn hạn."
+    synonyms:
+      - "đầu tư tài chính ngắn hạn"
+      - "tiền gửi có kỳ hạn"
+      - "short-term investments"
+
+  short_term_receivables:
+    display_name: "Các khoản phải thu ngắn hạn"
+    english_name: "Short-term Receivables"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "130"
+    description: "Phải thu của khách hàng, trả trước cho người bán và phải thu ngắn hạn khác."
+    synonyms:
+      - "phải thu ngắn hạn"
+      - "phải thu khách hàng"
+      - "receivables"
+
+  inventories:
+    display_name: "Hàng tồn kho"
+    english_name: "Inventories"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "140"
+    description: "Nguyên vật liệu, công cụ dụng cụ, chi phí SXKD dở dang, thành phẩm và hàng hóa."
+    synonyms:
+      - "hàng tồn kho"
+      - "tồn kho"
+      - "inventories"
+    data_sources:
+      tcbs_field: "inventory"
+      vietstock_field: "HangTonKho"
+      vnstock_field: "hang_ton_kho"
+
+  non_current_assets:
+    display_name: "Tài sản dài hạn"
+    english_name: "Non-current Assets"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "200"
+    description: "Tài sản cố định, bất động sản đầu tư, tài sản dở dang và đầu tư tài chính dài hạn."
+    synonyms:
+      - "tài sản dài hạn"
+      - "non-current assets"
+    data_sources:
+      tcbs_field: "longAsset"
+      vietstock_field: "TaiSanDaiHan"
+      vnstock_field: "tai_san_dai_han"
+
+  fixed_assets:
+    display_name: "Tài sản cố định"
+    english_name: "Fixed Assets"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "220"
+    description: "Tài sản cố định hữu hình, vô hình và thuê tài chính sau khi trừ hao mòn lũy kế."
+    synonyms:
+      - "tài sản cố định"
+      - "fixed assets"
+
+  total_liabilities:
+    display_name: "Nợ phải trả"
+    english_name: "Total Liabilities"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "300"
+    formula: "Mã 310 + Mã 330"
+    description: "Tổng các khoản nợ ngắn hạn và nợ dài hạn của doanh nghiệp."
+    synonyms:
+      - "nợ phải trả"
+      - "tổng nợ"
+      - "nợ"
+      - "liabilities"
+      - "total liabilities"
+    data_sources:
+      tcbs_field: "debt"
+      vietstock_field: "NoPhaiTra"
+      vnstock_field: "no_phai_tra"
+
+  current_liabilities:
+    display_name: "Nợ ngắn hạn"
+    english_name: "Current Liabilities"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "310"
+    description: "Các khoản nợ có thời hạn thanh toán dưới 1 năm hoặc trong một chu kỳ kinh doanh bình thường."
+    synonyms:
+      - "nợ ngắn hạn"
+      - "current liabilities"
+    data_sources:
+      tcbs_field: "shortDebt"
+      vietstock_field: "NoNganHan"
+      vnstock_field: "no_ngan_han"
+
+  non_current_liabilities:
+    display_name: "Nợ dài hạn"
+    english_name: "Non-current Liabilities"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "330"
+    description: "Các khoản nợ có thời hạn thanh toán trên 1 năm (vay nợ dài hạn, trái phiếu phát hành)."
+    synonyms:
+      - "nợ dài hạn"
+      - "long-term debt"
+      - "non-current liabilities"
+    data_sources:
+      tcbs_field: "longDebt"
+      vietstock_field: "NoDaiHan"
+      vnstock_field: "no_dai_han"
+
+  stockholders_equity_total:
+    display_name: "Vốn chủ sở hữu hợp nhất"
+    english_name: "Total Stockholders' Equity"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "400"
+    formula: "Mã 410 + Mã 430"
+    description: "Vốn đầu tư của chủ sở hữu, thặng dư vốn cổ phần, các quỹ và lợi nhuận chưa phân phối."
+    synonyms:
+      - "vốn chủ sở hữu"
+      - "vốn chủ"
+      - "vốn tự có"
+      - "tổng vốn chủ sở hữu"
+      - "equity"
+      - "stockholders equity"
+      - "stockholders equity total"
+    data_sources:
+      tcbs_field: "equity"
+      vietstock_field: "VonChuSoHuu"
+      vnstock_field: "von_chu_so_huu"
+
+  stockholders_equity_parent:
+    display_name: "Vốn chủ sở hữu thuộc cổ đông công ty mẹ"
+    english_name: "Stockholders' Equity Attributable to Parent Company"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "410"
+    description: "Phần vốn chủ sở hữu thuộc về các cổ đông của công ty mẹ (loại trừ lợi ích cổ đông không kiểm soát)."
+    synonyms:
+      - "vốn chủ sở hữu công ty mẹ"
+      - "vốn cổ đông công ty mẹ"
+      - "stockholders equity parent"
+
+  retained_earnings:
+    display_name: "Lợi nhuận sau thuế chưa phân phối"
+    english_name: "Undistributed Earnings / Retained Earnings"
+    category: "balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "421"
+    description: "Lợi nhuận sau thuế lũy kế chưa chia cho các cổ đông hoặc chưa chuyển vào các quỹ."
+    synonyms:
+      - "lợi nhuận chưa phân phối"
+      - "lợi nhuận sau thuế chưa phân phối"
+      - "retained earnings"
+      - "undistributed earnings"
+
+  # ----------------------------------------------------------------------------
+  # SECTION 3: Cash Flow Statement (Circular 200/2014/TT-BTC Form B 03 - DN)
+  # ----------------------------------------------------------------------------
+  operating_cash_flow:
+    display_name: "Lưu chuyển tiền thuần từ hoạt động kinh doanh"
+    english_name: "Net Cash Flow from Operating Activities"
+    category: "cash_flow"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "20"
+    description: "Dòng tiền thực thu và thực chi phát sinh từ hoạt động sản xuất kinh doanh chính."
+    synonyms:
+      - "dòng tiền từ hoạt động kinh doanh"
+      - "lưu chuyển tiền từ HĐKD"
+      - "operating cash flow"
+      - "cfo"
+    data_sources:
+      tcbs_field: "cashFlowFromBusinessActivities"
+      vietstock_field: "LuuChuyenTienThuanTuHoatDongKinhDoanh"
+      vnstock_field: "luu_chuyen_tien_tu_hdkd"
+
+  investing_cash_flow:
+    display_name: "Lưu chuyển tiền thuần từ hoạt động đầu tư"
+    english_name: "Net Cash Flow from Investing Activities"
+    category: "cash_flow"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "30"
+    description: "Dòng tiền thu chi liên quan đến mua sắm, thanh lý TSCĐ và đầu tư tài chính dài hạn."
+    synonyms:
+      - "dòng tiền từ hoạt động đầu tư"
+      - "lưu chuyển tiền từ HĐĐT"
+      - "investing cash flow"
+      - "cfi"
+
+  financing_cash_flow:
+    display_name: "Lưu chuyển tiền thuần từ hoạt động tài chính"
+    english_name: "Net Cash Flow from Financing Activities"
+    category: "cash_flow"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_code: "40"
+    description: "Dòng tiền tăng giảm vốn góp, tiền vay nhận được và trả nợ gốc vay, cổ tức đã trả."
+    synonyms:
+      - "dòng tiền từ hoạt động tài chính"
+      - "lưu chuyển tiền từ HĐTC"
+      - "financing cash flow"
+      - "cff"
+
+  # ----------------------------------------------------------------------------
+  # SECTION 4: Banking Financial Statements (Circular 49/2014/TT-NHNN)
+  # ----------------------------------------------------------------------------
+  interest_income:
+    display_name: "Thu nhập lãi và các khoản thu nhập tương tự"
+    english_name: "Interest and Similar Income"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "01"
+    description: "Tổng thu nhập từ cho vay khách hàng, tiền gửi tại các TCTD và đầu tư chứng khoán nợ."
+    synonyms:
+      - "thu nhập lãi"
+      - "thu nhập từ lãi"
+      - "interest income"
+
+  interest_expense_bank:
+    display_name: "Chi phí lãi và các chi phí tương tự"
+    english_name: "Interest and Similar Expenses"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "02"
+    description: "Chi phí trả lãi tiền gửi cho khách hàng, lãi tiền vay các TCTD và giấy tờ có giá."
+    synonyms:
+      - "chi phí lãi"
+      - "chi phí trả lãi"
+      - "interest expense"
+
+  net_interest_income:
+    display_name: "Thu nhập lãi thuần"
+    english_name: "Net Interest Income (NII)"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "03"
+    formula: "Mã 01 - Mã 02"
+    description: "Chênh lệch giữa thu nhập lãi và chi phí lãi - nguồn thu nhập cốt lõi của ngân hàng thương mại."
+    synonyms:
+      - "thu nhập lãi thuần"
+      - "lãi thuần"
+      - "net interest income"
+      - "nii"
+    data_sources:
+      tcbs_field: "netInterestIncome"
+      vietstock_field: "ThuNhapLaiThuan"
+      vnstock_field: "thu_nhap_lai_thuan"
+
+  net_fee_income:
+    display_name: "Lãi thuần từ hoạt động dịch vụ"
+    english_name: "Net Fee and Commission Income"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "06"
+    description: "Chênh lệch giữa thu nhập từ dịch vụ thanh toán, thẻ, bảo hiểm (bancassurance) và chi phí dịch vụ."
+    synonyms:
+      - "lãi thuần từ hoạt động dịch vụ"
+      - "thu nhập dịch vụ"
+      - "net fee income"
+
+  total_operating_income:
+    display_name: "Tổng thu nhập hoạt động (TOI)"
+    english_name: "Total Operating Income (TOI)"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "TOI"
+    formula: "Thu nhập lãi thuần + Thu nhập ngoài lãi"
+    description: "Tổng doanh thu hoạt động của ngân hàng trước chi phí hoạt động và chi phí dự phòng."
+    synonyms:
+      - "tổng thu nhập hoạt động"
+      - "toi"
+      - "total operating income"
+
+  provision_expense:
+    display_name: "Chi phí dự phòng rủi ro tín dụng"
+    english_name: "Provision Expenses for Credit Losses"
+    category: "banking_income_statement"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "11"
+    description: "Chi phí trích lập dự phòng rủi ro cho các khoản cho vay khách hàng suy giảm chất lượng."
+    synonyms:
+      - "chi phí dự phòng rủi ro tín dụng"
+      - "chi phí dự phòng"
+      - "trích lập dự phòng"
+      - "provision expense"
+      - "credit loss provision"
+
+  customer_loans:
+    display_name: "Cho vay khách hàng"
+    english_name: "Loans to Customers"
+    category: "banking_balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "ChoVayKhachHang"
+    description: "Tổng dư nợ cho vay các tổ chức kinh tế và cá nhân của ngân hàng tại thời điểm báo cáo."
+    synonyms:
+      - "cho vay khách hàng"
+      - "dư nợ cho vay"
+      - "dư nợ tín dụng"
+      - "customer loans"
+      - "loans to customers"
+    data_sources:
+      tcbs_field: "customerLoan"
+      vietstock_field: "ChoVayKhachHang"
+      vnstock_field: "cho_vay_khach_hang"
+
+  customer_deposits:
+    display_name: "Tiền gửi của khách hàng"
+    english_name: "Customer Deposits"
+    category: "banking_balance_sheet"
+    period_type: "instant"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    vas_bank_code: "TienGuiKhachHang"
+    description: "Tổng số dư tiền gửi có kỳ hạn, không kỳ hạn và tiền gửi thanh toán của khách hàng."
+    synonyms:
+      - "tiền gửi của khách hàng"
+      - "tiền gửi khách hàng"
+      - "tiền gửi"
+      - "customer deposits"
+      - "deposits"
+    data_sources:
+      tcbs_field: "customerDeposit"
+      vietstock_field: "TienGuiCuaKhachHang"
+      vnstock_field: "tien_gui_khach_hang"
+
+  # ----------------------------------------------------------------------------
+  # SECTION 5: Standard Financial Ratios (Analytical derived metrics)
+  # ----------------------------------------------------------------------------
+  gross_margin:
+    display_name: "Biên lợi nhuận gộp"
+    english_name: "Gross Margin"
+    category: "financial_ratios"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    formula: "(gross_profit / revenues) * 100"
+    synonyms:
+      - "biên lợi nhuận gộp"
+      - "biên lãi gộp"
+      - "gross margin"
+
+  operating_margin:
+    display_name: "Biên lợi nhuận thuần từ HĐKD"
+    english_name: "Operating Margin"
+    category: "financial_ratios"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    formula: "(operating_income / revenues) * 100"
+    synonyms:
+      - "biên lợi nhuận hoạt động"
+      - "biên lợi nhuận thuần"
+      - "operating margin"
+
+  net_margin:
+    display_name: "Biên lợi nhuận sau thuế"
+    english_name: "Net Profit Margin"
+    category: "financial_ratios"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    formula: "(net_income / revenues) * 100"
+    synonyms:
+      - "biên lợi nhuận sau thuế"
+      - "biên lợi nhuận ròng"
+      - "biên lãi ròng"
+      - "net margin"
+      - "net profit margin"
+
+  debt_to_equity:
+    display_name: "Tỷ lệ Nợ trên Vốn chủ sở hữu"
+    english_name: "Debt to Equity Ratio"
+    category: "financial_ratios"
+    period_type: "instant"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    formula: "(total_liabilities / stockholders_equity_total) * 100"
+    synonyms:
+      - "tỷ lệ nợ trên vốn chủ sở hữu"
+      - "tỷ lệ nợ / vốn chủ"
+      - "debt to equity"
+      - "d/e"
