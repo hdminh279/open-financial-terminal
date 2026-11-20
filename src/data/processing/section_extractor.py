@@ -109,8 +109,46 @@ CANONICAL_10Q_ITEMS: Dict[str, Dict[str, str]] = {
     },
 }
 
+CANONICAL_20F_ITEMS: Dict[str, str] = {
+    # Part I: Operating & Business Information
+    "ITEM 1": "Identity of Directors, Senior Management and Advisers",
+    "ITEM 2": "Offer Statistics and Expected Timetable",
+    "ITEM 3": "Key Information",
+    "ITEM 3D": "Risk Factors",
+    "ITEM 4": "Information on the Company",
+    "ITEM 4A": "Unresolved Staff Comments",
+    "ITEM 5": "Operating and Financial Review and Prospects",
+    "ITEM 6": "Directors, Senior Management and Employees",
+    "ITEM 7": "Major Shareholders and Related Party Transactions",
+    "ITEM 8": "Financial Information",
+    "ITEM 9": "The Offer and Listing",
+    "ITEM 10": "Additional Information",
+    "ITEM 11": "Quantitative and Qualitative Disclosures About Market Risk",
+    "ITEM 12": "Description of Securities Other than Equity Securities",
+    # Part II: Governance & Controls
+    "ITEM 13": "Defaults, Dividend Arrearages and Delinquencies",
+    "ITEM 14": "Material Modifications to the Rights of Security Holders and Use of Proceeds",
+    "ITEM 15": "Controls and Procedures",
+    "ITEM 16": "Reserved",
+    "ITEM 16A": "Audit Committee Financial Expert",
+    "ITEM 16B": "Code of Ethics",
+    "ITEM 16C": "Principal Accountant Fees and Services",
+    "ITEM 16D": "Exemptions from the Listing Standards for Audit Committees",
+    "ITEM 16E": "Purchases of Equity Securities by the Issuer and Affiliated Purchasers",
+    "ITEM 16F": "Change in Registrant's Certifying Accountant",
+    "ITEM 16G": "Corporate Governance",
+    "ITEM 16H": "Mine Safety Disclosure",
+    "ITEM 16I": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+    "ITEM 16J": "Insider Trading Policies",
+    "ITEM 16K": "Cybersecurity",
+    # Part III: Financial Statements & Exhibits
+    "ITEM 17": "Financial Statements",
+    "ITEM 18": "Financial Statements",
+    "ITEM 19": "Exhibits",
+}
+
 PART_REGEX = re.compile(r"^\s*PART\s+([IVX]+)\b", re.IGNORECASE)
-ITEM_REGEX = re.compile(r"^\s*ITEM\s+([0-9]{1,2}[A-Z]?)[.\s–—\-]*(.*?)$", re.IGNORECASE)
+ITEM_REGEX = re.compile(r"^\s*ITEM\s+([0-9]{1,2}\.[A-Z0-9]+|[0-9]{1,2}[A-Z]?)[.\s–—\-]*(.*?)$", re.IGNORECASE)
 EXECUTIVE_OFFICERS_REGEX = re.compile(
     r"(?:INFORMATION\s+ABOUT\s+(?:OUR\s+)?EXECUTIVE\s+OFFICERS|EXECUTIVE\s+OFFICERS\s+OF\s+THE\s+REGISTRANT)",
     re.IGNORECASE,
@@ -161,7 +199,8 @@ class HTMLSectionExtractor:
             text = self._normalize_text(a.get_text(" ", strip=True))
             m_item = ITEM_REGEX.match(text)
             if m_item:
-                item_key = f"ITEM {m_item.group(1).upper()}"
+                raw_num = m_item.group(1).upper().replace(".", "")
+                item_key = f"ITEM {raw_num}"
                 anchor_map[item_key] = target_id
                 parent = a.find_parent(["table", "div"])
                 if parent:
@@ -174,7 +213,7 @@ class HTMLSectionExtractor:
 
         for table in soup.find_all("table"):
             table_text = self._normalize_text(table.get_text(" ", strip=True))
-            matches = re.findall(r"\bItem\s+[0-9]{1,2}[A-Z]?", table_text, re.IGNORECASE)
+            matches = re.findall(r"\bItem\s+[0-9]{1,2}(?:\.[A-Z0-9]+|[A-Z])?", table_text, re.IGNORECASE)
             if len(matches) >= 3:
                 toc_elements.add(table)
 
@@ -349,9 +388,12 @@ class HTMLSectionExtractor:
 
             m_item = ITEM_REGEX.match(text)
             m_exec = EXECUTIVE_OFFICERS_REGEX.search(text)
+            is_financial_item = current_section and any(
+                k in current_section.item for k in ("ITEM 8", "ITEM 17", "ITEM 18", "NOTE")
+            )
             note_info = (
                 self._is_note_heading(block, text)
-                if (current_section and ("ITEM 8" in current_section.item or "ITEM_8_NOTE" in current_section.item))
+                if is_financial_item
                 else None
             )
 
@@ -361,11 +403,13 @@ class HTMLSectionExtractor:
             is_standard = True
 
             if m_item:
-                raw_num = m_item.group(1).upper()
+                raw_num = m_item.group(1).upper().replace(".", "")
                 item_key = f"ITEM {raw_num}"
                 is_new_section = True
                 if "10-K" in form.upper():
                     title = CANONICAL_10K_ITEMS.get(item_key, m_item.group(2).strip() or item_key)
+                elif "20-F" in form.upper():
+                    title = CANONICAL_20F_ITEMS.get(item_key, m_item.group(2).strip() or item_key)
                 else:
                     if item_key in CANONICAL_10Q_ITEMS["PART II"] and item_key not in CANONICAL_10Q_ITEMS.get(current_part or "PART I", {}):
                         current_part = "PART II"
@@ -413,8 +457,23 @@ class HTMLSectionExtractor:
         found_items = {s.item for s in sections}
         unidentified: List[str] = []
 
-        if form.upper() == "10-K":
+        if "10-K" in form.upper():
             for exp_item, exp_title in CANONICAL_10K_ITEMS.items():
+                if exp_item not in found_items:
+                    sections.append(
+                        ExtractedSection(
+                            part=None,
+                            item=exp_item,
+                            title=exp_title,
+                            status=SectionStatus.NOT_FOUND,
+                            is_standard=True,
+                            nodes=[],
+                            raw_text="",
+                        )
+                    )
+                    unidentified.append(exp_item)
+        elif "20-F" in form.upper():
+            for exp_item, exp_title in CANONICAL_20F_ITEMS.items():
                 if exp_item not in found_items:
                     sections.append(
                         ExtractedSection(

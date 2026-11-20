@@ -299,6 +299,7 @@ class FilingsTextPipeline:
                         "filings_count": 0,
                         "10K_count": 0,
                         "10Q_count": 0,
+                        "20F_count": 0,
                         "total_sections": 0,
                         "total_tables": 0,
                         "total_chunks": 0,
@@ -307,8 +308,11 @@ class FilingsTextPipeline:
 
                 stat = company_stats[ticker]
                 stat["filings_count"] += 1
-                if summary["form"] == "10-K":
+                form_upper = summary["form"].upper()
+                if "10-K" in form_upper:
                     stat["10K_count"] += 1
+                elif "20-F" in form_upper:
+                    stat["20F_count"] += 1
                 else:
                     stat["10Q_count"] += 1
                 stat["total_sections"] += summary["sections_extracted"]

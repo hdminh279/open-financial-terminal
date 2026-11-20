@@ -229,7 +229,7 @@ def run_ingest(args: argparse.Namespace) -> int:
         return 1
 
     effective_limit = None if (getattr(args, "no_limit", False) or args.limit == 0) else args.limit
-    forms = getattr(args, "forms", ["10-K", "10-Q", "10-K/A", "10-Q/A"])
+    forms = getattr(args, "forms", ["10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A"])
     min_year = getattr(args, "min_year", 2009)
 
     rate_limiter = RateLimiter(requests_per_second=10.0)
