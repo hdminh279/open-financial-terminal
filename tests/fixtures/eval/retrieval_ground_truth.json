@@ -1,0 +1,489 @@
+[
+  {
+    "id": "Q01",
+    "query": "Apple Vision Pro spatial computer operating system and spatial computing hardware",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "Vision Pro",
+      "spatial computer",
+      "visionOS"
+    ],
+    "ground_truth_excerpt": "Apple Vision Pro\u2122 is the Company\u2019s first spatial computer based on its visionOS\u2122 operating system."
+  },
+  {
+    "id": "Q02",
+    "query": "Apple Intelligence personal intelligence system using generative models",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 7"
+    ],
+    "expected_keywords": [
+      "Apple Intelligence",
+      "generative models"
+    ],
+    "ground_truth_excerpt": "Apple Intelligence\u2122, a personal intelligence system that uses generative models."
+  },
+  {
+    "id": "Q03",
+    "query": "Apple foreign exchange rate risk exposure from net receiver of foreign currencies",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 7A",
+    "expected_keywords": [
+      "net receiver",
+      "foreign exchange rate risk",
+      "currencies"
+    ],
+    "ground_truth_excerpt": "The Company\u2019s exposure to foreign exchange rate risk relates primarily to the Company being a net receiver of currencies other than the U.S. dollar."
+  },
+  {
+    "id": "Q04",
+    "query": "Apple geographic reportable segments in Americas Europe Greater China and Japan",
+    "category": "table_structured",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 7",
+      "ITEM 8"
+    ],
+    "expected_keywords": [
+      "Americas",
+      "Europe",
+      "Greater China",
+      "Japan"
+    ],
+    "ground_truth_excerpt": "The Company\u2019s reportable segments consist of the Americas, Europe, Greater China, Japan and Rest of Asia Pacific."
+  },
+  {
+    "id": "Q05",
+    "query": "Apple supply chain reliance on single-source outsourcing partners for components and assembly",
+    "category": "conceptual_semantic",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1A",
+    "expected_keywords": [
+      "single-source",
+      "outsourcing partners",
+      "components"
+    ],
+    "ground_truth_excerpt": "The Company relies on single-source outsourcing partners in the U.S., Asia and Europe to supply and manufacture many components..."
+  },
+  {
+    "id": "Q06",
+    "query": "Apple Research and Development engineering focus and rapid technological advances",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "Research and Development",
+      "technological advances"
+    ],
+    "ground_truth_excerpt": "Research and Development. Because the industries in which the Company competes are characterized by rapid technological advances..."
+  },
+  {
+    "id": "Q07",
+    "query": "Apple Board of Directors and Audit Committee oversight of cybersecurity risks",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1C",
+    "expected_keywords": [
+      "Audit Committee",
+      "cybersecurity",
+      "Board"
+    ],
+    "ground_truth_excerpt": "The Audit Committee assists the Board in the oversight and monitoring of cybersecurity matters."
+  },
+  {
+    "id": "Q08",
+    "query": "Apple Services net sales from App Store advertising and cloud services in quarterly report",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-Q"
+    },
+    "expected_item": "ITEM 2",
+    "expected_keywords": [
+      "Services net sales",
+      "App Store",
+      "cloud services"
+    ],
+    "ground_truth_excerpt": "Services net sales increased during the third quarter and first nine months of 2025 compared to the same periods in 2024 due primarily to higher net sales from advertising, the App Store and cloud services."
+  },
+  {
+    "id": "Q09",
+    "query": "Microsoft long-term partnership with OpenAI as exclusive cloud provider for Azure workloads",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "OpenAI",
+      "exclusive cloud provider",
+      "Azure"
+    ],
+    "ground_truth_excerpt": "As OpenAI\u2019s exclusive cloud provider, Azure powers all of OpenAI's workloads."
+  },
+  {
+    "id": "Q10",
+    "query": "Microsoft AI transformation offerings Copilot and Copilot stack",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "Copilot",
+      "Copilot stack",
+      "AI transformation"
+    ],
+    "ground_truth_excerpt": "Microsoft's AI offerings, including Copilot and our Copilot stack, are already orchestrating a new era of AI transformation..."
+  },
+  {
+    "id": "Q11",
+    "query": "Microsoft acquisition of Activision Blizzard and interactive entertainment content publisher",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 8"
+    ],
+    "expected_keywords": [
+      "Activision Blizzard",
+      "October 2023"
+    ],
+    "ground_truth_excerpt": "Activision Blizzard, Inc. (\u201cActivision Blizzard\u201d), a leader in game development and an interactive entertainment content publisher, joined Microsoft in October 2023."
+  },
+  {
+    "id": "Q12",
+    "query": "Microsoft Productivity and Business Processes segment products Office Commercial Exchange and Teams",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 7"
+    ],
+    "expected_keywords": [
+      "Productivity and Business Processes",
+      "Office Commercial",
+      "Teams"
+    ],
+    "ground_truth_excerpt": "Productivity and Business Processes segment consists of products and services in our portfolio of productivity, communication, and information services..."
+  },
+  {
+    "id": "Q13",
+    "query": "Microsoft Intelligent Cloud segment public private and hybrid server products and cloud services",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 7"
+    ],
+    "expected_keywords": [
+      "Intelligent Cloud",
+      "server products",
+      "cloud services"
+    ],
+    "ground_truth_excerpt": "Intelligent Cloud segment consists of our public, private, and hybrid server products and cloud services that can power modern business and developers."
+  },
+  {
+    "id": "Q14",
+    "query": "Microsoft More Personal Computing segment Windows Gaming and Devices",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 7"
+    ],
+    "expected_keywords": [
+      "More Personal Computing",
+      "Windows"
+    ],
+    "ground_truth_excerpt": "More Personal Computing segment consists of products and services that put customers at the center of the experience with our technology. This segment primarily comprises: Windows..."
+  },
+  {
+    "id": "Q15",
+    "query": "Microsoft Azure and other cloud services AI consumption-based services and GitHub in Form 10-Q",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-Q"
+    },
+    "expected_item": "ITEM 2",
+    "expected_keywords": [
+      "Azure and other cloud services",
+      "GitHub cloud services"
+    ],
+    "ground_truth_excerpt": "services, including Azure and other cloud services, comprising cloud and AI consumption-based services, GitHub cloud services, Nuance Healthcare cloud services..."
+  },
+  {
+    "id": "Q16",
+    "query": "Microsoft purchase price allocation and goodwill for Activision Blizzard acquisition in financial notes",
+    "category": "table_structured",
+    "filter": {
+      "ticker": "MSFT",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 8",
+    "expected_keywords": [
+      "Activision Blizzard",
+      "purchase price",
+      "goodwill"
+    ],
+    "ground_truth_excerpt": "On January 18, 2022, we entered into a definitive agreement to acquire Activision Blizzard, Inc. for 5.00 per share in an all-cash transaction valued at 8.7 billion, inclusive of Activision Blizzard's net cash..."
+  },
+  {
+    "id": "Q17",
+    "query": "Google multimodal general model Gemini launched in December 2023",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "Gemini",
+      "multimodal",
+      "December 2023"
+    ],
+    "ground_truth_excerpt": "In December 2023, we launched Gemini, our most capable and general model. It was built from the ground up to be multimodal..."
+  },
+  {
+    "id": "Q18",
+    "query": "Alphabet reporting segments Google Services Google Cloud and non-Google Other Bets",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1",
+      "ITEM 7",
+      "ITEM 8"
+    ],
+    "expected_keywords": [
+      "Google Services",
+      "Google Cloud",
+      "Other Bets"
+    ],
+    "ground_truth_excerpt": "We report Google in two segments, Google Services and Google Cloud, and all non-Google businesses collectively as Other Bets."
+  },
+  {
+    "id": "Q19",
+    "query": "Alphabet Other Bets operating segments healthcare services and internet services",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 1",
+    "expected_keywords": [
+      "Other Bets",
+      "healthcare-related",
+      "operating segments"
+    ],
+    "ground_truth_excerpt": "Other Bets is a combination of multiple operating segments that are not individually material. Revenues from Other Bets are generated primarily from the sale of healthcare-related services and internet services."
+  },
+  {
+    "id": "Q20",
+    "query": "Google jury verdict in Epic Games v Google finding antitrust billing violations",
+    "category": "conceptual_semantic",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": [
+      "ITEM 1A",
+      "ITEM 8"
+    ],
+    "expected_keywords": [
+      "Epic Games",
+      "antitrust",
+      "Google Play"
+    ],
+    "ground_truth_excerpt": "In December 2023, a California jury delivered a verdict in Epic Games v. Google finding that Google violated antitrust laws related to Google Play's billing practices."
+  },
+  {
+    "id": "Q21",
+    "query": "Google Cloud operating income growth from prior year operating loss",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 7",
+    "expected_keywords": [
+      "Google Cloud operating income",
+      "operating loss"
+    ],
+    "ground_truth_excerpt": "Google Cloud operating income of .7 billion for 2023 compared to an operating loss of .9 billion for 2022 represents an increase of .6 billion."
+  },
+  {
+    "id": "Q22",
+    "query": "Google advertising revenues from Google Search and other properties YouTube ads and Google Network",
+    "category": "table_structured",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-K"
+    },
+    "expected_item": "ITEM 7",
+    "expected_keywords": [
+      "Google Search & other",
+      "YouTube",
+      "Google Network"
+    ],
+    "ground_truth_excerpt": "advertising that appears on Google Search & other properties, YouTube, and Google Network partners' properties..."
+  },
+  {
+    "id": "Q23",
+    "query": "Google Cloud revenues from Google Cloud Platform GCP infrastructure and Google Workspace in Form 10-Q",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-Q"
+    },
+    "expected_item": "ITEM 2",
+    "expected_keywords": [
+      "Google Cloud revenues",
+      "Google Cloud Platform",
+      "infrastructure"
+    ],
+    "ground_truth_excerpt": "Google Cloud revenues are comprised of the following: \u2022 Google Cloud Platform, which generates consumption-based fees and subscriptions for infrastructure, platform, and other services..."
+  },
+  {
+    "id": "Q24",
+    "query": "Google advertising revenue breakdown YouTube ads and Google Search in quarterly Form 10-Q",
+    "category": "table_structured",
+    "filter": {
+      "ticker": "GOOGL",
+      "form": "10-Q"
+    },
+    "expected_item": "ITEM 2",
+    "expected_keywords": [
+      "Google Search & other",
+      "YouTube ads",
+      "Google Network"
+    ],
+    "ground_truth_excerpt": "Google Search & other, YouTube ads, Google Network, Google advertising, Google subscriptions, platforms, and devices..."
+  },
+  {
+    "id": "Q25",
+    "query": "Apple iPhone net sales growth driven by Pro models in Form 10-Q quarterly report",
+    "category": "fact_lookup",
+    "filter": {
+      "ticker": "AAPL",
+      "form": "10-Q"
+    },
+    "expected_item": "ITEM 2",
+    "expected_keywords": [
+      "iPhone net sales",
+      "Pro models"
+    ],
+    "ground_truth_excerpt": "iPhone net sales increased during the third quarter and first nine months of 2025 compared to the same periods in 2024 due to higher net sales of Pro models."
+  },
+  {
+    "id": "Q26",
+    "query": "Apple internal corporate employee Slack messages regarding executive performance review",
+    "category": "negative_out_of_scope",
+    "filter": {
+      "ticker": "AAPL"
+    },
+    "expected_item": "NOT_FOUND",
+    "expected_keywords": [
+      "internal Slack messages",
+      "executive review"
+    ],
+    "ground_truth_excerpt": "NONE - Deliberately out-of-scope internal communication not filed in SEC EDGAR."
+  },
+  {
+    "id": "Q27",
+    "query": "Microsoft secret acquisition of commercial nuclear fusion power reactors in 1998",
+    "category": "negative_out_of_scope",
+    "filter": {
+      "ticker": "MSFT"
+    },
+    "expected_item": "NOT_FOUND",
+    "expected_keywords": [
+      "nuclear fusion reactors",
+      "secret acquisition"
+    ],
+    "ground_truth_excerpt": "NONE - Non-existent fictitious transaction to test hallucination resistance."
+  },
+  {
+    "id": "Q28",
+    "query": "Alphabet confidential astronaut training contracts for manned Mars mission with NASA",
+    "category": "negative_out_of_scope",
+    "filter": {
+      "ticker": "GOOGL"
+    },
+    "expected_item": "NOT_FOUND",
+    "expected_keywords": [
+      "astronaut training",
+      "Mars mission NASA"
+    ],
+    "ground_truth_excerpt": "NONE - Non-existent fictitious aerospace contract."
+  },
+  {
+    "id": "Q29",
+    "query": "Historical quarterly production quotas for Tesla electric vehicle factories in 2015",
+    "category": "negative_out_of_scope",
+    "filter": {
+      "ticker": "AAPL"
+    },
+    "expected_item": "NOT_FOUND",
+    "expected_keywords": [
+      "Tesla production quotas 2015"
+    ],
+    "ground_truth_excerpt": "NONE - Cross-entity irrelevant question targeting Tesla in an Apple filing."
+  },
+  {
+    "id": "Q30",
+    "query": "Microsoft commercial contracts for military manned submarine manufacturing",
+    "category": "negative_out_of_scope",
+    "filter": {
+      "ticker": "MSFT"
+    },
+    "expected_item": "NOT_FOUND",
+    "expected_keywords": [
+      "military manned submarine manufacturing"
+    ],
+    "ground_truth_excerpt": "NONE - Non-existent military manufacturing contracts."
+  }
+]

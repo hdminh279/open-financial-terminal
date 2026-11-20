@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: sec_silver
+    description: "Cleansed SEC EDGAR XBRL fact observations stored in MinIO Silver bucket."
+    tables:
+      - name: facts
+        description: "Standardized GAAP fact observations across AAPL, MSFT, and GOOGL."
+        meta:
+          external_location: "s3://sec-silver/facts/facts.parquet"

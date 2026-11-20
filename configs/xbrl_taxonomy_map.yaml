@@ -1,0 +1,1036 @@
+version: "4.0"
+description: "Comprehensive US-GAAP Taxonomy mapping, Financial Metric Registry, and Semantic Validation rules"
+
+# Standard validation constraints
+constraints:
+  allowed_units:
+    - "USD"
+    - "USD/shares"
+    - "EUR"
+    - "EUR/shares"
+    - "TWD"
+    - "TWD/shares"
+    - "INR"
+    - "INR/shares"
+    - "GBP"
+    - "GBP/shares"
+    - "JPY"
+    - "JPY/shares"
+  null_allowed_metrics:
+    - "gross_profit"  # Alphabet (GOOGL) does not report Gross Profit (TAC-based model); must remain NULL, never 0
+  value_datatype: "DECIMAL(28, 2)"  # High-precision fixed point, avoids IEEE-754 floating-point errors
+  accounting_equations:
+    balance_sheet:
+      formula: "total_assets == total_liabilities + stockholders_equity_total"
+      type: "soft_check"  # Audit warning only; never drops records due to mezzanine equity or rounding
+      tolerance_usd: 1000.0
+
+# Period duration classification thresholds (evaluates duration_days without overriding SEC official fy/fp)
+duration_rules:
+  discrete_quarter:
+    min_days: 80
+    max_days: 105
+    description: "Discrete ~3-month single quarter period reported in Form 10-Q"
+  cumulative_6m:
+    min_days: 160
+    max_days: 200
+    description: "Cumulative ~6-month Year-To-Date period reported in Q2 Form 10-Q"
+  cumulative_9m:
+    min_days: 250
+    max_days: 295
+    description: "Cumulative ~9-month Year-To-Date period reported in Q3 Form 10-Q"
+  annual_12m:
+    min_days: 350
+    max_days: 375
+    description: "Full fiscal year ~12-month period reported in Form 10-K"
+  instant:
+    min_days: 0
+    max_days: 0
+    description: "Point-in-time balance sheet snapshot where start_date is null"
+
+# ==============================================================================
+# Comprehensive Standardized Financial Metrics Registry (SSOT)
+# ==============================================================================
+metrics:
+
+  # ----------------------------------------------------------------------------
+  # SECTION 1: Income Statement (GAAP Core Metrics - sql_gold)
+  # ----------------------------------------------------------------------------
+  revenues:
+    display_name: "Total Revenues"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total recognized consolidated revenue from sales of goods and services."
+    synonyms:
+      - "revenue"
+      - "revenues"
+      - "total revenue"
+      - "total revenues"
+      - "sales"
+      - "net sales"
+      - "doanh thu"
+      - "tổng doanh thu"
+      - "doanh số"
+      - "doanh thu thuần"
+    rules:
+      - entity_ciks: ["0001652044"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Revenues"
+        priority: 1
+        regime: "Alphabet Standard"
+        description: "Primary revenue tag continuously reported by Alphabet (GOOGL)."
+      - entity_ciks: ["0000320193", "0000789019"]
+        effective_start_fy: 2018
+        effective_end_fy: null
+        tag: "RevenueFromContractWithCustomerExcludingAssessedTax"
+        priority: 1
+        regime: "ASC 606"
+        description: "Standard revenue from contracts with customers under ASC 606 since FY2018."
+      - entity_ciks: ["0000320193", "0000789019"]
+        effective_start_fy: null
+        effective_end_fy: 2017
+        tag: "SalesRevenueNet"
+        priority: 1
+        regime: "ASC 605 Legacy"
+        description: "Net sales revenue tag predominantly used before ASC 606 adoption."
+      - entity_ciks: ["*"]
+        effective_start_fy: 2018
+        effective_end_fy: null
+        tag: "RevenueFromContractWithCustomerExcludingAssessedTax"
+        priority: 1
+        regime: "ASC 606 Global"
+        description: "Global fallback under ASC 606."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Revenues"
+        priority: 2
+        regime: "General Fallback"
+        description: "Broad general revenue tag fallback."
+
+  operating_income:
+    display_name: "Operating Income (EBIT)"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Operating income or loss before interest, taxes, and non-operating items (EBIT equivalent)."
+    synonyms:
+      - "operating income"
+      - "operating profit"
+      - "ebit"
+      - "income from operations"
+      - "lợi nhuận hoạt động"
+      - "lợi nhuận từ hoạt động kinh doanh"
+      - "lãi hoạt động"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "OperatingIncomeLoss"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Operating income or loss before non-operating items, interest, and taxes."
+
+  net_income:
+    display_name: "Net Income (Loss)"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Consolidated bottom-line net profit or loss attributable to the parent entity shareholders."
+    synonyms:
+      - "net income"
+      - "net profit"
+      - "net earnings"
+      - "bottom line"
+      - "profit"
+      - "lợi nhuận ròng"
+      - "lợi nhuận sau thuế"
+      - "lãi ròng"
+      - "thu nhập thuần"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "NetIncomeLoss"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Consolidated net income or loss attributable to the parent entity common shareholders."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "ProfitLoss"
+        priority: 2
+        regime: "US-GAAP"
+        description: "Consolidated profit or loss including noncontrolling interests (fallback)."
+
+  gross_profit:
+    display_name: "Gross Profit"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Revenues minus Cost of Goods Sold. Nullable: not reported by Alphabet (GOOGL)."
+    synonyms:
+      - "gross profit"
+      - "gross income"
+      - "lợi nhuận gộp"
+      - "lãi gộp"
+    rules:
+      - entity_ciks: ["0000320193", "0000789019", "*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "GrossProfit"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Revenues minus Cost of Goods Sold. Nullable: not reported by Alphabet (GOOGL)."
+
+  research_and_development:
+    display_name: "Research and Development Expense"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Costs incurred to develop new products, services, or software features prior to commercial availability."
+    synonyms:
+      - "research and development"
+      - "r&d"
+      - "r and d"
+      - "r&d expense"
+      - "r&d expenses"
+      - "chi phí r&d"
+      - "chi phí nghiên cứu"
+      - "chi phí nghiên cứu và phát triển"
+      - "chi phí nghiên cứu phát triển"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "ResearchAndDevelopmentExpense"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Standard US-GAAP expense tag for Research and Development."
+
+  selling_general_and_admin:
+    display_name: "Selling, General and Administrative Expense (SG&A)"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Aggregate selling, marketing, customer support, legal, administrative, and executive overhead expenses."
+    synonyms:
+      - "sg&a"
+      - "selling general and administrative"
+      - "selling, general and administrative"
+      - "chi phí sg&a"
+      - "chi phí bán hàng và quản lý"
+      - "chi phí bán hàng và quản lý doanh nghiệp"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "SellingGeneralAndAdministrativeExpense"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Standard US-GAAP tag for SG&A operating expenses."
+
+  total_operating_expenses:
+    display_name: "Total Operating Expenses"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total direct and indirect operating costs incurred in running business operations (excluding COGS)."
+    synonyms:
+      - "operating expenses"
+      - "total operating expenses"
+      - "opex"
+      - "chi phí hoạt động"
+      - "tổng chi phí hoạt động"
+      - "chi phí kinh doanh"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "OperatingExpenses"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Standard US-GAAP tag for total operating expenses."
+
+  eps_diluted:
+    display_name: "Diluted Earnings Per Share"
+    category: "income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD/shares"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Net income per share assuming all dilutive convertible securities, stock options, and warrants are exercised."
+    synonyms:
+      - "eps"
+      - "diluted eps"
+      - "diluted earnings per share"
+      - "eps pha loãng"
+      - "thu nhập pha loãng trên cổ phiếu"
+      - "lãi cơ bản pha loãng"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "EarningsPerShareDiluted"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Diluted earnings per share based on weighted-average shares outstanding."
+
+  # ----------------------------------------------------------------------------
+  # SECTION 2: Balance Sheet (GAAP Core Metrics - sql_gold)
+  # ----------------------------------------------------------------------------
+  total_assets:
+    display_name: "Total Assets"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total economic resources owned or controlled by the enterprise at the reporting balance sheet date."
+    synonyms:
+      - "total assets"
+      - "assets"
+      - "tổng tài sản"
+      - "tài sản"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Assets"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Total economic resources owned or controlled by the entity at snapshot date (start_date is null)."
+
+  total_liabilities:
+    display_name: "Total Liabilities"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total aggregate financial obligations, debts, and payables owed to creditors and vendors."
+    synonyms:
+      - "total liabilities"
+      - "liabilities"
+      - "debt"
+      - "tổng nợ"
+      - "tổng nợ phải trả"
+      - "nợ phải trả"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Liabilities"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Total aggregate financial obligations and debt owed by the entity at snapshot date."
+
+  stockholders_equity_total:
+    display_name: "Total Stockholders' Equity"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total consolidated residual interest in assets after deducting liabilities, including noncontrolling interest."
+    synonyms:
+      - "stockholders equity"
+      - "shareholders equity"
+      - "total equity"
+      - "equity"
+      - "vốn chủ sở hữu"
+      - "tổng vốn chủ sở hữu"
+      - "nguồn vốn chủ sở hữu"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Total consolidated stockholders' equity including noncontrolling interests."
+
+  stockholders_equity_parent:
+    display_name: "Stockholders' Equity (Parent Entity)"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Equity interest attributable solely to parent company stockholders (excludes noncontrolling interests)."
+    synonyms:
+      - "stockholders equity parent"
+      - "parent equity"
+      - "vốn chủ sở hữu công ty mẹ"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "StockholdersEquity"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Equity interest attributable solely to parent company stockholders. Excludes noncontrolling interests."
+
+  cash_and_cash_equivalents:
+    display_name: "Cash and Cash Equivalents"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Currency on hand, demand deposits, and highly liquid short-term marketable investments."
+    synonyms:
+      - "cash"
+      - "cash and cash equivalents"
+      - "tiền mặt"
+      - "tiền và tương đương tiền"
+      - "tiền và các khoản tương đương tiền"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "CashAndCashEquivalentsAtCarryingValue"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Cash and highly liquid marketable deposits at carrying value."
+
+  current_assets:
+    display_name: "Total Current Assets"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Liquid resources expected to be converted to cash, sold, or consumed within one fiscal year."
+    synonyms:
+      - "current assets"
+      - "tài sản ngắn hạn"
+      - "tổng tài sản ngắn hạn"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "AssetsCurrent"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Total economic resources expected to be realized within one year or one operating cycle."
+
+  current_liabilities:
+    display_name: "Total Current Liabilities"
+    category: "balance_sheet"
+    classification: "gaap"
+    period_type: "instant"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Financial obligations and debts due to be settled within one fiscal year."
+    synonyms:
+      - "current liabilities"
+      - "nợ ngắn hạn"
+      - "nợ phải trả ngắn hạn"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "LiabilitiesCurrent"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Total obligations due within one year or one operating cycle."
+
+  # ----------------------------------------------------------------------------
+  # SECTION 3: Cash Flow Statement (GAAP Core Metrics - sql_gold)
+  # ----------------------------------------------------------------------------
+  operating_cash_flow:
+    display_name: "Operating Cash Flow"
+    category: "cash_flow"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Net cash generated from or used in normal core operational business activities."
+    synonyms:
+      - "operating cash flow"
+      - "cash from operations"
+      - "cfo"
+      - "dòng tiền từ hoạt động kinh doanh"
+      - "lưu chuyển tiền tệ từ hoạt động kinh doanh"
+      - "dòng tiền hoạt động"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "NetCashProvidedByUsedInOperatingActivities"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Standard cash flow statement tag for operational cash flow."
+
+  capital_expenditures:
+    display_name: "Capital Expenditures (CapEx)"
+    category: "cash_flow"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Funds used by an enterprise to acquire, upgrade, and maintain physical assets such as property, plant, and equipment."
+    synonyms:
+      - "capex"
+      - "capital expenditures"
+      - "capital expenditure"
+      - "chi phí vốn"
+      - "chi tiêu vốn"
+      - "chi mua sắm tài sản cố định"
+    rules:
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "PaymentsToAcquirePropertyPlantAndEquipment"
+        priority: 1
+        regime: "US-GAAP"
+        description: "Standard cash flow investing tag for PP&E acquisitions."
+
+  # ----------------------------------------------------------------------------
+  # SECTION 4: Financial Ratios & Derived Margins (Derived GAAP - sql_gold)
+  # ----------------------------------------------------------------------------
+  operating_margin:
+    display_name: "Operating Margin"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Percentage ratio of operating income to total revenues: (Operating Income / Total Revenues) * 100."
+    synonyms:
+      - "operating margin"
+      - "operating margin percentage"
+      - "ebit margin"
+      - "biên lợi nhuận hoạt động"
+      - "tỷ suất lợi nhuận hoạt động"
+      - "biên lợi nhuận kinh doanh"
+    rules: []
+
+  gross_margin:
+    display_name: "Gross Margin"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Percentage ratio of gross profit to total revenues: (Gross Profit / Total Revenues) * 100."
+    synonyms:
+      - "gross margin"
+      - "gross margin percentage"
+      - "biên lợi nhuận gộp"
+      - "tỷ suất lợi nhuận gộp"
+      - "biên lãi gộp"
+    rules: []
+
+  net_margin:
+    display_name: "Net Profit Margin"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Percentage ratio of net income to total revenues: (Net Income / Total Revenues) * 100."
+    synonyms:
+      - "net margin"
+      - "net profit margin"
+      - "profit margin"
+      - "biên lợi nhuận ròng"
+      - "tỷ suất lợi nhuận ròng"
+      - "tỷ suất sinh lời thuần"
+      - "biên lãi ròng"
+    rules: []
+
+  revenue_growth_yoy:
+    display_name: "Revenue Growth YoY"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Percentage change in total revenue compared to the exact same period of the prior year."
+    synonyms:
+      - "revenue growth"
+      - "sales growth"
+      - "revenue growth yoy"
+      - "tăng trưởng doanh thu"
+      - "tốc độ tăng trưởng doanh thu"
+      - "tăng trưởng doanh số"
+    rules: []
+
+  current_ratio:
+    display_name: "Current Ratio"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "instant"
+    default_unit: "ratio"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Liquidity metric measuring ability to cover short-term debt: Total Current Assets / Total Current Liabilities."
+    synonyms:
+      - "current ratio"
+      - "hệ số thanh toán hiện hành"
+      - "tỷ số thanh toán ngắn hạn"
+      - "khả năng thanh toán ngắn hạn"
+    rules: []
+
+  debt_to_equity:
+    display_name: "Debt to Equity Ratio (D/E)"
+    category: "financial_ratio"
+    classification: "derived_gaap_ratio"
+    period_type: "instant"
+    default_unit: "ratio"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Leverage ratio evaluating financial risk: Total Liabilities / Total Stockholders' Equity."
+    synonyms:
+      - "debt to equity"
+      - "d/e"
+      - "d/e ratio"
+      - "hệ số nợ trên vốn chủ sở hữu"
+      - "tỷ lệ nợ trên vốn"
+    rules: []
+
+  free_cash_flow:
+    display_name: "Free Cash Flow (FCF)"
+    category: "cash_flow"
+    classification: "derived_gaap_ratio"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Cash available for discretionary deployment: Operating Cash Flow minus Capital Expenditures."
+    synonyms:
+      - "free cash flow"
+      - "fcf"
+      - "dòng tiền tự do"
+    rules: []
+
+  # ----------------------------------------------------------------------------
+  # SECTION 5: Product Categories & Line Disclosures (GAAP Note 8 - rag_textual)
+  # ----------------------------------------------------------------------------
+  product_revenue_iphone:
+    display_name: "iPhone Net Sales"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Apple product line revenue generated exclusively from iPhone hardware and related accessories."
+    synonyms:
+      - "iphone"
+      - "iphone revenue"
+      - "iphone sales"
+      - "iphone net sales"
+      - "doanh thu iphone"
+      - "doanh số iphone"
+      - "bán iphone"
+    rules: []
+
+  product_revenue_mac:
+    display_name: "Mac Net Sales"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Apple product line revenue generated from Mac personal computer hardware (MacBook, iMac, Mac Pro)."
+    synonyms:
+      - "mac"
+      - "mac revenue"
+      - "mac sales"
+      - "macbook sales"
+      - "doanh thu mac"
+      - "doanh số máy tính mac"
+    rules: []
+
+  product_revenue_ipad:
+    display_name: "iPad Net Sales"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Apple product line revenue generated from iPad tablet devices and related keyboards/pencils."
+    synonyms:
+      - "ipad"
+      - "ipad revenue"
+      - "ipad sales"
+      - "doanh thu ipad"
+      - "doanh số ipad"
+    rules: []
+
+  product_revenue_wearables:
+    display_name: "Wearables, Home and Accessories"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Apple product line revenue comprising AirPods, Apple Watch, HomePod, Beats, and branded accessories."
+    synonyms:
+      - "wearables"
+      - "wearables home and accessories"
+      - "apple watch sales"
+      - "airpods sales"
+      - "doanh thu thiết bị đeo"
+      - "thiết bị đeo và phụ kiện"
+    rules: []
+
+  product_revenue_services:
+    display_name: "Services Net Sales"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Apple services segment revenue comprising App Store commissions, advertising, AppleCare, iCloud, and Apple Pay."
+    synonyms:
+      - "services"
+      - "services revenue"
+      - "apple services"
+      - "doanh thu dịch vụ"
+      - "mảng dịch vụ apple"
+    rules: []
+
+  segment_revenue_intelligent_cloud:
+    display_name: "Intelligent Cloud Segment Revenue"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Microsoft reportable segment encompassing public, private, and hybrid server products and cloud services."
+    synonyms:
+      - "intelligent cloud"
+      - "intelligent cloud revenue"
+      - "đám mây thông minh"
+      - "phân khúc đám mây thông minh"
+    rules: []
+
+  segment_revenue_productivity:
+    display_name: "Productivity and Business Processes Revenue"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Microsoft reportable segment comprising Office commercial/consumer, LinkedIn, and Dynamics business solutions."
+    synonyms:
+      - "productivity and business processes"
+      - "office 365 revenue"
+      - "linkedin revenue"
+      - "năng suất và quy trình nghiệp vụ"
+    rules: []
+
+  segment_revenue_more_personal:
+    display_name: "More Personal Computing Revenue"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Microsoft reportable segment comprising Windows OEM, Surface devices, Xbox gaming hardware, and search ads."
+    synonyms:
+      - "more personal computing"
+      - "windows revenue"
+      - "xbox revenue"
+      - "điện toán cá nhân"
+    rules: []
+
+  product_revenue_azure:
+    display_name: "Azure Cloud Services Revenue"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Microsoft Azure cloud computing infrastructure platform and enterprise AI cloud services disclosures."
+    synonyms:
+      - "azure"
+      - "azure revenue"
+      - "azure growth"
+      - "azure cloud"
+      - "doanh thu azure"
+      - "tăng trưởng azure"
+      - "đám mây azure"
+    rules: []
+
+  segment_revenue_google_services:
+    display_name: "Google Services Segment Revenue"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Alphabet segment comprising Android, Chrome, Google Maps, Google Play, Search, YouTube, and hardware."
+    synonyms:
+      - "google services"
+      - "google services revenue"
+      - "dịch vụ google"
+      - "phân khúc dịch vụ google"
+    rules: []
+
+  segment_revenue_google_cloud:
+    display_name: "Google Cloud Segment Revenue"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Alphabet enterprise cloud segment encompassing Google Cloud Platform (GCP) and Google Workspace productivity apps."
+    synonyms:
+      - "google cloud"
+      - "google cloud revenue"
+      - "gcp revenue"
+      - "doanh thu google cloud"
+      - "đám mây google"
+    rules: []
+
+  product_revenue_google_search:
+    display_name: "Google Search & Other Advertising"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Alphabet revenue generated directly from sponsored search queries on Google.com properties."
+    synonyms:
+      - "google search"
+      - "search revenue"
+      - "search advertising"
+      - "doanh thu tìm kiếm google"
+      - "quảng cáo tìm kiếm"
+    rules: []
+
+  product_revenue_youtube_ads:
+    display_name: "YouTube Advertising Revenue"
+    category: "product_category"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Alphabet revenue generated from video advertisements displayed on the YouTube platform."
+    synonyms:
+      - "youtube"
+      - "youtube ads"
+      - "youtube revenue"
+      - "doanh thu youtube"
+      - "quảng cáo youtube"
+    rules: []
+
+  # ----------------------------------------------------------------------------
+  # SECTION 6: Reportable Geographic Segments (GAAP Note 8 - rag_textual)
+  # ----------------------------------------------------------------------------
+  segment_geo_americas:
+    display_name: "Americas Geographic Segment"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Geographic reportable operating segment encompassing North and South America operations."
+    synonyms:
+      - "americas"
+      - "americas segment"
+      - "khu vực châu mỹ"
+      - "phân khúc châu mỹ"
+    rules: []
+
+  segment_geo_europe:
+    display_name: "Europe Geographic Segment"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Geographic reportable operating segment encompassing continental Europe, UK, and Middle East operations."
+    synonyms:
+      - "europe"
+      - "europe segment"
+      - "khu vực châu âu"
+      - "phân khúc châu âu"
+    rules: []
+
+  segment_geo_greater_china:
+    display_name: "Greater China Geographic Segment"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Geographic reportable operating segment encompassing China mainland, Hong Kong, and Taiwan."
+    synonyms:
+      - "greater china"
+      - "china segment"
+      - "khu vực đại trung hoa"
+      - "thị trường trung quốc"
+    rules: []
+
+  segment_geo_japan:
+    display_name: "Japan Geographic Segment"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Geographic reportable operating segment comprising Japanese domestic commercial operations."
+    synonyms:
+      - "japan"
+      - "japan segment"
+      - "khu vực nhật bản"
+      - "thị trường nhật bản"
+    rules: []
+
+  segment_geo_rest_of_asia_pacific:
+    display_name: "Rest of Asia Pacific Geographic Segment"
+    category: "reportable_segment"
+    classification: "gaap_disclosure"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: true
+    description: "Geographic reportable segment comprising Australia, Southeast Asia, India, and other Asia-Pacific territories."
+    synonyms:
+      - "rest of asia pacific"
+      - "asia pacific"
+      - "apac"
+      - "khu vực châu á thái bình dương"
+      - "phần còn lại của châu á thái bình dương"
+    rules: []
+
+  # ----------------------------------------------------------------------------
+  # SECTION 7: Non-GAAP Financial Measures (classification: non_gaap)
+  # ----------------------------------------------------------------------------
+  adjusted_operating_income:
+    display_name: "Adjusted Operating Income (Non-GAAP)"
+    category: "non_gaap"
+    classification: "non_gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: false
+    description: "Non-GAAP operating income adjusted for stock-based compensation, restructuring charges, or litigation costs."
+    synonyms:
+      - "adjusted operating income"
+      - "non-gaap operating income"
+      - "lợi nhuận hoạt động điều chỉnh"
+      - "lợi nhuận hoạt động non-gaap"
+    rules: []
+
+  adjusted_net_income:
+    display_name: "Adjusted Net Income (Non-GAAP)"
+    category: "non_gaap"
+    classification: "non_gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: false
+    description: "Non-GAAP bottom-line profit excluding non-recurring amortization of intangibles, impairment, and tax effects."
+    synonyms:
+      - "adjusted net income"
+      - "non-gaap net income"
+      - "lợi nhuận ròng điều chỉnh"
+      - "lợi nhuận sau thuế điều chỉnh"
+    rules: []
+
+  adjusted_diluted_eps:
+    display_name: "Adjusted Diluted EPS (Non-GAAP)"
+    category: "non_gaap"
+    classification: "non_gaap"
+    period_type: "duration"
+    default_unit: "USD/shares"
+    storage_layer: "rag_textual"
+    is_dimensional: false
+    description: "Non-GAAP diluted earnings per share adjusted for non-cash and non-operating accounting items."
+    synonyms:
+      - "adjusted eps"
+      - "non-gaap eps"
+      - "adjusted diluted eps"
+      - "eps điều chỉnh"
+      - "thu nhập trên cổ phiếu điều chỉnh"
+    rules: []
+
+  adjusted_gross_margin:
+    display_name: "Adjusted Gross Margin (Non-GAAP)"
+    category: "non_gaap"
+    classification: "non_gaap"
+    period_type: "duration"
+    default_unit: "%"
+    storage_layer: "rag_textual"
+    is_dimensional: false
+    description: "Non-GAAP gross profit margin adjusting for supply chain disruptions, amortization of acquired tech, or tariffs."
+    synonyms:
+      - "adjusted gross margin"
+      - "non-gaap gross margin"
+      - "biên lợi nhuận gộp điều chỉnh"
+    rules: []
+
+  adjusted_ebitda:
+    display_name: "Adjusted EBITDA (Non-GAAP)"
+    category: "non_gaap"
+    classification: "non_gaap"
+    period_type: "duration"
+    default_unit: "USD"
+    storage_layer: "rag_textual"
+    is_dimensional: false
+    description: "Earnings before interest, taxes, depreciation, and amortization, further adjusted for share-based compensation."
+    synonyms:
+      - "adjusted ebitda"
+      - "ebitda"
+      - "ebitda điều chỉnh"
+    rules: []

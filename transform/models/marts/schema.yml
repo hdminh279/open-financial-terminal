@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: fct_financial_statements
+    description: "Standardized canonical financial statements for Group A companies (AAPL, MSFT, GOOGL) materialized as external Parquet in MinIO Gold."
+    columns:
+      - name: statement_key
+        description: "Surrogate primary key: md5(ticker-fiscal_year-fiscal_period)"
+        tests:
+          - unique
+          - not_null
+
+      - name: ticker
+        description: "Trading ticker symbol"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['AAPL', 'MSFT', 'GOOGL']
+
+      - name: fiscal_year
+        description: "Authoritative SEC fiscal year"
+        tests:
+          - not_null
+
+      - name: fiscal_period
+        description: "Authoritative SEC fiscal period (Q1, Q2, Q3, Q4, FY)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Q1', 'Q2', 'Q3', 'Q4', 'FY']
+
+      - name: period_type
+        description: "Duration type: quarterly or annual"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['quarterly', 'annual']
+
+      - name: is_derived
+        description: "Boolean flag: TRUE if record was derived via financial subtraction (e.g. Q4 = FY - 9M)"
+        tests:
+          - not_null
+
+  - name: fct_financial_ratios
+    description: "Key financial profitability, liquidity, and growth ratios materialized as external Parquet in MinIO Gold."
+    columns:
+      - name: ratio_key
+        description: "Surrogate primary key matching statement_key"
+        tests:
+          - unique
+          - not_null
+
+      - name: ticker
+        tests:
+          - not_null
+
+      - name: fiscal_year
+        tests:
+          - not_null
+
+      - name: fiscal_period
+        tests:
+          - not_null
+
+  - name: audit_balance_sheet_check
+    description: "Audit view validating Assets = Liabilities + Equity identity"
+    columns:
+      - name: statement_key
+        tests:
+          - unique
+          - not_null
+
+      - name: audit_warning
+        description: "Audit warning flag: TRUE if discrepancy exceeds 2% threshold"
+        tests:
+          - accepted_values:
+              values: [false]

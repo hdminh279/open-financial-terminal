@@ -1,0 +1,842 @@
+[
+  {
+    "id": "EVAL_Q01",
+    "query": "What was Apple's total revenue in FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q02",
+    "query": "What was Microsoft's operating income for fiscal year 2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "operating_income"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q03",
+    "query": "Show me Alphabet's net income for FY2023.",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "net_income"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q04",
+    "query": "What was Apple's diluted earnings per share (EPS) in FY2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "eps_diluted"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q05",
+    "query": "How much cash and cash equivalents did Microsoft hold at the end of FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "cash_and_cash_equivalents"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q06",
+    "query": "What were Alphabet's total assets for fiscal year 2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "total_assets"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q07",
+    "query": "What were Apple's total liabilities in FY2022?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2022,
+      "fiscal_period": "FY",
+      "metric": "total_liabilities"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q08",
+    "query": "What was Microsoft's stockholders' equity in FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "stockholders_equity_total"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q09",
+    "query": "What was Alphabet's gross profit in FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "gross_profit"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "insufficient_evidence"
+  },
+  {
+    "id": "EVAL_Q10",
+    "query": "What was Apple's revenue in Q3 FY2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2024,
+      "fiscal_period": "Q3",
+      "metric": "revenues"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q11",
+    "query": "What was Microsoft's operating margin for Q2 FY2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2024,
+      "fiscal_period": "Q2",
+      "metric": "operating_margin"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q12",
+    "query": "What was Alphabet's net margin in FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "net_margin"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q13",
+    "query": "What was Apple's current ratio in FY2023?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "current_ratio"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q14",
+    "query": "What was Microsoft's debt-to-equity ratio in FY2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "debt_to_equity"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q15",
+    "query": "What was Apple's year-over-year revenue growth in FY2024?",
+    "expected_intent": "FINANCIAL_METRIC",
+    "expected_tools": [
+      "financial_sql_tool"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "revenue_growth_yoy"
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q16",
+    "query": "How does Apple describe the Vision Pro spatial computing platform and visionOS in its 10-K?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q17",
+    "query": "What are the main risks Apple identified regarding foreign exchange rate fluctuations?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q18",
+    "query": "Describe Apple's supply chain dependency on single-source outsourcing manufacturing partners.",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q19",
+    "query": "How does Apple's Board of Directors and Audit Committee supervise cybersecurity and data protection risks?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q20",
+    "query": "What does Microsoft say about its commercial partnership and commitments with OpenAI?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q21",
+    "query": "How does Microsoft position its AI Copilot stack across Azure and Microsoft 365?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q22",
+    "query": "What cybersecurity operational risks does Microsoft report regarding sophisticated nation-state actors?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q23",
+    "query": "What regulatory commitments and remedies did Microsoft agree to for closing the Activision Blizzard acquisition?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q24",
+    "query": "How did Alphabet describe the organizational consolidation of Google Research and DeepMind?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q25",
+    "query": "What legal risks does Alphabet disclose concerning the Department of Justice antitrust lawsuits?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q26",
+    "query": "How does Alphabet address regulatory compliance with the European Union Digital Markets Act (DMA)?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q27",
+    "query": "What are Alphabet's disclosures regarding technical infrastructure investments and AI data center expansion?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q28",
+    "query": "What are the key drivers of Apple Services revenue growth discussed in Item 7?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q29",
+    "query": "What does Microsoft disclose about competition in Intelligent Cloud from Amazon and Google?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q30",
+    "query": "How does Apple describe its environmental initiatives and carbon neutrality roadmap in Form 10-K?",
+    "expected_intent": "TEXTUAL_RESEARCH",
+    "expected_tools": [
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": false,
+    "partial_allowed": false,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q31",
+    "query": "What was Apple's total revenue in FY2023, and how did management explain the change in product sales?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q32",
+    "query": "What was Microsoft's revenue for FY2024, and what were the main cloud growth drivers discussed in MD&A?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q33",
+    "query": "How much did Alphabet earn in net income in FY2024, and what legal proceedings did they disclose in Item 3?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "net_income"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q34",
+    "query": "What was Apple's Q3 FY2024 revenue, and what did management comment regarding Services and iPhone performance in the 10-Q?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2024,
+      "fiscal_period": "Q3",
+      "metric": "revenues"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q35",
+    "query": "What was Microsoft's operating income in FY2023, and how did AI services contribute to Intelligent Cloud results?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "operating_income"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q36",
+    "query": "What were Alphabet's total assets at the end of FY2023, and what investments in servers and data centers were highlighted?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "total_assets"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q37",
+    "query": "What was Apple's revenue growth YoY in FY2023, and what impact did foreign exchange rates have according to Item 7?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "revenue_growth_yoy"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q38",
+    "query": "What was Microsoft's operating margin in FY2024, and what headcount or severance costs were mentioned in operating expenses?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "operating_margin"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q39",
+    "query": "What was Alphabet's operating income in FY2024, and how did Google Services versus Google Cloud perform?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "operating_income"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q40",
+    "query": "What was Apple's diluted EPS in FY2023, and what did the company disclose regarding share repurchase authorizations?",
+    "expected_intent": "MIXED_RESEARCH",
+    "expected_tools": [
+      "financial_sql_tool",
+      "hybrid_retriever"
+    ],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "eps_diluted"
+    },
+    "must_abstain": false,
+    "partial_allowed": true,
+    "expected_abstain_scope": null
+  },
+  {
+    "id": "EVAL_Q41",
+    "query": "What was Tesla's total automotive revenue in FY2023?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_company"
+  },
+  {
+    "id": "EVAL_Q42",
+    "query": "How much did Amazon Web Services (AWS) earn in operating profit in FY2024?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "operating_income"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_company"
+  },
+  {
+    "id": "EVAL_Q43",
+    "query": "What were Nvidia's data center GPU chip sales in FY2024?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_company"
+  },
+  {
+    "id": "EVAL_Q44",
+    "query": "What was Meta Platforms' total advertising revenue in FY2023?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": 2023,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_company"
+  },
+  {
+    "id": "EVAL_Q45",
+    "query": "What was Apple's total revenue in FY2018?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": 2018,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "out_of_range_year"
+  },
+  {
+    "id": "EVAL_Q46",
+    "query": "What will Microsoft's projected revenue be in fiscal year 2030?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": "MSFT",
+      "fiscal_year": 2030,
+      "fiscal_period": "FY",
+      "metric": "revenues"
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "out_of_range_year"
+  },
+  {
+    "id": "EVAL_Q47",
+    "query": "Will Apple's stock price hit 00 by next quarter?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": "AAPL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "speculative_prediction"
+  },
+  {
+    "id": "EVAL_Q48",
+    "query": "Should I buy or sell Alphabet stock today based on its valuation?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": "GOOGL",
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "investment_advice"
+  },
+  {
+    "id": "EVAL_Q49",
+    "query": "What is the current weather forecast in Cupertino, California?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_topic"
+  },
+  {
+    "id": "EVAL_Q50",
+    "query": "Who won the most recent NFL Super Bowl championship?",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_tools": [],
+    "expected_entities": {
+      "ticker": null,
+      "fiscal_year": null,
+      "fiscal_period": null,
+      "metric": null
+    },
+    "must_abstain": true,
+    "partial_allowed": false,
+    "expected_abstain_scope": "unsupported_topic"
+  }
+]

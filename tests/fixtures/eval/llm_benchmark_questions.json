@@ -1,0 +1,721 @@
+[
+  {
+    "id": "BENCH-01",
+    "category": "calculation_yoy",
+    "ticker": "AAPL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000320193-23-000106",
+    "prompt": "Based on the provided financial data for Apple Inc.:\n- FY2022 Revenue: $394,328,000,000\n- FY2023 Revenue: $383,285,000,000\nCalculate the Year-over-Year (YoY) revenue growth percentage from FY2022 to FY2023. State the final percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": -2.8,
+    "tolerance": 0.15,
+    "expected_text": "-2.8%"
+  },
+  {
+    "id": "BENCH-02",
+    "category": "calculation_margin",
+    "ticker": "MSFT",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000950170-23-035122",
+    "prompt": "Based on the provided financial data for Microsoft Corporation for FY2023:\n- Total Revenues: $211,915,000,000\n- Operating Income: $88,523,000,000\nCalculate the Operating Margin for FY2023. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 41.77,
+    "tolerance": 0.2,
+    "expected_text": "41.8%"
+  },
+  {
+    "id": "BENCH-03",
+    "category": "calculation_current_ratio",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Based on the provided balance sheet excerpt for Alphabet Inc. as of December 31, 2023:\n- Total Current Assets: $171,530,000,000\n- Total Current Liabilities: $81,814,000,000\nCalculate the Current Ratio for FY2023 rounded to two decimal places.",
+    "check_type": "numeric_tolerance",
+    "target_value": 2.1,
+    "tolerance": 0.05,
+    "expected_text": "2.10"
+  },
+  {
+    "id": "BENCH-04",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000320193-23-000106",
+    "prompt": "Read the following Item 1A Risk Factors excerpt from Apple's FY2023 Form 10-K:\n'The Company's business can be impacted by global economic conditions and supply chain disruptions. Substantially all of the Company's manufacturing is performed by outsourced partners located primarily in Asia. Many components are currently obtained from single or limited sources.'\nIdentify the geographic concentration of Apple's manufacturing partners and the specific sourcing risk mentioned.",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Asia",
+      "single"
+    ],
+    "expected_text": "Asia and single or limited sources"
+  },
+  {
+    "id": "BENCH-05",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000950170-23-035122",
+    "prompt": "Read the cover page excerpt from Microsoft's FY2023 Form 10-K:\n'The number of shares of common stock outstanding as of July 20, 2023 was 7,432,302,000.'\nState the exact number of shares of common stock outstanding and the corresponding record date.",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "7,432,302,000",
+      "July 20, 2023"
+    ],
+    "expected_text": "7,432,302,000 as of July 20, 2023"
+  },
+  {
+    "id": "BENCH-06",
+    "category": "multi_step_comparison",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Based on Alphabet's financial statements:\n- FY2022 Net Income: $59,972,000,000\n- FY2023 Net Income: $73,795,000,000\nCalculate the percentage growth in Net Income from FY2022 to FY2023. State the growth percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 23.05,
+    "tolerance": 0.5,
+    "expected_text": "23.05%"
+  },
+  {
+    "id": "BENCH-07",
+    "category": "abstention_missing_data",
+    "ticker": "AAPL",
+    "fiscal_year": 2022,
+    "fiscal_period": "FY",
+    "accession": "0000320193-22-000108",
+    "prompt": "Context from Apple's FY2022 Form 10-K Item 7 (Net Sales by Product Category):\n- iPhone: $205,489M\n- Mac: $40,177M\n- iPad: $29,292M\n- Wearables, Home and Accessories: $41,241M\n- Services: $78,129M\nQuestion: What was the exact dollar revenue generated specifically by Apple Vision Pro in fiscal year 2022?",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not provided",
+      "not available",
+      "does not contain",
+      "no mention",
+      "not mentioned",
+      "not include",
+      "cannot be determined",
+      "was not released",
+      "did not generate"
+    ],
+    "expected_text": "Abstain (Vision Pro was not released and is not in FY2022 filing)"
+  },
+  {
+    "id": "BENCH-08",
+    "category": "abstention_missing_data",
+    "ticker": "MSFT",
+    "fiscal_year": 2022,
+    "fiscal_period": "Q1",
+    "accession": "0001564590-21-051876",
+    "prompt": "Context from Microsoft's Form 10-Q for the quarterly period ended September 30, 2021 (Q1 FY22):\n- Research and Development: $5,599M\n- General and Administrative: $1,287M\n- Sales and Marketing: $4,547M\nQuestion: What was the final purchase price paid to complete the acquisition of Activision Blizzard recorded in this Q1 FY22 filing?",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not provided",
+      "not available",
+      "does not contain",
+      "no mention",
+      "not mentioned",
+      "not completed",
+      "cannot be determined",
+      "not include",
+      "no information",
+      "not contained",
+      "no activision",
+      "was not recorded",
+      "no purchase price",
+      "not recorded"
+    ],
+    "expected_text": "Abstain (Acquisition was not completed in Q1 FY22)"
+  },
+  {
+    "id": "BENCH-09",
+    "category": "calculation_yoy",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Based on the provided financial data for Apple Inc.:\n- FY2023 Revenue: $383,285,000,000\n- FY2024 Revenue: $391,035,000,000\nCalculate the Year-over-Year (YoY) revenue growth percentage from FY2023 to FY2024. State the final percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 2.02,
+    "tolerance": 0.15,
+    "expected_text": "2.02%"
+  },
+  {
+    "id": "BENCH-10",
+    "category": "calculation_margin",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Based on the provided financial statements for Apple Inc. for FY2024:\n- Total Revenues: $391,035,000,000\n- Operating Income: $123,216,000,000\nCalculate the Operating Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 31.51,
+    "tolerance": 0.2,
+    "expected_text": "31.51%"
+  },
+  {
+    "id": "BENCH-11",
+    "category": "calculation_margin",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Based on Apple Inc.'s FY2024 financial statement:\n- Total Revenues: $391,035,000,000\n- Net Income: $93,736,000,000\nCalculate the Net Profit Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 23.97,
+    "tolerance": 0.2,
+    "expected_text": "23.97%"
+  },
+  {
+    "id": "BENCH-12",
+    "category": "calculation_liquidity",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Based on Apple Inc.'s consolidated balance sheet as of September 28, 2024:\n- Total Current Assets: $152,987,000,000\n- Total Current Liabilities: $176,392,000,000\nCalculate the Current Ratio for FY2024 rounded to two decimal places.",
+    "check_type": "numeric_tolerance",
+    "target_value": 0.87,
+    "tolerance": 0.05,
+    "expected_text": "0.87"
+  },
+  {
+    "id": "BENCH-13",
+    "category": "calculation_yoy",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Based on the provided financial data for Microsoft Corporation:\n- FY2023 Revenue: $211,915,000,000\n- FY2024 Revenue: $245,122,000,000\nCalculate the YoY revenue growth percentage from FY2023 to FY2024. State the final percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 15.67,
+    "tolerance": 0.2,
+    "expected_text": "15.67%"
+  },
+  {
+    "id": "BENCH-14",
+    "category": "calculation_margin",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Based on Microsoft Corporation's FY2024 financial statement:\n- Total Revenues: $245,122,000,000\n- Operating Income: $109,433,000,000\nCalculate Microsoft's Operating Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 44.64,
+    "tolerance": 0.2,
+    "expected_text": "44.64%"
+  },
+  {
+    "id": "BENCH-15",
+    "category": "calculation_margin",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Based on Microsoft Corporation's FY2024 financial statement:\n- Total Revenues: $245,122,000,000\n- Net Income: $88,136,000,000\nCalculate the Net Profit Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 35.96,
+    "tolerance": 0.2,
+    "expected_text": "35.96%"
+  },
+  {
+    "id": "BENCH-16",
+    "category": "calculation_liquidity",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Based on Microsoft Corporation's balance sheet as of June 30, 2024:\n- Total Current Assets: $159,734,000,000\n- Total Current Liabilities: $125,286,000,000\nCalculate the Current Ratio for FY2024 rounded to two decimal places.",
+    "check_type": "numeric_tolerance",
+    "target_value": 1.27,
+    "tolerance": 0.05,
+    "expected_text": "1.27"
+  },
+  {
+    "id": "BENCH-17",
+    "category": "calculation_yoy",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0001652044-25-000014",
+    "prompt": "Based on the provided financial data for Alphabet Inc.:\n- FY2023 Revenue: $307,394,000,000\n- FY2024 Revenue: $350,018,000,000\nCalculate the Year-over-Year (YoY) revenue growth percentage from FY2023 to FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 13.87,
+    "tolerance": 0.2,
+    "expected_text": "13.87%"
+  },
+  {
+    "id": "BENCH-18",
+    "category": "calculation_margin",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0001652044-25-000014",
+    "prompt": "Based on Alphabet Inc.'s FY2024 financial statement:\n- Total Revenues: $350,018,000,000\n- Operating Income: $112,390,000,000\nCalculate Alphabet's Operating Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 32.11,
+    "tolerance": 0.2,
+    "expected_text": "32.11%"
+  },
+  {
+    "id": "BENCH-19",
+    "category": "calculation_margin",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0001652044-25-000014",
+    "prompt": "Based on Alphabet Inc.'s FY2024 financial statement:\n- Total Revenues: $350,018,000,000\n- Net Income: $100,118,000,000\nCalculate the Net Profit Margin for FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 28.6,
+    "tolerance": 0.2,
+    "expected_text": "28.60%"
+  },
+  {
+    "id": "BENCH-20",
+    "category": "calculation_liquidity",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0001652044-25-000014",
+    "prompt": "Based on Alphabet Inc.'s consolidated balance sheet as of December 31, 2024:\n- Total Current Assets: $163,711,000,000\n- Total Current Liabilities: $89,122,000,000\nCalculate the Current Ratio for FY2024 rounded to two decimal places.",
+    "check_type": "numeric_tolerance",
+    "target_value": 1.84,
+    "tolerance": 0.05,
+    "expected_text": "1.84"
+  },
+  {
+    "id": "BENCH-21",
+    "category": "calculation_quarterly",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q1",
+    "accession": "0000320193-24-000006",
+    "prompt": "Based on Apple Inc.'s Q1 FY2024 financial report:\n- Total Revenues: $119,575,000,000\n- Operating Income: $40,373,000,000\nCalculate Apple's Operating Margin for Q1 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 33.76,
+    "tolerance": 0.25,
+    "expected_text": "33.76%"
+  },
+  {
+    "id": "BENCH-22",
+    "category": "calculation_quarterly",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q1",
+    "accession": "0000950170-23-054855",
+    "prompt": "Based on Microsoft Corporation's Q1 FY2024 financial report:\n- Total Revenues: $56,517,000,000\n- Operating Income: $26,895,000,000\nCalculate Microsoft's Operating Margin for Q1 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 47.59,
+    "tolerance": 0.25,
+    "expected_text": "47.59%"
+  },
+  {
+    "id": "BENCH-23",
+    "category": "calculation_quarterly",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q1",
+    "accession": "0001652044-24-000053",
+    "prompt": "Based on Alphabet Inc.'s Q1 FY2024 financial report:\n- Total Revenues: $80,539,000,000\n- Operating Income: $25,472,000,000\nCalculate Alphabet's Operating Margin for Q1 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 31.63,
+    "tolerance": 0.25,
+    "expected_text": "31.63%"
+  },
+  {
+    "id": "BENCH-24",
+    "category": "calculation_quarterly",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q2",
+    "accession": "0000320193-24-000069",
+    "prompt": "Based on Apple Inc.'s Q2 FY2024 report:\n- Q2 FY2023 Revenue: $94,836,000,000\n- Q2 FY2024 Revenue: $90,753,000,000\nCalculate the YoY revenue growth percentage for Q2 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": -4.31,
+    "tolerance": 0.2,
+    "expected_text": "-4.31%"
+  },
+  {
+    "id": "BENCH-25",
+    "category": "calculation_quarterly",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q2",
+    "accession": "0000950170-24-008814",
+    "prompt": "Based on Microsoft Corporation's Q2 FY2024 report:\n- Q2 FY2023 Revenue: $52,747,000,000\n- Q2 FY2024 Revenue: $62,020,000,000\nCalculate the YoY revenue growth percentage for Q2 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 17.58,
+    "tolerance": 0.25,
+    "expected_text": "17.58%"
+  },
+  {
+    "id": "BENCH-26",
+    "category": "calculation_quarterly",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q2",
+    "accession": "0001652044-24-000079",
+    "prompt": "Based on Alphabet Inc.'s Q2 FY2024 report:\n- Q2 FY2023 Revenue: $74,604,000,000\n- Q2 FY2024 Revenue: $84,742,000,000\nCalculate the YoY revenue growth percentage for Q2 FY2024. State the percentage clearly.",
+    "check_type": "numeric_tolerance",
+    "target_value": 13.59,
+    "tolerance": 0.2,
+    "expected_text": "13.59%"
+  },
+  {
+    "id": "BENCH-27",
+    "category": "calculation_multistep",
+    "ticker": "MULTI",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "MULTI-2024",
+    "prompt": "Consider the following FY2024 operating income figures:\n- Microsoft (MSFT): $109,433,000,000\n- Alphabet (GOOGL): $112,390,000,000\nCalculate the difference in operating income between Alphabet and Microsoft (GOOGL minus MSFT) in billions of dollars rounded to two decimal places.",
+    "check_type": "numeric_tolerance",
+    "target_value": 2.96,
+    "tolerance": 0.1,
+    "expected_text": "2.96 billion"
+  },
+  {
+    "id": "BENCH-28",
+    "category": "calculation_multistep",
+    "ticker": "MULTI",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "MULTI-2024",
+    "prompt": "Consider the FY2024 Net Margins for the following companies:\n- Apple Inc.: 23.97%\n- Microsoft Corporation: 35.96%\nCalculate how many percentage points higher Microsoft's Net Margin is compared to Apple's Net Margin in FY2024.",
+    "check_type": "numeric_tolerance",
+    "target_value": 11.99,
+    "tolerance": 0.2,
+    "expected_text": "11.99 percentage points"
+  },
+  {
+    "id": "BENCH-29",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Read the following Item 1 Business excerpt from Apple's FY2024 Form 10-K:\n'Apple Vision Pro\u2122 is the Company\u2019s first spatial computer based on its visionOS\u2122 operating system.'\nWhat is the name of Apple's first spatial computer and what operating system is it based on?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Vision Pro",
+      "visionOS"
+    ],
+    "expected_text": "Apple Vision Pro and visionOS"
+  },
+  {
+    "id": "BENCH-30",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Read the following Item 1 excerpt from Apple's FY2024 Form 10-K:\n'In June 2024, the Company introduced Apple Intelligence\u2122, a personal intelligence system that uses generative models.'\nWhat personal intelligence system did Apple introduce in June 2024 and what kind of models does it use?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Apple Intelligence",
+      "generative"
+    ],
+    "expected_text": "Apple Intelligence and generative models"
+  },
+  {
+    "id": "BENCH-31",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Read the Item 1C Cybersecurity excerpt from Apple's FY2024 Form 10-K:\n'The Audit Committee assists the Board in the oversight and monitoring of cybersecurity risks.'\nWhich committee of Apple's Board of Directors assists in the oversight of cybersecurity risks?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Audit",
+      "Committee"
+    ],
+    "expected_text": "Audit Committee"
+  },
+  {
+    "id": "BENCH-32",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Read the Item 7A Market Risk excerpt from Apple's FY2024 Form 10-K:\n'The Company\u2019s exposure to foreign exchange rate risk relates primarily to the Company being a net receiver of currencies other than the U.S. dollar.'\nWhat is the primary factor driving Apple's foreign exchange rate risk exposure according to the excerpt?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "net receiver",
+      "currencies"
+    ],
+    "expected_text": "net receiver of currencies"
+  },
+  {
+    "id": "BENCH-33",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Read the Item 1 Business excerpt from Microsoft's FY2024 Form 10-K:\n'We have a long-term partnership with OpenAI, a leading AI research and deployment company. As OpenAI\u2019s exclusive cloud provider, Azure powers all of OpenAI's workloads.'\nWhat cloud platform serves as the exclusive cloud provider powering OpenAI's workloads according to Microsoft?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Azure"
+    ],
+    "expected_text": "Azure"
+  },
+  {
+    "id": "BENCH-34",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Read the Item 1 Business excerpt from Microsoft's FY2024 Form 10-K:\n'On October 13, 2023, we completed our acquisition of Activision Blizzard, Inc., a leader in game development and interactive entertainment content publisher.'\nWhat company did Microsoft acquire on October 13, 2023?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Activision",
+      "Blizzard"
+    ],
+    "expected_text": "Activision Blizzard"
+  },
+  {
+    "id": "BENCH-35",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Read the Item 1 segment reporting excerpt from Microsoft's FY2024 Form 10-K:\n'Our Productivity and Business Processes segment consists of products and services in our portfolio of productivity, communication, and information services, spanning a variety of devices and platforms, including Office Commercial, Office Consumer, LinkedIn, and Dynamics business solutions.'\nName at least two product or solution offerings included in Microsoft's Productivity and Business Processes segment.",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Office",
+      "LinkedIn"
+    ],
+    "expected_text": "Office and LinkedIn"
+  },
+  {
+    "id": "BENCH-36",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Read the Item 1 segment excerpt from Microsoft's FY2024 Form 10-K:\n'Our Intelligent Cloud segment consists of our public, private, and hybrid server products and cloud services that can power modern business and developers, including server products such as Windows Server, Microsoft SQL Server, and Azure.'\nName the main cloud and server product offerings listed under Microsoft's Intelligent Cloud segment.",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Azure",
+      "Server"
+    ],
+    "expected_text": "Azure and Windows Server"
+  },
+  {
+    "id": "BENCH-37",
+    "category": "extraction_filing",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Read the Item 1 Business excerpt from Alphabet's FY2023 Form 10-K:\n'In December 2023, we launched Gemini, our most capable and general model. It was built from the ground up to be multimodal, which means it can generalize and seamlessly understand, operate across, and combine different types of information including text, code, audio, image, and video.'\nWhen did Alphabet launch Gemini and what does multimodal mean according to the text?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "December 2023",
+      "multimodal"
+    ],
+    "expected_text": "December 2023 and multimodal"
+  },
+  {
+    "id": "BENCH-38",
+    "category": "extraction_filing",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Read the Item 1 segment reporting excerpt from Alphabet's FY2023 Form 10-K:\n'We report Google in two segments, Google Services and Google Cloud, and all non-Google businesses collectively as Other Bets.'\nWhat are the three reporting segments of Alphabet Inc. described in the filing?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Google Services",
+      "Google Cloud",
+      "Other Bets"
+    ],
+    "expected_text": "Google Services, Google Cloud, and Other Bets"
+  },
+  {
+    "id": "BENCH-39",
+    "category": "extraction_filing",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Read the Item 8 Legal Proceedings excerpt from Alphabet's FY2023 Form 10-K:\n'In December 2023, a California jury delivered a verdict in Epic Games v. Google finding that Google engaged in anticompetitive conduct in the Android app distribution and in-app billing markets.'\nIn which antitrust case did a California jury deliver a verdict against Google in December 2023?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "Epic Games"
+    ],
+    "expected_text": "Epic Games v. Google"
+  },
+  {
+    "id": "BENCH-40",
+    "category": "extraction_filing",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Read the Item 7 MD&A excerpt from Alphabet's FY2023 Form 10-K:\n'Google Cloud operating income was $864 million for 2023 compared to an operating loss of $1,864 million for 2022.'\nWhat was Google Cloud's operating income in 2023 and what was its operating loss in 2022?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "864",
+      "1,864"
+    ],
+    "expected_text": "$864 million operating income and $1,864 million operating loss"
+  },
+  {
+    "id": "BENCH-41",
+    "category": "extraction_filing",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q3",
+    "accession": "0000320193-24-000081",
+    "prompt": "Read the Item 2 MD&A excerpt from Apple's Q3 FY2024 Form 10-Q:\n'iPhone net sales increased during the third quarter and first nine months of 2024 compared to the same periods in 2023 due to higher net sales of iPhone 15 family of devices.'\nWhat specific product family drove the increase in iPhone net sales during Q3 FY2024 according to the excerpt?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "iPhone 15"
+    ],
+    "expected_text": "iPhone 15 family of devices"
+  },
+  {
+    "id": "BENCH-42",
+    "category": "extraction_filing",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "Q3",
+    "accession": "0000950170-24-048288",
+    "prompt": "Read the Item 2 excerpt from Microsoft's Q3 FY2024 Form 10-Q:\n'Server products and cloud services revenue increased 24%, driven by Azure and other cloud services revenue growth of 31%.'\nBy what percentage did Azure and other cloud services revenue grow in Q3 FY2024 according to Microsoft?",
+    "check_type": "contains_all",
+    "target_keywords": [
+      "31%"
+    ],
+    "expected_text": "31%"
+  },
+  {
+    "id": "BENCH-43",
+    "category": "abstain",
+    "ticker": "AAPL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000320193-24-000123",
+    "prompt": "Based on the provided excerpt from Apple's FY2024 Form 10-K:\n'Apple designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services.'\nQuestion: What is Apple's projected revenue target for electric vehicles and quantum computing in the fiscal year 2035? If this information is not in the excerpt, clearly state that the provided text does not contain this information.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned"
+    ],
+    "expected_text": "Abstain: The text does not provide projected revenue targets for 2035."
+  },
+  {
+    "id": "BENCH-44",
+    "category": "abstain",
+    "ticker": "MSFT",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0000950170-24-087843",
+    "prompt": "Based on the provided excerpt from Microsoft's FY2024 Form 10-K:\n'Microsoft enables digital transformation for the era of an intelligent cloud and an intelligent edge. Our mission is to empower every person and every organization on the planet to achieve more.'\nQuestion: What were the secret internal production quotas for commercial nuclear submarines built by Microsoft in 2024? If not present, abstain by stating that the text does not contain this information.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned"
+    ],
+    "expected_text": "Abstain: The text does not contain information about submarine production."
+  },
+  {
+    "id": "BENCH-45",
+    "category": "abstain",
+    "ticker": "GOOGL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0001652044-24-000022",
+    "prompt": "Based on the provided excerpt from Alphabet's FY2023 Form 10-K:\n'Our business is focused on key areas, such as search, advertising, maps, cloud, hardware, software, and artificial intelligence.'\nQuestion: How many astronauts did Alphabet train for NASA's manned mission to Jupiter in 2023? If not mentioned, state that the excerpt does not contain this information.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned"
+    ],
+    "expected_text": "Abstain: The text does not contain information about astronaut training for Jupiter."
+  },
+  {
+    "id": "BENCH-46",
+    "category": "abstain",
+    "ticker": "AAPL",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000320193-23-000106",
+    "prompt": "Based on the provided excerpt from Apple's FY2023 Form 10-K:\n'The Company's fiscal year is the 52- or 53-week period that ends on the last Saturday of September.'\nQuestion: What was the exact private personal cell phone number of Apple's Chief Executive Officer during fiscal year 2023? If not present in the excerpt, state that this information is not provided.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned"
+    ],
+    "expected_text": "Abstain: The private cell phone number is not provided in the text."
+  },
+  {
+    "id": "BENCH-47",
+    "category": "abstain",
+    "ticker": "MSFT",
+    "fiscal_year": 2023,
+    "fiscal_period": "FY",
+    "accession": "0000950170-23-035122",
+    "prompt": "Based on the provided excerpt from Microsoft's FY2023 Form 10-K:\n'We generate revenue by offering a wide range of cloud-based and other services to people and businesses; licensing and supporting an array of software products; designing, manufacturing, and selling devices; and delivering relevant online advertising to a global audience.'\nQuestion: What was the total number of electric cars delivered by Tesla Motors in the third quarter of 2023? If not mentioned, state that the excerpt does not provide this information.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned",
+      "discusses microsoft's revenue"
+    ],
+    "expected_text": "Abstain: The text does not provide information regarding Tesla Motors electric cars."
+  },
+  {
+    "id": "BENCH-48",
+    "category": "abstain",
+    "ticker": "GOOGL",
+    "fiscal_year": 2024,
+    "fiscal_period": "FY",
+    "accession": "0001652044-25-000014",
+    "prompt": "Based on the provided excerpt from Alphabet's FY2024 Form 10-K:\n'Alphabet is a collection of businesses \u2014 the largest of which is Google.'\nQuestion: According to this text, what was the exact dividend payout per share paid by Apple Inc. to its shareholders in 2024? If not present, explicitly state that the text does not contain this information.",
+    "check_type": "abstain",
+    "abstain_keywords": [
+      "not contain",
+      "not provided",
+      "does not mention",
+      "cannot be determined",
+      "not stated",
+      "insufficient",
+      "not mentioned"
+    ],
+    "expected_text": "Abstain: The text does not contain information about Apple Inc.'s dividend payout."
+  }
+]

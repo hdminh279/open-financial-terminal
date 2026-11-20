@@ -1,0 +1,47 @@
+# Python & Virtualenv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Data (Raw & Processed) - Never commit raw data or marts
+/data/
+
+# Models & Binary Weights
+models/*.gguf
+models/*.bin
+*.duckdb
+*.duckdb.wal
+
+# dbt artifacts
+transform/target/
+transform/dbt_packages/
+transform/*.duckdb*
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Docker & runtime logs
+*.log
+logs/
+
+# File MD
+AGENTS.md
+master-plan.md
+master_plan.md
+
+# Private Internal Docs
+docs/

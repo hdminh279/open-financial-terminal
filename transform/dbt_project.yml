@@ -1,0 +1,20 @@
+name: 'corporate_filing_transform'
+version: '1.0.0'
+config-version: 2
+
+profile: 'corporate_filing_profile'
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  corporate_filing_transform:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: external

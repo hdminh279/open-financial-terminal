@@ -1,0 +1,30 @@
+corporate_filing_profile:
+  # Default to 'local' target, or override via DBT_TARGET environment variable
+  target: "{{ env_var('DBT_TARGET', 'local') }}"
+
+  outputs:
+    # Target 1: For host development machine (connecting to exposed port on localhost)
+    local:
+      type: duckdb
+      path: "dev.duckdb"
+      extensions:
+        - httpfs
+      settings:
+        s3_endpoint: "{{ env_var('S3_ENDPOINT_URL_LOCAL') }}"
+        s3_access_key_id: "{{ env_var('S3_ACCESS_KEY') }}"
+        s3_secret_access_key: "{{ env_var('S3_SECRET_KEY') }}"
+        s3_use_ssl: false
+        s3_url_style: "path"
+
+    # Target 2: For Docker container execution (connecting via Docker internal network)
+    docker:
+      type: duckdb
+      path: ":memory:"
+      extensions:
+        - httpfs
+      settings:
+        s3_endpoint: "{{ env_var('S3_ENDPOINT_URL') }}"
+        s3_access_key_id: "{{ env_var('S3_ACCESS_KEY') }}"
+        s3_secret_access_key: "{{ env_var('S3_SECRET_KEY') }}"
+        s3_use_ssl: false
+        s3_url_style: "path"

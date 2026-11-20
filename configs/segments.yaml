@@ -1,0 +1,92 @@
+# Corporate reporting segments and product line categories (Single Source of Truth)
+segments:
+  AAPL:
+    - name: "Americas"
+      type: "geographic"
+      aliases: ["americas"]
+    - name: "Europe"
+      type: "geographic"
+      aliases: ["europe"]
+    - name: "Greater China"
+      type: "geographic"
+      aliases: ["greater china", "china"]
+    - name: "Japan"
+      type: "geographic"
+      aliases: ["japan"]
+    - name: "Rest of Asia Pacific"
+      type: "geographic"
+      aliases: ["rest of asia pacific", "apac"]
+    - name: "iPhone"
+      type: "product_line"
+      aliases: ["iphone"]
+    - name: "Mac"
+      type: "product_line"
+      aliases: ["mac", "macbook"]
+    - name: "iPad"
+      type: "product_line"
+      aliases: ["ipad"]
+    - name: "Wearables, Home and Accessories"
+      type: "product_line"
+      aliases: ["wearables", "apple watch", "airpods"]
+    - name: "Services"
+      type: "product_line"
+      aliases: ["services", "app store", "apple music", "icloud"]
+  MSFT:
+    - name: "Productivity and Business Processes"
+      type: "operating"
+      aliases: ["productivity", "office 365", "linkedin", "dynamics"]
+    - name: "Intelligent Cloud"
+      type: "operating"
+      aliases: ["intelligent cloud", "server products"]
+    - name: "More Personal Computing"
+      type: "operating"
+      aliases: ["more personal computing", "windows", "xbox", "surface"]
+    - name: "Azure and other cloud services"
+      type: "product_line"
+      aliases: ["azure", "azure revenue"]
+    - name: "Office Commercial"
+      type: "product_line"
+      aliases: ["office commercial"]
+    - name: "Xbox content and services"
+      type: "product_line"
+      aliases: ["xbox", "gaming"]
+    - name: "United States"
+      type: "geographic"
+      aliases: ["united states", "u.s.", "u.s.a."]
+    - name: "Other countries"
+      type: "geographic"
+      aliases: ["other countries", "international"]
+  GOOGL:
+    - name: "Google Services"
+      type: "operating"
+      aliases: ["google services"]
+    - name: "Google Cloud"
+      type: "operating"
+      aliases: ["google cloud"]
+    - name: "Other Bets"
+      type: "operating"
+      aliases: ["other bets", "waymo", "verily"]
+    - name: "Google Search & other"
+      type: "product_line"
+      aliases: ["google search", "search & other"]
+    - name: "YouTube advertising"
+      type: "product_line"
+      aliases: ["youtube", "youtube ads"]
+    - name: "Google Network"
+      type: "product_line"
+      aliases: ["google network", "adsense", "admob"]
+    - name: "Google subscriptions, platforms, and devices"
+      type: "product_line"
+      aliases: ["google subscriptions", "google pixel", "google hardware"]
+    - name: "United States"
+      type: "geographic"
+      aliases: ["united states", "u.s.", "u.s.a."]
+    - name: "EMEA"
+      type: "geographic"
+      aliases: ["emea", "europe middle east"]
+    - name: "APAC"
+      type: "geographic"
+      aliases: ["apac", "asia pacific"]
+    - name: "Other Americas"
+      type: "geographic"
+      aliases: ["other americas"]
