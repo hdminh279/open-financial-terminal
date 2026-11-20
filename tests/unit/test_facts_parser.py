@@ -486,7 +486,7 @@ class TestFactsParserTaxonomyAndUnits:
                                     "fp": "Q1",
                                 }
                             ],
-                            "EUR": [
+                            "CAD": [
                                 {
                                     "val": 95000,
                                     "start": "2023-01-01",

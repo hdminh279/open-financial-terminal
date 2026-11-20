@@ -112,6 +112,20 @@ metrics:
         priority: 2
         regime: "General Fallback"
         description: "Broad general revenue tag fallback."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "RevenueFromContractsWithCustomers"
+        priority: 3
+        regime: "IFRS 15 Global"
+        description: "Primary revenue tag under IFRS 15 for foreign private issuers (TSMC, Infosys, Shell)."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Revenue"
+        priority: 4
+        regime: "IFRS General Fallback"
+        description: "Standard revenue tag under IFRS."
 
   operating_income:
     display_name: "Operating Income (EBIT)"
@@ -138,6 +152,20 @@ metrics:
         priority: 1
         regime: "US-GAAP"
         description: "Operating income or loss before non-operating items, interest, and taxes."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "ProfitLossFromOperatingActivities"
+        priority: 2
+        regime: "IFRS Standard"
+        description: "Operating profit or loss under IFRS."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "OperatingProfit"
+        priority: 3
+        regime: "IFRS General Fallback"
+        description: "General operating profit tag under IFRS."
 
   net_income:
     display_name: "Net Income (Loss)"
@@ -376,6 +404,13 @@ metrics:
         priority: 1
         regime: "US-GAAP"
         description: "Total consolidated stockholders' equity including noncontrolling interests."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "Equity"
+        priority: 2
+        regime: "IFRS Total Equity"
+        description: "Total equity under IFRS."
 
   stockholders_equity_parent:
     display_name: "Stockholders' Equity (Parent Entity)"
@@ -398,6 +433,13 @@ metrics:
         priority: 1
         regime: "US-GAAP"
         description: "Equity interest attributable solely to parent company stockholders. Excludes noncontrolling interests."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "EquityAttributableToOwnersOfParent"
+        priority: 2
+        regime: "IFRS Parent Equity"
+        description: "Equity attributable to owners of parent under IFRS."
 
   cash_and_cash_equivalents:
     display_name: "Cash and Cash Equivalents"
@@ -422,6 +464,13 @@ metrics:
         priority: 1
         regime: "US-GAAP"
         description: "Cash and highly liquid marketable deposits at carrying value."
+      - entity_ciks: ["*"]
+        effective_start_fy: null
+        effective_end_fy: null
+        tag: "CashAndCashEquivalents"
+        priority: 2
+        regime: "IFRS Standard"
+        description: "Cash and cash equivalents under IFRS."
 
   current_assets:
     display_name: "Total Current Assets"

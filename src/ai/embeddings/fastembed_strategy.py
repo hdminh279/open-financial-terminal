@@ -41,15 +41,20 @@ class FastEmbedStrategy(EmbeddingStrategy):
         if self._model is None:
             env_threads = os.getenv("FASTEMBED_THREADS")
             cpu_threads = self._threads or (int(env_threads) if env_threads else max(1, (os.cpu_count() or 1) - 1))
+            env_cuda = os.getenv("EMBEDDING_CUDA", "").lower() in ("true", "1", "yes")
+            env_device = os.getenv("EMBEDDING_DEVICE", "cpu").lower()
+            use_cuda = env_cuda or (env_device in ("cuda", "gpu"))
             logger.info(
-                "Initializing FastEmbed TextEmbedding model '%s' (threads=%d) on CPU...",
+                "Initializing FastEmbed TextEmbedding model '%s' (threads=%d, cuda=%s)...",
                 self._model_name,
                 cpu_threads,
+                use_cuda,
             )
             self._model = TextEmbedding(
                 model_name=self._model_name,
                 cache_dir=self._cache_dir,
                 threads=cpu_threads,
+                cuda=use_cuda,
                 lazy_load=False,
             )
             # Resolve actual model dimension from FastEmbed registry metadata

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SEC_ARCHIVE_BASE_URL = "https://www.sec.gov/Archives/edgar/data/{cik_int}/{accession_no_hyphens}/{primary_doc}"
-DEFAULT_TARGET_FORMS: Sequence[str] = ("10-K", "10-Q", "10-K/A", "10-Q/A")
+DEFAULT_TARGET_FORMS: Sequence[str] = ("10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A")
 
 
 @dataclass(frozen=True)

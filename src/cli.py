@@ -77,8 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_parser.add_argument(
         "--forms",
         nargs="+",
-        default=["10-K", "10-Q", "10-K/A", "10-Q/A"],
-        help="Target filing forms (default: 10-K 10-Q 10-K/A 10-Q/A).",
+        default=["10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A"],
+        help="Target filing forms (default: 10-K 10-Q 10-K/A 10-Q/A 20-F 20-F/A).",
     )
     ingest_parser.add_argument(
         "--min-year",

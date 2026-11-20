@@ -29,7 +29,7 @@ class FactsParser:
     CANONICAL_DIMENSIONS = "consolidated"
     DEFAULT_TAXONOMY_PATH = "configs/xbrl_taxonomy_map.yaml"
     DEFAULT_COMPANIES_PATH = "configs/companies.yaml"
-    ALLOWED_FORMS = ("10-K", "10-Q", "10-K/A", "10-Q/A")
+    ALLOWED_FORMS = ("10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A")
 
     FACTS_SCHEMA = pa.schema([
         ("fact_key", pa.string()),
