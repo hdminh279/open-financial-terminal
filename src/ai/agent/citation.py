@@ -45,35 +45,35 @@ def _get_financial_ontology() -> FinancialOntology:
         _financial_ontology = FinancialOntology()
     return _financial_ontology
 
-SYNTHESIS_SYSTEM_PROMPT = """You are a senior financial research analyst and SEC filings specialist.
+SYNTHESIS_SYSTEM_PROMPT = """You are a senior financial research analyst and corporate intelligence specialist.
 Your mission is to synthesize a factual, clear, and comprehensive answer to the user's question,
-grounded STRICTLY and EXCLUSIVELY in the provided SEC EDGAR evidence.
+grounded strictly and objectively in the provided verified evidence (including official SEC EDGAR filings, VAS financial statements, and live web sources).
 
-### Financial Semantic Guardrails (Mandatory 4-Layer Rules):
-1. Layer 1 (GAAP vs Non-GAAP):
-   - Clearly identify GAAP metrics (Revenues, Net Income, Operating Income) versus Non-GAAP or Segment metric disclosures.
+### Financial Semantic Guardrails:
+1. Layer 1 (GAAP / VAS vs Non-GAAP):
+   - Clearly distinguish official GAAP/VAS reported metrics (Revenues, Net Income, Operating Income) versus segment, non-GAAP, or news disclosures.
 2. Layer 2 (Financial Ontology - Geographic vs Product Lines):
-   - Strictly separate Geographic Segments (e.g. Americas, Europe, Greater China, Rest of Asia Pacific) from Product Categories (e.g. iPhone, Mac, iPad, Services, Azure).
+   - Strictly separate Geographic Segments (e.g. Americas, Europe, Greater China) from Product Categories (e.g. iPhone, Mac, Services, Azure).
    - NEVER confuse, mix, or aggregate Geographic revenue with Product Line revenue.
-3. Layer 3 (Two-Tier Response Structure):
-   Your answer MUST be organized into two distinct sections:
-   - `### [Official SEC Disclosures]`:
-     * Pure factual figures, standard Markdown tables with pipes (|), and inline citations [1], [2].
+3. Layer 3 (Two-Tier Structured Organization):
+   Your answer should be well-organized into two clear sections:
+   - `### [Official Disclosures]`:
+     * Core factual figures, standard Markdown tables with pipes (|), and inline citations [1], [2].
    - `### [Analysis & Commentary]`:
      * Growth rates, margins, business dynamics, and strategic commentary directly backed by the evidence.
 4. Layer 4 (Mathematical Consistency):
    - Operating Margin = Operating Income / Revenues.
    - Net Margin = Net Income / Revenues.
-   - Never hallucinate margins that contradict the raw numbers in the evidence.
+   - Never hallucinate margins or figures that contradict the raw evidence.
 
 ### Language Enforcement:
-- If the user's inquiry is in another language (such as Vietnamese), you MUST synthesize the entire answer fluently in that language, translating the two-tier section headers accordingly.
+- If the user's inquiry is in Vietnamese (or another language), synthesize the entire answer fluently in that language, translating the two-tier section headers naturally (e.g. `### [Công bố Chính thức & Bằng chứng]`, `### [Phân tích & Bình luận]`).
 - For English queries, use:
-  * `### [Official SEC Disclosures]`
+  * `### [Official Disclosures]`
   * `### [Analysis & Commentary]`
 
 ### Markdown Table Formatting Rule:
-- When presenting multiple fiscal periods, product categories, or metric comparisons, you MUST format the data as a clean, standard GitHub Flavored Markdown Table with pipe syntax:
+- When presenting multiple fiscal periods, product categories, or metric comparisons, format the data as a clean, standard GitHub Flavored Markdown Table with pipe syntax:
   | Fiscal Period / Product Line | Value | Citation Source |
   | :--- | :---: | :---: |
   | <Period_or_Segment_1> | <Amount_1> | [1] |
@@ -118,6 +118,7 @@ class CitationEngine:
         citations: List[Citation] = []
         for idx, ev_dict in enumerate(evidence_dicts):
             citation_id = idx + 1
+            source_type = ev_dict.get("source_type")
             ticker = ev_dict.get("ticker", "SEC")
             form = ev_dict.get("form", "Filing")
             fy = ev_dict.get("fiscal_year")
@@ -126,10 +127,15 @@ class CitationEngine:
             item_or_metric = ev_dict.get("item_or_metric", "Filing Reference")
             source_url = ev_dict.get("source_url") or "https://www.sec.gov/edgar/searchedgar/companysearch"
 
-            formatted_ref = (
-                f"[{citation_id}] {ticker} Form {form} {period_str} "
-                f"{item_or_metric} — [SEC EDGAR Source]({source_url})"
-            )
+            if source_type == EvidenceSourceType.WEB.value or form == "WEB_NEWS":
+                formatted_ref = f"[{citation_id}] {item_or_metric} — [Live Web Source]({source_url})"
+            elif form in ("BCTC", "VAS", "VAS-BANK", "VAS-SECURITIES", "VAS-INSURANCE") or "vndirect" in source_url or "vietstock" in source_url:
+                formatted_ref = f"[{citation_id}] {ticker} BCTC {period_str} {item_or_metric} — [Financial Statement Source]({source_url})"
+            else:
+                formatted_ref = (
+                    f"[{citation_id}] {ticker} Form {form} {period_str} "
+                    f"{item_or_metric} — [SEC EDGAR Source]({source_url})"
+                )
 
             citations.append(
                 Citation(

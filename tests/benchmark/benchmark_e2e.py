@@ -92,7 +92,9 @@ def run_e2e_benchmark() -> Dict[str, Any]:
         for c in citations:
             total_citations += 1
             url = c.get("source_url", "")
-            if url.startswith("https://www.sec.gov/") and "/Archives/edgar/data/" in url:
+            is_sec_url = url.startswith("https://www.sec.gov/") and "/Archives/edgar/data/" in url
+            is_valid_web_url = url.startswith("http://") or url.startswith("https://")
+            if is_sec_url or is_valid_web_url:
                 citations_valid += 1
             else:
                 is_all_urls_valid = False

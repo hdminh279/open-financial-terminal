@@ -52,6 +52,7 @@ class FinancialQueryPlan(BaseModel):
     fiscal_periods: List[str] = Field(default_factory=list, description="Target fiscal periods")
     requires_sql: bool = Field(default=False, description="Flag indicating if SQL Gold layer is needed")
     requires_rag: bool = Field(default=False, description="Flag indicating if RAG Textual layer is needed")
+    requires_web: bool = Field(default=False, description="Flag indicating if Live Web Search is needed")
     comparison_type: ComparisonType = Field(default=ComparisonType.NONE, description="Analytical comparison type")
     sql_metrics: List[str] = Field(default_factory=list, description="Canonical metrics routed to SQL Gold")
     rag_metrics: List[str] = Field(default_factory=list, description="Canonical or segment metrics routed to RAG")
@@ -113,6 +114,7 @@ class EvidenceSourceType(str, Enum):
 
     SQL = "sql"
     RAG = "rag"
+    WEB = "web"
 
 
 class ExecutionStrategy(str, Enum):
@@ -163,6 +165,23 @@ class RAGQueryParams(BaseModel):
     )
 
 
+class WebSearchQueryParams(BaseModel):
+    """Structured parameters planned by LLM for WebSearchTool."""
+
+    model_config = ConfigDict(frozen=True)
+
+    search_query: str = Field(
+        ...,
+        description="Refined web search query for breaking news, live quotes, or recent events",
+    )
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum number of search results to retrieve",
+    )
+
+
 class RoutingDecision(BaseModel):
     """Structured decision produced autonomously by the Intent Router LLM."""
 
@@ -184,6 +203,10 @@ class RoutingDecision(BaseModel):
     rag_params: Optional[RAGQueryParams] = Field(
         default=None,
         description="Targeted parameters for RAG Retriever if selected",
+    )
+    web_params: Optional[WebSearchQueryParams] = Field(
+        default=None,
+        description="Targeted parameters for Web Search Tool if selected",
     )
     tickers: List[str] = Field(
         default_factory=list,

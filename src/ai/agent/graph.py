@@ -26,6 +26,7 @@ from src.ai.agent.tools.financial_sql_tool import (
     FinancialQueryInput,
     FinancialSQLTool,
 )
+from src.ai.agent.tools.web_search_tool import WebSearchTool
 from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter
 from src.core.financial.company_registry import get_supported_tickers, load_company_catalog
 from src.core.financial.metric_registry import MetricRegistry
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 _SHARED_SQL_TOOL: Optional[FinancialSQLTool] = None
 _SHARED_RETRIEVER: Optional[HybridRetriever] = None
+_SHARED_WEB_TOOL: Optional[WebSearchTool] = None
 
 
 def get_sql_tool() -> FinancialSQLTool:
@@ -56,6 +58,14 @@ def get_retriever() -> HybridRetriever:
     if _SHARED_RETRIEVER is None:
         _SHARED_RETRIEVER = HybridRetriever()
     return _SHARED_RETRIEVER
+
+
+def get_web_tool() -> WebSearchTool:
+    """Retrieve or lazily initialize the shared WebSearchTool instance."""
+    global _SHARED_WEB_TOOL
+    if _SHARED_WEB_TOOL is None:
+        _SHARED_WEB_TOOL = WebSearchTool()
+    return _SHARED_WEB_TOOL
 
 
 def sql_node(
@@ -473,6 +483,104 @@ def rag_node(
             }],
         }
 
+
+def web_node(
+    state: AgentState,
+    web_tool: Optional[WebSearchTool] = None,
+) -> Dict[str, Any]:
+    """LangGraph node executing real-time web searches via DuckDuckGo Search.
+
+    Args:
+        state: Current AgentState containing 'web_params' or 'query'.
+        web_tool: Injected or default WebSearchTool instance.
+
+    Returns:
+        State dictionary update containing 'web_data', 'tool_results', 'evidence_items', and 'activity_timeline'.
+    """
+    start_time = time.perf_counter()
+    tool = web_tool or get_web_tool()
+    raw_params = state.get("web_params") or {}
+    query_str = raw_params.get("search_query") or state.get("query", "").strip()
+    max_results = raw_params.get("max_results", 5)
+
+    try:
+        response = tool.search(query=query_str, max_results=max_results)
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        status = (
+            ToolExecutionStatus.SUCCESS
+            if response.total_found > 0
+            else ToolExecutionStatus.NO_DATA_FOUND
+        )
+
+        tool_result = ToolExecutionResult(
+            tool_name="web_search_tool",
+            status=status,
+            data=response.model_dump(),
+            execution_time_ms=elapsed_ms,
+        )
+
+        routing_decision = state.get("routing_decision") or {}
+        tickers = routing_decision.get("tickers") or []
+        primary_ticker = tickers[0] if tickers else "WEB"
+
+        evidence_items: List[Dict[str, Any]] = []
+        for idx, item in enumerate(response.results):
+            evidence = EvidenceItem(
+                citation_id=idx + 1,
+                source_type=EvidenceSourceType.WEB,
+                ticker=primary_ticker,
+                form="WEB_NEWS",
+                fiscal_year=None,
+                fiscal_period=None,
+                item_or_metric=f"Web: {item.title}",
+                content_summary=item.snippet,
+                source_url=item.url,
+                accession_number=None,
+            )
+            evidence_items.append(evidence.model_dump())
+
+        web_step = {
+            "step": "Searching live web",
+            "status": "completed",
+            "description": (
+                f"Retrieved {response.total_found} live web result(s)"
+                if status == ToolExecutionStatus.SUCCESS
+                else "No matching live web results found"
+            ),
+            "duration_ms": round(elapsed_ms, 2),
+        }
+
+        return {
+            "web_data": response.model_dump(),
+            "tool_results": [tool_result.model_dump()],
+            "evidence_items": evidence_items,
+            "activity_timeline": [web_step],
+        }
+
+    except Exception as exc:
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        logger.error("Error executing web_search_tool: %s", exc, exc_info=True)
+        tool_result = ToolExecutionResult(
+            tool_name="web_search_tool",
+            status=ToolExecutionStatus.TOOL_FAILED,
+            data=None,
+            execution_time_ms=elapsed_ms,
+            error_message="Live web search service failed",
+        )
+        return {
+            "web_data": None,
+            "tool_results": [tool_result.model_dump()],
+            "evidence_items": [],
+            "activity_timeline": [{
+                "step": "Searching live web",
+                "status": "failed",
+                "description": "Live web search service failed",
+                "duration_ms": round(elapsed_ms, 2),
+            }],
+        }
+
+
 def build_agent_graph() -> Any:
     """Construct and compile the enterprise LangGraph StateGraph workflow.
     Workflow topology:
@@ -481,14 +589,16 @@ def build_agent_graph() -> Any:
        - 'OUT_OF_SCOPE' -> abstention_node
        - 'FINANCIAL_METRIC' -> sql_node
        - 'TEXTUAL_RESEARCH' -> rag_node
-       - 'MIXED_RESEARCH' / 'DEEP_RESEARCH_REPORT' -> ['sql_node', 'rag_node'] (Parallel Fan-Out)
+       - 'web_search_tool' / breaking news -> web_node
+       - Parallel Fan-Out (e.g. ['sql_node', 'web_node'], ['sql_node', 'rag_node', 'web_node'])
     3. sql_node -> abstention_node (Fan-In)
     4. rag_node -> abstention_node (Fan-In)
-    5. abstention_node -> decide_after_abstention (Conditional Edge):
+    5. web_node -> abstention_node (Fan-In)
+    6. abstention_node -> decide_after_abstention (Conditional Edge):
        - Full Abstention -> citation_node (short-circuits synthesis)
        - Supported / Partial -> synthesis_node
-    6. synthesis_node -> citation_node
-    7. citation_node -> END
+    7. synthesis_node -> citation_node
+    8. citation_node -> END
     Returns:
         Compiled LangGraph application.
     """
@@ -497,6 +607,7 @@ def build_agent_graph() -> Any:
     workflow.add_node("router_node", router_node)
     workflow.add_node("sql_node", sql_node)
     workflow.add_node("rag_node", rag_node)
+    workflow.add_node("web_node", web_node)
     workflow.add_node("abstention_node", abstention_node)
     workflow.add_node("synthesis_node", synthesis_node)
     workflow.add_node("citation_node", citation_node)
@@ -506,11 +617,12 @@ def build_agent_graph() -> Any:
     workflow.add_conditional_edges(
         "router_node",
         route_next_step,
-        ["sql_node", "rag_node", "abstention_node"],
+        ["sql_node", "rag_node", "web_node", "abstention_node"],
     )
     # 4. Tool Convergence to Abstention Gate (Fan-In)
     workflow.add_edge("sql_node", "abstention_node")
     workflow.add_edge("rag_node", "abstention_node")
+    workflow.add_edge("web_node", "abstention_node")
     # 5. Abstention Gate Conditional Branching
     workflow.add_conditional_edges(
         "abstention_node",

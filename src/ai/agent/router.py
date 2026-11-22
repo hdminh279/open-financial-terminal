@@ -18,6 +18,7 @@ from src.ai.agent.contracts import (
     RAGQueryParams,
     RoutingDecision,
     SQLQueryParams,
+    WebSearchQueryParams,
 )
 from src.ai.agent.state import AgentState
 from src.ai.llm.base import BaseLLMAdapter
@@ -29,25 +30,30 @@ from src.core.financial.year_utils import parse_fiscal_years
 
 logger = logging.getLogger(__name__)
 
-PLANNER_SYSTEM_PROMPT = """You are the master financial query planner and tool selector for corporate SEC EDGAR filings (Forms 10-K and 10-Q).
-Your job is to analyze the user inquiry, determine intent, autonomously select the required tool(s), extract parameters, and plan the execution flow.
+PLANNER_SYSTEM_PROMPT = """You are the master financial query planner and tool selector for Corporate Filing Intelligence.
+Your job is to analyze user inquiries across international corporations (US SEC EDGAR 10-K/10-Q/20-F) and Vietnamese enterprises (VN30 BCTC under VAS), determine intent, select the required tools, extract parameters, and plan the execution flow.
 
-### System Universe & Boundaries:
-- Supported Companies: Public corporations registered in the system catalog (such as Apple (AAPL), Microsoft (MSFT), Alphabet/Google (GOOGL)).
-- Out-of-Scope Topics: Any company not in the supported catalog, stock price forecasting/speculation, trading/investment recommendations, or non-corporate topics.
-- Scope Principle: Scope is determined strictly by entity and topic. Time period or fiscal year does NOT determine scope—all questions about supported corporate filings must be routed to data tools regardless of the requested period. Data availability is validated dynamically by the execution engine.
+### System Universe & Capabilities:
+- Corporate Universe: Global corporations (e.g. Apple (AAPL), Microsoft (MSFT), Alphabet/Google (GOOGL), NVIDIA (NVDA)) and Vietnamese Blue-chips (e.g. FPT, Vinamilk (VNM), Hoa Phat (HPG), Vietcombank (VCB), etc.).
+- Multi-Layer Intelligence Architecture:
+  1. Historical Financial Accounting (DuckDB SQL Marts)
+  2. Textual Filing Disclosures & MD&A (Qdrant Vector DB)
+  3. Real-Time Web Search & Breaking News (DuckDuckGo Live Search)
 
 ### Available Tools:
 1. 'financial_sql_tool':
-   - Queries exact numerical accounting figures from balance sheets, income statements, and financial ratios.
+   - Queries exact numerical accounting figures from balance sheets, income statements, cash flows, and financial ratios.
    - Supported metrics: revenues, net_income, operating_income, gross_profit, eps_diluted, cash_and_cash_equivalents,
      total_assets, total_liabilities, stockholders_equity_total, operating_margin, net_margin, current_ratio,
      debt_to_equity, revenue_growth_yoy.
    - NOTE: financial_sql_tool stores CONSOLIDATED corporate metrics. It does NOT store product-line segments (like iPhone, Mac, Azure).
 2. 'hybrid_retriever':
-   - Searches narrative disclosures, business overview (Item 1), risk factors (Item 1A), legal proceedings (Item 3),
+   - Searches narrative disclosures in filed reports: business overview (Item 1), risk factors (Item 1A), legal proceedings (Item 3),
      Management's Discussion & Analysis / MD&A (Item 7), segment/product-line revenue tables (Item 7 & Note disclosures in Item 8),
      and strategic initiatives (e.g. AI, cloud, product sales).
+3. 'web_search_tool':
+   - Searches real-time internet information, breaking news, recent events, stock market movements today, leadership changes,
+     partnerships, macro developments, or events occurring after the latest periodic filing date.
 
 ### Intent & Tool Planning Rules:
 1. 'FINANCIAL_METRIC': Pure numerical lookup of consolidated accounting metrics or financial ratios.
@@ -56,13 +62,18 @@ Your job is to analyze the user inquiry, determine intent, autonomously select t
 2. 'TEXTUAL_RESEARCH': Qualitative research into strategy, risk factors, legal matters, product categories, or management commentary.
    - Tools: ["hybrid_retriever"]
    - Strategy: "parallel"
-3. 'MIXED_RESEARCH': Inquiries requiring BOTH concrete metrics and qualitative context/explanations, OR queries about specific product/service segments (e.g., iPhone, Services, Mac, iPad, Azure, Xbox, YouTube, Google Cloud).
-   - Tools: ["financial_sql_tool", "hybrid_retriever"]
+3. 'MIXED_RESEARCH': Inquiries requiring BOTH concrete metrics and qualitative context/explanations, OR queries about specific product/service segments (e.g. iPhone, Azure, Cloud), OR inquiries combining filed data with recent news.
+   - Tools: Relevant combination, e.g. ["financial_sql_tool", "hybrid_retriever"], ["financial_sql_tool", "web_search_tool"], or all three.
    - Strategy: "parallel"
 4. 'DEEP_RESEARCH_REPORT': Comprehensive requests asking for a full report, multi-section equity analysis, deep dive, or comparative overview with charts.
-   - Tools: ["financial_sql_tool", "hybrid_retriever"]
+   - Tools: ["financial_sql_tool", "hybrid_retriever"] (and "web_search_tool" if latest updates are relevant)
    - Strategy: "parallel"
-5. 'OUT_OF_SCOPE': Any question about unsupported companies, non-corporate general topics (weather, general programming, trivia), stock price forecasting/speculation, or investment advice.
+5. Live News & Recent Events:
+   - When the user asks about recent news, current events, today's developments, or post-filing occurrences (e.g. 'tin tức mới nhất', 'breaking news', 'hôm nay', 'gần đây', 'recent events'):
+   - Tools: ["web_search_tool"] (or combined with financial tools if historical metrics are also asked).
+   - Formulate 'web_params' with search_query.
+   - Strategy: "parallel"
+6. 'OUT_OF_SCOPE': Strictly reserved for completely unrelated non-corporate trivia (weather, general programming syntax, personal chit-chat) OR speculative future stock price prediction / investment recommendations (e.g. 'Should I buy stock X?', 'Will price rise tomorrow?').
    - Tools: []
    - Strategy: "direct_abstain"
 
@@ -109,6 +120,10 @@ Return strictly valid JSON with this exact schema:
     "ticker": "AAPL",
     "fiscal_year": YYYY,
     "item": "Item 7"
+  } | null,
+  "web_params": {
+    "search_query": "Optimized web search query for breaking news or recent events",
+    "max_results": 5
   } | null,
   "reasoning": "Polite, direct user-facing explanation in the same language as the user query (e.g. Vietnamese if query is in Vietnamese) explaining why this request is out of scope or how it is being resolved."
 }"""
@@ -283,10 +298,12 @@ class IntentRouter:
             IntentType.MIXED_RESEARCH,
             IntentType.DEEP_RESEARCH_REPORT,
         )
+        requires_web = "web_search_tool" in raw_target_tools or (raw_data.get("web_params") is not None)
 
         if intent == IntentType.OUT_OF_SCOPE:
             requires_sql = False
             requires_rag = False
+            requires_web = False
 
         # Auto-promote to MIXED_RESEARCH if both layers are demanded
         if requires_sql and requires_rag and intent != IntentType.DEEP_RESEARCH_REPORT:
@@ -298,18 +315,15 @@ class IntentRouter:
         if intent == IntentType.OUT_OF_SCOPE:
             target_tools = []
             strategy = ExecutionStrategy.DIRECT_ABSTAIN
-        elif requires_sql and requires_rag:
-            target_tools = ["financial_sql_tool", "hybrid_retriever"]
-            strategy = ExecutionStrategy.PARALLEL
-        elif requires_sql:
-            target_tools = ["financial_sql_tool"]
-            strategy = ExecutionStrategy.PARALLEL
-        elif requires_rag:
-            target_tools = ["hybrid_retriever"]
-            strategy = ExecutionStrategy.PARALLEL
         else:
             target_tools = []
-            strategy = ExecutionStrategy.DIRECT_ABSTAIN
+            if requires_sql:
+                target_tools.append("financial_sql_tool")
+            if requires_rag:
+                target_tools.append("hybrid_retriever")
+            if requires_web:
+                target_tools.append("web_search_tool")
+            strategy = ExecutionStrategy.PARALLEL if target_tools else ExecutionStrategy.DIRECT_ABSTAIN
 
         # 5. Semantic Comparison Classification
         q_lower = original_query.lower()
@@ -350,6 +364,7 @@ class IntentRouter:
             fiscal_periods=periods,
             requires_sql=requires_sql,
             requires_rag=requires_rag,
+            requires_web=requires_web,
             comparison_type=comparison_type,
             sql_metrics=sql_metrics,
             rag_metrics=rag_metrics,
@@ -402,12 +417,24 @@ class IntentRouter:
                 item=rp.get("item"),
             )
 
+        # 9. Parse Web Search Params if required
+        web_params: Optional[WebSearchQueryParams] = None
+        if requires_web:
+            wp = raw_data.get("web_params") or {}
+            web_query = wp.get("search_query") or original_query
+            max_res = wp.get("max_results") or 5
+            web_params = WebSearchQueryParams(
+                search_query=web_query,
+                max_results=max_res,
+            )
+
         return RoutingDecision(
             intent=intent,
             target_tools=target_tools,
             execution_strategy=strategy,
             sql_params=sql_params,
             rag_params=rag_params,
+            web_params=web_params,
             tickers=valid_tickers,
             fiscal_years=valid_years,
             fiscal_periods=periods,
@@ -522,6 +549,7 @@ def router_node(state: AgentState, router: Optional[IntentRouter] = None) -> Dic
         "query_plan": decision.query_plan.model_dump() if decision.query_plan else None,
         "sql_params": decision.sql_params.model_dump() if decision.sql_params else None,
         "rag_params": decision.rag_params.model_dump() if decision.rag_params else None,
+        "web_params": decision.web_params.model_dump() if decision.web_params else None,
         "execution_strategy": decision.execution_strategy.value,
         "activity_timeline": [step_understanding, step_metrics],
     }
@@ -541,16 +569,26 @@ def route_next_step(state: AgentState) -> Union[List[str], str]:
     if intent == IntentType.OUT_OF_SCOPE.value:
         return "abstention_node"
 
-    query_plan = state.get("query_plan")
-    if query_plan:
-        requires_sql = query_plan.get("requires_sql", False)
-        requires_rag = query_plan.get("requires_rag", False)
-        if requires_sql and requires_rag:
-            return ["sql_node", "rag_node"]
-        if requires_sql:
-            return "sql_node"
-        if requires_rag:
-            return "rag_node"
+    routing_decision = state.get("routing_decision") or {}
+    target_tools = routing_decision.get("target_tools") or []
+
+    query_plan = state.get("query_plan") or {}
+    requires_sql = query_plan.get("requires_sql", False) or ("financial_sql_tool" in target_tools)
+    requires_rag = query_plan.get("requires_rag", False) or ("hybrid_retriever" in target_tools)
+    requires_web = query_plan.get("requires_web", False) or ("web_search_tool" in target_tools)
+
+    selected_nodes: List[str] = []
+    if requires_sql:
+        selected_nodes.append("sql_node")
+    if requires_rag:
+        selected_nodes.append("rag_node")
+    if requires_web:
+        selected_nodes.append("web_node")
+
+    if len(selected_nodes) > 1:
+        return selected_nodes
+    if len(selected_nodes) == 1:
+        return selected_nodes[0]
 
     if intent == IntentType.FINANCIAL_METRIC.value:
         return "sql_node"

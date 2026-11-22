@@ -44,7 +44,12 @@ def canonicalize_timeline(
     }
 
     ordered_steps: List[ActivityTimelineStep] = []
-    for step_name in CANONICAL_TIMELINE_STEPS:
+    steps_to_process = list(CANONICAL_TIMELINE_STEPS)
+    if "Searching live web" in event_by_step:
+        sec_idx = steps_to_process.index("Searching SEC filings")
+        steps_to_process.insert(sec_idx + 1, "Searching live web")
+
+    for step_name in steps_to_process:
         if step_name in event_by_step:
             ev = event_by_step[step_name]
             ordered_steps.append(
@@ -63,6 +68,8 @@ def canonicalize_timeline(
                 description = "Skipped (pure textual research)"
             elif step_name == "Searching SEC filings" and intent == IntentType.FINANCIAL_METRIC:
                 description = "Skipped (structured metric query)"
+            elif step_name == "Searching live web":
+                description = "Skipped (historical filing inquiry)"
             elif step_name == "Preparing visualization" and not has_charts:
                 description = "Skipped (no visual trend requested)"
 

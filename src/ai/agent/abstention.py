@@ -84,16 +84,37 @@ class AbstentionGate:
 
         sql_results = [r for r in tool_results if r.get("tool_name") == "financial_sql_tool"]
         rag_results = [r for r in tool_results if r.get("tool_name") == "hybrid_retriever"]
+        web_results = [r for r in tool_results if r.get("tool_name") == "web_search_tool"]
 
         sql_success = any(r.get("status") == ToolExecutionStatus.SUCCESS.value for r in sql_results)
         rag_success = any(r.get("status") == ToolExecutionStatus.SUCCESS.value for r in rag_results)
+        web_success = any(r.get("status") == ToolExecutionStatus.SUCCESS.value for r in web_results)
 
         sql_failed = any(r.get("status") == ToolExecutionStatus.TOOL_FAILED.value for r in sql_results)
         rag_failed = any(r.get("status") == ToolExecutionStatus.TOOL_FAILED.value for r in rag_results)
+        web_failed = any(r.get("status") == ToolExecutionStatus.TOOL_FAILED.value for r in web_results)
 
         # -------------------------------------------------------------
         # Tier 3: Intent-Specific Granular Resolution
         # -------------------------------------------------------------
+        # Pure Live Web Search evaluation
+        if web_results and not sql_results and not rag_results:
+            if web_failed:
+                return AbstentionInfo(
+                    is_abstaining=True,
+                    is_partial=False,
+                    reason=AbstentionReason.TOOL_ERROR,
+                    explanation="A technical error occurred while executing live web search.",
+                )
+            if not web_success or len(evidence_items) == 0:
+                return AbstentionInfo(
+                    is_abstaining=True,
+                    is_partial=False,
+                    reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
+                    explanation=f"No relevant live web news or articles found for {ticker_str}.",
+                )
+            return AbstentionInfo(is_abstaining=False, is_partial=False)
+
         if intent == IntentType.FINANCIAL_METRIC:
             if sql_failed:
                 return AbstentionInfo(
@@ -113,14 +134,16 @@ class AbstentionGate:
             return AbstentionInfo(is_abstaining=False, is_partial=False)
 
         if intent == IntentType.TEXTUAL_RESEARCH:
-            if rag_failed:
+            if web_success and len(evidence_items) > 0:
+                return AbstentionInfo(is_abstaining=False, is_partial=False)
+            if rag_failed and not web_success:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.TOOL_ERROR,
                     explanation="A technical retrieval service error occurred while searching filing texts.",
                 )
-            if not rag_success or len(evidence_items) == 0:
+            if (not rag_success and not web_success) or len(evidence_items) == 0:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
@@ -131,13 +154,13 @@ class AbstentionGate:
 
         # Mixed & Report Intents: Evaluate Partial Failure
         if intent in (IntentType.MIXED_RESEARCH, IntentType.DEEP_RESEARCH_REPORT):
-            if not sql_success and not rag_success:
-                reason = AbstentionReason.TOOL_ERROR if (sql_failed or rag_failed) else AbstentionReason.INSUFFICIENT_EVIDENCE
+            if not sql_success and not rag_success and not web_success:
+                reason = AbstentionReason.TOOL_ERROR if (sql_failed or rag_failed or web_failed) else AbstentionReason.INSUFFICIENT_EVIDENCE
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=reason,
-                    explanation=f"Unable to retrieve verified financial figures or filing disclosures for {ticker_str}.",
+                    explanation=f"Unable to retrieve verified financial figures, filing disclosures, or live news for {ticker_str}.",
                 )
 
             # SQL succeeded, but RAG failed or found no textual context

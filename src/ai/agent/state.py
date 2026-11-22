@@ -35,11 +35,13 @@ class AgentState(TypedDict, total=False):
     query_plan: Optional[Dict[str, Any]]
     sql_params: Optional[Dict[str, Any]]
     rag_params: Optional[Dict[str, Any]]
+    web_params: Optional[Dict[str, Any]]
     execution_strategy: str
 
     # 2. Tool Data Stores
     sql_data: Optional[Dict[str, Any]]
     rag_data: Optional[Dict[str, Any]]
+    web_data: Optional[Dict[str, Any]]
     
     # 3. Accumulated Logs & Evidences (Reducers for parallel Fan-Out/Fan-In)
     tool_results: Annotated[List[Dict[str, Any]], operator.add]
