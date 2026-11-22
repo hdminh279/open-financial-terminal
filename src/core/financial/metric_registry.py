@@ -2,7 +2,8 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from functools import lru_cache
+
 import yaml
 
 
@@ -19,7 +20,7 @@ class MetricDefinition:
     storage_layer: str
     is_dimensional: bool
     description: str
-    synonyms: List[str] = field(default_factory=list)
+    synonyms: list[str] = field(default_factory=list)
 
 
 class MetricRegistry:
@@ -29,15 +30,15 @@ class MetricRegistry:
 
     def __init__(self, config_path: str = DEFAULT_TAXONOMY_PATH) -> None:
         self.config_path = config_path
-        self._metrics: Dict[str, MetricDefinition] = {}
-        self._synonym_index: Dict[str, str] = {}
+        self._metrics: dict[str, MetricDefinition] = {}
+        self._synonym_index: dict[str, str] = {}
         self._load_and_index()
 
     def _load_and_index(self) -> None:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(f"Taxonomy config not found: {self.config_path}")
 
-        with open(self.config_path, "r", encoding="utf-8") as f:
+        with open(self.config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         metrics_raw = data.get("metrics", {})
@@ -68,11 +69,11 @@ class MetricRegistry:
             for syn in synonyms:
                 self._synonym_index[syn] = metric_key
 
-    def get(self, metric_key: str) -> Optional[MetricDefinition]:
+    def get(self, metric_key: str) -> MetricDefinition | None:
         """Retrieve metric definition by canonical key."""
         return self._metrics.get(metric_key.strip().lower())
 
-    def resolve(self, query_term: str) -> Optional[MetricDefinition]:
+    def resolve(self, query_term: str) -> MetricDefinition | None:
         """Resolve a bilingual synonym, display name, or canonical key to its definition."""
         if not query_term or not isinstance(query_term, str):
             return None
@@ -97,9 +98,9 @@ class MetricRegistry:
 
     def list_metrics(
         self,
-        category: Optional[str] = None,
-        storage_layer: Optional[str] = None,
-    ) -> List[str]:
+        category: str | None = None,
+        storage_layer: str | None = None,
+    ) -> list[str]:
         """List canonical keys filtered optionally by category or storage layer."""
         results = []
         for key, m in self._metrics.items():
@@ -109,3 +110,9 @@ class MetricRegistry:
                 continue
             results.append(key)
         return results
+
+
+@lru_cache(maxsize=4)
+def get_metric_registry(config_path: str = MetricRegistry.DEFAULT_TAXONOMY_PATH) -> MetricRegistry:
+    """Return a cached MetricRegistry instance to avoid repeated YAML disk reads."""
+    return MetricRegistry(config_path=config_path)

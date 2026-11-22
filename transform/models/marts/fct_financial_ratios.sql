@@ -29,6 +29,8 @@ WITH statements AS (
         total_liabilities,
         stockholders_equity_parent,
         stockholders_equity_total,
+        source_accession_number,
+        source_filed_date,
         -- Prior period lookup for exact YoY comparison (same fiscal period, prior fiscal year)
         LAG(revenues, 1) OVER (
             PARTITION BY ticker, fiscal_period, period_type
@@ -67,7 +69,11 @@ SELECT
         WHEN prior_fiscal_year = fiscal_year - 1 AND prior_year_revenues IS NOT NULL
         THEN ROUND((revenues - prior_year_revenues) / NULLIF(prior_year_revenues, 0), 4)
         ELSE NULL
-    END AS revenue_growth_yoy
+    END AS revenue_growth_yoy,
+
+    -- Provenance & Audit Metadata
+    source_accession_number,
+    source_filed_date
 FROM statements
 ORDER BY
     market ASC,

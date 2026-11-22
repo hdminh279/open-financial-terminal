@@ -69,6 +69,7 @@ as_reported_periods AS (
     FROM pivoted p
     LEFT JOIN balance_instant b
       ON p.ticker = b.ticker
+     AND p.currency = b.currency
      AND p.fiscal_year = b.fiscal_year
      AND p.fiscal_period = b.fiscal_period
     WHERE (p.fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4') AND p.duration_scope = 'discrete_quarter')
@@ -121,6 +122,7 @@ derived_q4 AS (
     FROM pivoted fy
     LEFT JOIN pivoted q3
       ON fy.ticker = q3.ticker
+     AND fy.currency = q3.currency
      AND fy.fiscal_year = q3.fiscal_year
      AND fy.start_date = q3.start_date
      AND q3.fiscal_period = 'Q3'
@@ -128,6 +130,7 @@ derived_q4 AS (
      AND q3.end_date < fy.end_date
     LEFT JOIN balance_instant b
       ON fy.ticker = b.ticker
+     AND fy.currency = b.currency
      AND fy.fiscal_year = b.fiscal_year
      AND b.fiscal_period = 'FY'
     WHERE fy.fiscal_period = 'FY'

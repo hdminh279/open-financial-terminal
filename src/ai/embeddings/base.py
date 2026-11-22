@@ -1,14 +1,13 @@
 """Abstract Base Strategy for Embedding Generation."""
 
 from abc import ABC, abstractmethod
-from typing import List
 
 
 class EmbeddingStrategy(ABC):
     """Abstract interface defining the contract for all embedding models."""
 
     @abstractmethod
-    def embed_documents(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_documents(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Compute dense vector embeddings for a list of document chunks.
 
         Args:
@@ -21,7 +20,7 @@ class EmbeddingStrategy(ABC):
         pass
 
     @abstractmethod
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Compute dense vector embedding for a single search query.
 
         Args:

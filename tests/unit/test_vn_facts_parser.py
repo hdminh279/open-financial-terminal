@@ -1,17 +1,15 @@
 """Unit tests for Vietnamese Financial Facts Parser and Silver Data Quality Gates."""
 
-from datetime import date, datetime, timezone
-from decimal import Decimal
-import io
 import json
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from unittest.mock import MagicMock
-import pyarrow.parquet as pq
+
 import pytest
 
 from src.data.processing.vn_facts_parser import (
-    VNFactsParser,
     ALLOWED_UNITS,
-    ITEM_CODE_MAP,
+    VNFactsParser,
 )
 
 
@@ -39,13 +37,15 @@ class TestVNFactsParserQualityGates:
 
     def test_rule_1_empty_payload_anomaly(self, parser, mock_storage):
         """Rule 1: Empty upstream JSON payload must be quarantined with EMPTY_PAYLOAD_ANOMALY."""
-        raw_json = json.dumps({
-            "ticker": "FPT",
-            "report_type": "incomestatement",
-            "period": "yearly",
-            "source_url": "https://api-finfo.vndirect.com.vn",
-            "data": [],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "FPT",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "source_url": "https://api-finfo.vndirect.com.vn",
+                "data": [],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         clean, quarantine = parser.parse_bronze_file(
@@ -74,18 +74,20 @@ class TestVNFactsParserQualityGates:
 
     def test_rule_3_unsupported_currency(self, parser, mock_storage):
         """Rule 3: Monetary units outside standard whitelist must be quarantined."""
-        raw_json = json.dumps({
-            "ticker": "FPT",
-            "report_type": "incomestatement",
-            "period": "yearly",
-            "data": [
-                {
-                    "itemCode": 21001,
-                    "numericValue": 50000000000,
-                    "fiscalDate": "2023-12-31",
-                }
-            ],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "FPT",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "data": [
+                    {
+                        "itemCode": 21001,
+                        "numericValue": 50000000000,
+                        "fiscalDate": "2023-12-31",
+                    }
+                ],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         # Temporarily tamper allowed units to simulate unsupported currency
@@ -104,18 +106,20 @@ class TestVNFactsParserQualityGates:
 
     def test_rule_4_unmapped_taxonomy_tag(self, parser, mock_storage):
         """Rule 4: Unrecognized itemCode must be quarantined with UNMAPPED_TAXONOMY_TAG."""
-        raw_json = json.dumps({
-            "ticker": "FPT",
-            "report_type": "incomestatement",
-            "period": "yearly",
-            "data": [
-                {
-                    "itemCode": 999999,  # Non-existent item code
-                    "numericValue": 12345678,
-                    "fiscalDate": "2023-12-31",
-                }
-            ],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "FPT",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "data": [
+                    {
+                        "itemCode": 999999,  # Non-existent item code
+                        "numericValue": 12345678,
+                        "fiscalDate": "2023-12-31",
+                    }
+                ],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         clean, quarantine = parser.parse_bronze_file("test-bronze", "test.json")
@@ -126,25 +130,27 @@ class TestVNFactsParserQualityGates:
 
     def test_rule_5_duplicate_observation_deduplication(self, parser, mock_storage):
         """Rule 5: Deduplicate multiple observations for same period, keeping latest modifiedDate."""
-        raw_json = json.dumps({
-            "ticker": "FPT",
-            "report_type": "incomestatement",
-            "period": "yearly",
-            "data": [
-                {
-                    "itemCode": 21001,  # revenues
-                    "numericValue": 50000000000,
-                    "fiscalDate": "2023-12-31",
-                    "modifiedDate": "2024-01-15 00:00:00",
-                },
-                {
-                    "itemCode": 21001,  # duplicate with newer amended date
-                    "numericValue": 52617900827385,
-                    "fiscalDate": "2023-12-31",
-                    "modifiedDate": "2024-03-20 00:00:00",
-                },
-            ],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "FPT",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "data": [
+                    {
+                        "itemCode": 21001,  # revenues
+                        "numericValue": 50000000000,
+                        "fiscalDate": "2023-12-31",
+                        "modifiedDate": "2024-01-15 00:00:00",
+                    },
+                    {
+                        "itemCode": 21001,  # duplicate with newer amended date
+                        "numericValue": 52617900827385,
+                        "fiscalDate": "2023-12-31",
+                        "modifiedDate": "2024-03-20 00:00:00",
+                    },
+                ],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         clean, quarantine = parser.parse_bronze_file("test-bronze", "test.json")
@@ -161,18 +167,20 @@ class TestVNFactsParserQualityGates:
         assert parser.quantize_decimal(50000) == Decimal("50000.00")
 
         # Case B: Unparseable NaN / Infinity quarantined
-        raw_json = json.dumps({
-            "ticker": "FPT",
-            "report_type": "incomestatement",
-            "period": "yearly",
-            "data": [
-                {
-                    "itemCode": 21001,
-                    "numericValue": "NaN_CORRUPTED",
-                    "fiscalDate": "2023-12-31",
-                }
-            ],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "FPT",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "data": [
+                    {
+                        "itemCode": 21001,
+                        "numericValue": "NaN_CORRUPTED",
+                        "fiscalDate": "2023-12-31",
+                    }
+                ],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         clean, quarantine = parser.parse_bronze_file("test-bronze", "test.json")
@@ -189,19 +197,21 @@ class TestVNFactsParserTransformAndParquet:
 
     def test_clean_transformation_and_fact_keys(self, parser, mock_storage):
         """Ensure clean records generate deterministic SHA-256 keys and correct schema."""
-        raw_json = json.dumps({
-            "ticker": "VNM",
-            "report_type": "balancesheet",
-            "period": "yearly",
-            "data": [
-                {
-                    "itemCode": 12700,  # total_assets
-                    "numericValue": 52673371104460.0,
-                    "fiscalDate": "2023-12-31",
-                    "modifiedDate": "2024-03-10 00:00:00",
-                }
-            ],
-        }).encode("utf-8")
+        raw_json = json.dumps(
+            {
+                "ticker": "VNM",
+                "report_type": "balancesheet",
+                "period": "yearly",
+                "data": [
+                    {
+                        "itemCode": 12700,  # total_assets
+                        "numericValue": 52673371104460.0,
+                        "fiscalDate": "2023-12-31",
+                        "modifiedDate": "2024-03-10 00:00:00",
+                    }
+                ],
+            }
+        ).encode("utf-8")
         mock_storage.download_bytes.return_value = raw_json
 
         clean, quarantine = parser.parse_bronze_file("test-bronze", "test.json")
@@ -256,7 +266,7 @@ class TestVNFactsParserTransformAndParquet:
                 "raw_payload": "{}",
                 "quarantine_reason": "EMPTY_PAYLOAD_ANOMALY",
                 "source_file": "s3://test/fpt_empty.json",
-                "quarantined_at": datetime.now(timezone.utc),
+                "quarantined_at": datetime.now(UTC),
             }
         ]
 
@@ -266,3 +276,26 @@ class TestVNFactsParserTransformAndParquet:
         assert stats["facts_parquet_bytes"] > 0
         assert stats["quarantine_parquet_bytes"] > 0
         assert mock_storage.upload_bytes.call_count == 2
+
+    def test_vas_bank_excludes_corporate_gross_profit(self, parser, mock_storage):
+        """VAS-BANK issuers must never map Circular 200 gross_profit or revenues codes."""
+        raw_json = json.dumps(
+            {
+                "ticker": "VCB",
+                "report_type": "incomestatement",
+                "period": "yearly",
+                "data": [
+                    {"itemCode": 23100, "numericValue": 8383018000000, "fiscalDate": "2024-12-31"},
+                    {"itemCode": 21001, "numericValue": 999999, "fiscalDate": "2024-12-31"},
+                    {"itemCode": 421701, "numericValue": 68578496000000, "fiscalDate": "2024-12-31"},
+                ],
+            }
+        ).encode("utf-8")
+        mock_storage.download_bytes.return_value = raw_json
+
+        clean, quarantine = parser.parse_bronze_file("test-bronze", "vn_raw/financials/VCB_incomestatement_yearly.json")
+        tags = {row["tag"] for row in clean}
+        assert "gross_profit" not in tags
+        assert "revenues" not in tags
+        assert "total_operating_income" in tags
+        assert len(quarantine) == 0

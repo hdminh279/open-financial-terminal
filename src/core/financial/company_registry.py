@@ -1,31 +1,39 @@
 """Company Registry providing dynamic ticker and enterprise metadata resolution (SSOT)."""
 
 import os
-from typing import Any, Dict, List, Set
+from functools import lru_cache
+from typing import Any
+
 import yaml
 
 DEFAULT_COMPANIES_PATH = "configs/companies.yaml"
 DEFAULT_VN_COMPANIES_PATH = "configs/companies_vn.yaml"
 
 
-def load_company_catalog(config_path: str = DEFAULT_COMPANIES_PATH) -> List[Dict[str, Any]]:
-    """Load list of company dictionary definitions from configuration YAML."""
-    catalogs: List[Dict[str, Any]] = []
+@lru_cache(maxsize=8)
+def _load_company_catalog_cached(config_path: str) -> tuple[dict[str, Any], ...]:
+    """Read and cache company definitions from YAML configuration."""
+    catalogs: list[dict[str, Any]] = []
     if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         catalogs.extend(data.get("companies", []))
 
     # Also include VN30 catalog when loading standard catalog
     if config_path == DEFAULT_COMPANIES_PATH and os.path.exists(DEFAULT_VN_COMPANIES_PATH):
-        with open(DEFAULT_VN_COMPANIES_PATH, "r", encoding="utf-8") as f:
+        with open(DEFAULT_VN_COMPANIES_PATH, encoding="utf-8") as f:
             vn_data = yaml.safe_load(f) or {}
         catalogs.extend(vn_data.get("companies", []))
 
-    return catalogs
+    return tuple(catalogs)
 
 
-def get_supported_tickers(config_path: str = DEFAULT_COMPANIES_PATH) -> Set[str]:
+def load_company_catalog(config_path: str = DEFAULT_COMPANIES_PATH) -> list[dict[str, Any]]:
+    """Load list of company dictionary definitions from configuration YAML."""
+    return list(_load_company_catalog_cached(config_path))
+
+
+def get_supported_tickers(config_path: str = DEFAULT_COMPANIES_PATH) -> set[str]:
     """Retrieve set of uppercase canonical company ticker symbols from configuration."""
-    companies = load_company_catalog(config_path)
+    companies = _load_company_catalog_cached(config_path)
     return {str(c["ticker"]).upper() for c in companies if "ticker" in c}

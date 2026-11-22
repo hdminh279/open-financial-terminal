@@ -1,9 +1,10 @@
 """Integration test for Qdrant Vector Database connectivity."""
 
 import os
+
 import pytest
-from qdrant_client import QdrantClient
 from dotenv import load_dotenv
+from qdrant_client import QdrantClient
 
 load_dotenv()
 
@@ -41,6 +42,7 @@ def test_qdrant_temporary_collection_lifecycle():
 
     # Create temporary collection
     from qdrant_client.http import models
+
     client.create_collection(
         collection_name=test_collection,
         vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE),

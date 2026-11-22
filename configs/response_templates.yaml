@@ -1,0 +1,97 @@
+# Multilingual user-facing response templates and lightweight routing markers.
+# Keeps Python source code 100% English while serving localized VI/EN user messages.
+
+language_detection:
+  vietnamese_keywords:
+    - "doanh thu"
+    - "loi nhuan"
+    - "so sanh"
+    - "hom nay"
+    - "tin tuc"
+    - "bao nhieu"
+    - "thi sao"
+    - "co nen mua"
+
+routing_markers:
+  high_precision_realtime_news:
+    - "tin tức hôm nay"
+    - "tin tức mới nhất"
+    - "bản tin mới nhất"
+    - "tin tức kinh tế"
+    - "tin tức tài chính"
+    - "tin tức thị trường"
+    - "kinh tế hôm nay"
+    - "thị trường hôm nay"
+    - "today's news"
+    - "today news"
+    - "breaking news"
+    - "latest news"
+    - "economic news"
+    - "market news"
+    - "financial news"
+  anaphora_references:
+    - "còn "
+    - "thì sao"
+    - "công ty đó"
+    - "doanh nghiệp đó"
+    - "what about"
+    - "how about"
+    - "for it"
+    - "for them"
+    - "its "
+    - "their "
+    - "draw a chart for this"
+    - "vẽ biểu đồ cho"
+  filing_disclosure_markers:
+    - "10-k"
+    - "10-q"
+    - "20-f"
+    - "báo cáo thường niên"
+    - "hồ sơ sec"
+    - "sec filing"
+    - "ban lãnh đạo"
+    - "management"
+    - "md&a"
+    - "thuyết minh"
+    - "rủi ro"
+    - "risk"
+    - "item "
+  vn30_basket_markers:
+    - "vn30"
+    - "30 công ty"
+    - "30 doanh nghiệp"
+    - "toàn bộ vn30"
+  quarterly_form_markers:
+    - "10-q"
+    - "6-k"
+    - "quý"
+    - "quarter"
+  annual_form_markers:
+    - "10-k"
+    - "20-f"
+    - "báo cáo thường niên"
+    - "annual report"
+    - "rủi ro"
+    - "risk factor"
+    - "risks"
+
+templates:
+  web_news_abstention:
+    vi: "Kho hồ sơ SEC chỉ lưu trữ báo cáo định kỳ (10-K/10-Q/20-F) và BCTC chuẩn hóa, không có tin tức thời sự ngày hôm nay (dịch vụ tìm kiếm trực tuyến hiện không khả dụng hoặc không tìm thấy bài viết phù hợp)."
+    en: "The SEC and financial filing repository only stores periodic statements (10-K/10-Q/20-F) and does not contain today's live breaking news (live web search is unavailable or returned no matching articles)."
+
+  fiscal_period_footnote:
+    vi: "*(Lưu ý: Năm tài chính của {company_name} ({ticker}) lệch so với năm dương lịch; kỳ báo cáo {period_label} thực tế diễn ra chủ yếu trong năm dương lịch {calendar_year}, từ {start_date} đến {end_date}.)*"
+    en: "*(Note: {company_name} ({ticker}) uses a shifted fiscal calendar; {period_label} actually falls primarily in calendar year {calendar_year}, covering {start_date} to {end_date}.)*"
+
+  unsupported_company:
+    vi: "Doanh nghiệp '{tickers}' hiện chưa nằm trong danh mục hỗ trợ của hệ thống Corporate Filing Intelligence."
+    en: "Company '{tickers}' is not currently supported. Corporate Filing Intelligence supports: {supported}."
+
+  no_financial_records:
+    vi: "Không tìm thấy số liệu tài chính đã công bố cho {tickers}{period_str} trong kho hồ sơ BCTC đã xác thực (kỳ báo cáo chưa kết thúc, chưa phát hành hoặc doanh nghiệp không công bố chỉ tiêu này)."
+    en: "No reported financial records found for {tickers}{period_str} in verified SEC filings."
+
+  no_textual_disclosures:
+    vi: "Không tìm thấy thuyết minh hoặc nội dung văn bản phù hợp trong kho hồ sơ BCTC đã lưu trữ cho {tickers} (hệ thống hiện chỉ lưu trữ văn bản tường thuật 10-K/10-Q/20-F của các doanh nghiệp SEC; các doanh nghiệp VN30 mới có dữ liệu số liệu BCTC chuẩn hóa)."
+    en: "No relevant narrative disclosures found in verified filing texts for {tickers} (narrative text search currently covers SEC 10-K/10-Q/20-F filings)."

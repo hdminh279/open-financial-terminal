@@ -2,7 +2,6 @@
 
 import hashlib
 from unittest.mock import MagicMock
-import pytest
 
 from src.data.ingestion.fetch_facts import FactsIngestionPipeline
 from src.data.storage.s3_storage import S3Storage
@@ -64,9 +63,7 @@ def test_facts_idempotency_skips_when_sha256_matches():
     mock_sec.get.return_value = mock_response
 
     mock_s3.object_exists.return_value = True
-    mock_s3.get_metadata.return_value = {
-        "metadata": {"sha256": payload_hash}
-    }
+    mock_s3.get_metadata.return_value = {"metadata": {"sha256": payload_hash}}
 
     pipeline = FactsIngestionPipeline(sec_client=mock_sec, s3_storage=mock_s3)
     result = pipeline._fetch_and_store_endpoint(
@@ -95,9 +92,7 @@ def test_facts_idempotency_uploads_when_sha256_differs():
     mock_sec.get.return_value = mock_response
 
     mock_s3.object_exists.return_value = True
-    mock_s3.get_metadata.return_value = {
-        "metadata": {"sha256": old_hash}
-    }
+    mock_s3.get_metadata.return_value = {"metadata": {"sha256": old_hash}}
 
     pipeline = FactsIngestionPipeline(sec_client=mock_sec, s3_storage=mock_s3)
     result = pipeline._fetch_and_store_endpoint(

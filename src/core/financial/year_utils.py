@@ -5,10 +5,88 @@ user query strings and query plans without duplicated heuristics.
 """
 
 import re
-from typing import List, Optional, Sequence
+from collections.abc import Sequence
+from datetime import date, datetime
 
 
-def extract_years_from_text(text: str) -> List[int]:
+def _coerce_date(value: date | datetime | str | None) -> date | None:
+    """Convert date, datetime, or ISO date string into a date object."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value.strip()[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def dominant_calendar_year(
+    start_date: date | datetime | str | None,
+    end_date: date | datetime | str | None,
+) -> tuple[int | None, float]:
+    """Compute the calendar year containing the largest share of days in [start_date, end_date].
+
+    Args:
+        start_date: Inclusive period start date (None for point-in-time instant balances).
+        end_date: Inclusive period end date.
+
+    Returns:
+        Tuple of (dominant_year, share_ratio) where share_ratio is in [0.0, 1.0].
+        Returns (None, 0.0) when dates are missing or inverted.
+    """
+    start = _coerce_date(start_date)
+    end = _coerce_date(end_date)
+    if start is None or end is None or end < start:
+        return None, 0.0
+
+    total_days = (end - start).days + 1
+    best_year: int | None = None
+    best_days = -1
+
+    for yr in range(start.year, end.year + 1):
+        seg_start = max(start, date(yr, 1, 1))
+        seg_end = min(end, date(yr, 12, 31))
+        days_in_year = (seg_end - seg_start).days + 1
+        if days_in_year > best_days:
+            best_days = days_in_year
+            best_year = yr
+
+    return best_year, best_days / total_days
+
+
+def is_shifted_fiscal_period(
+    fiscal_year: int,
+    start_date: date | datetime | str | None,
+    end_date: date | datetime | str | None,
+    threshold: float = 0.75,
+) -> tuple[bool, int | None]:
+    """Determine whether a reporting period falls predominantly in a different calendar year.
+
+    For example, NVIDIA's fiscal year ends in late January, so FY2027 Q1 runs from
+    late January 2026 to late April 2026 (100% inside calendar year 2026), whereas
+    Microsoft's June 30 fiscal year splits ~50/50 and does not trigger a shift warning.
+
+    Args:
+        fiscal_year: Authoritative SEC/VAS fiscal year label.
+        start_date: Inclusive start date of the duration period.
+        end_date: Inclusive end date of the duration period.
+        threshold: Minimum share of period days required in the non-matching calendar year.
+
+    Returns:
+        Tuple of (is_shifted, dominant_calendar_year).
+    """
+    dom_year, share = dominant_calendar_year(start_date, end_date)
+    if dom_year is None:
+        return False, None
+    return (dom_year != int(fiscal_year) and share >= threshold), dom_year
+
+
+def extract_years_from_text(text: str) -> list[int]:
     """Extract distinct 4-digit calendar/fiscal years sorted chronologically."""
     if not text:
         return []
@@ -19,19 +97,18 @@ def extract_years_from_text(text: str) -> List[int]:
 def expand_year_range(
     years: Sequence[int],
     max_expansion_span: int = 30,
-) -> List[int]:
+) -> list[int]:
     """Expand a 2-year boundary pair [start, end] into a full inclusive sequence."""
-    if len(years) == 2 and years[0] < years[1]:
-        if years[1] - years[0] <= max_expansion_span:
-            return list(range(years[0], years[1] + 1))
+    if len(years) == 2 and years[0] < years[1] and years[1] - years[0] <= max_expansion_span:
+        return list(range(years[0], years[1] + 1))
     return list(years)
 
 
 def parse_fiscal_years(
     text: str,
-    explicit_years: Optional[Sequence[int]] = None,
+    explicit_years: Sequence[int] | None = None,
     max_expansion_span: int = 30,
-) -> List[int]:
+) -> list[int]:
     """Parse and expand fiscal years from explicit input or natural language query text.
 
     Args:

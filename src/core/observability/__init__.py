@@ -6,6 +6,7 @@ from src.core.observability.telemetry import (
     get_telemetry_logger,
     log_run_telemetry,
     sanitize_query,
+    summarize_traffic_telemetry,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "get_telemetry_logger",
     "log_run_telemetry",
     "sanitize_query",
+    "summarize_traffic_telemetry",
 ]

@@ -5,15 +5,17 @@ downloads the primary HTML document via SECClient, computes SHA-256 integrity ha
 and uploads both the raw document and companion metadata to `sec-bronze`.
 """
 
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
 import os
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
-from dotenv import load_dotenv
+from typing import Any
+
 import yaml
+from dotenv import load_dotenv
 
 from src.data.ingestion.filing_resolver import (
     DEFAULT_TARGET_FORMS,
@@ -21,8 +23,8 @@ from src.data.ingestion.filing_resolver import (
     ResolvedFiling,
 )
 from src.data.ingestion.rate_limiter import RateLimiter
-from src.data.storage.s3_storage import S3Storage
 from src.data.ingestion.sec_client import SECClient
+from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class FilingsIngestionPipeline:
         self,
         sec_client: SECClient,
         s3_storage: S3Storage,
-        resolver: Optional[FilingResolver] = None,
+        resolver: FilingResolver | None = None,
         bronze_bucket: str = "sec-bronze",
     ) -> None:
         """Initialize the pipeline with required clients and destination bucket."""
@@ -73,10 +75,19 @@ class FilingsIngestionPipeline:
                 content_len = meta.get("content_length")
                 has_sha256 = bool(meta.get("metadata", {}).get("sha256"))
                 if isinstance(content_len, (int, float)) and content_len > 0 and has_sha256:
-                    logger.info("Filing already exists with valid SHA-256 at s3://%s/%s. Skipping.", self.bronze_bucket, filing.s3_key)
+                    logger.info(
+                        "Filing already exists with valid SHA-256 at s3://%s/%s. Skipping.",
+                        self.bronze_bucket,
+                        filing.s3_key,
+                    )
                     return False
             except Exception as exc:
-                logger.warning("Filing s3://%s/%s failed metadata check (%s). Re-downloading.", self.bronze_bucket, filing.s3_key, exc)
+                logger.warning(
+                    "Filing s3://%s/%s failed metadata check (%s). Re-downloading.",
+                    self.bronze_bucket,
+                    filing.s3_key,
+                    exc,
+                )
 
         logger.info(
             "Fetching %s [%s] (%s) from %s",
@@ -94,9 +105,9 @@ class FilingsIngestionPipeline:
             raise ValueError(f"Empty payload received from SEC for {filing.sec_url}")
 
         sha256_hash = self._compute_sha256(payload_bytes)
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
 
-        metadata_dict: Dict[str, Any] = {
+        metadata_dict: dict[str, Any] = {
             "ticker": filing.ticker,
             "cik": filing.cik,
             "form": filing.form,
@@ -148,10 +159,10 @@ class FilingsIngestionPipeline:
         ticker: str,
         cik: str,
         forms: Sequence[str] = DEFAULT_TARGET_FORMS,
-        limit_per_form: Optional[int] = None,
-        min_year: Optional[int] = 2009,
+        limit_per_form: int | None = None,
+        min_year: int | None = 2009,
         force: bool = False,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Resolve and ingest target filings for a specific company."""
         logger.info("Resolving target filings for %s (CIK: %s)", ticker, cik)
         filings = self.resolver.resolve_from_s3(
@@ -177,8 +188,8 @@ class FilingsIngestionPipeline:
         self,
         config_path: str = "configs/companies.yaml",
         forms: Sequence[str] = DEFAULT_TARGET_FORMS,
-        limit_per_form: Optional[int] = None,
-        min_year: Optional[int] = 2009,
+        limit_per_form: int | None = None,
+        min_year: int | None = 2009,
         force: bool = False,
     ) -> None:
         """Run the filing ingestion pipeline for all companies defined in the config file."""
@@ -186,10 +197,10 @@ class FilingsIngestionPipeline:
         if not config_file.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
 
-        companies: List[Dict[str, Any]] = cfg.get("companies", [])
+        companies: list[dict[str, Any]] = cfg.get("companies", [])
         if not companies:
             logger.warning("No companies configured in %s", config_path)
             return
@@ -197,7 +208,9 @@ class FilingsIngestionPipeline:
         self.s3_storage.ensure_buckets_exist()
 
         limit_desc = f"{limit_per_form}/form" if limit_per_form else "all available"
-        logger.info("Starting filings ingestion for %d companies (limit=%s, min_year=%s)", len(companies), limit_desc, min_year)
+        logger.info(
+            "Starting filings ingestion for %d companies (limit=%s, min_year=%s)", len(companies), limit_desc, min_year
+        )
         for item in companies:
             ticker = item["ticker"]
             cik = item["cik"]

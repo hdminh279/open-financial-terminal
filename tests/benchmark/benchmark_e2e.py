@@ -11,7 +11,8 @@ import logging
 import statistics
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
 from fastapi.testclient import TestClient
 
 from src.api.main import app
@@ -20,30 +21,30 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("benchmark_e2e")
 
 
-def run_e2e_benchmark() -> Dict[str, Any]:
+def run_e2e_benchmark() -> dict[str, Any]:
     """Execute end-to-end benchmark suite across all 50 certified questions."""
     eval_fixture_path = Path("tests/fixtures/eval/agent_eval_questions.json")
     if not eval_fixture_path.exists():
         raise FileNotFoundError(f"Evaluation questions file not found at {eval_fixture_path}")
 
-    with open(eval_fixture_path, "r", encoding="utf-8") as f:
-        questions: List[Dict[str, Any]] = json.load(f)
+    with open(eval_fixture_path, encoding="utf-8") as f:
+        questions: list[dict[str, Any]] = json.load(f)
 
     client = TestClient(app)
 
     total_questions = len(questions)
-    latencies: List[float] = []
+    latencies: list[float] = []
     intent_correct = 0
     tools_correct = 0
     abstention_correct = 0
     citations_valid = 0
     total_citations = 0
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     logger.info("Starting E2E Evaluation across %d questions...", total_questions)
 
-    for idx, q in enumerate(questions, 1):
+    for q in questions:
         q_id = q["id"]
         query_text = q["query"]
         expected_intent = q["expected_intent"]
@@ -57,19 +58,21 @@ def run_e2e_benchmark() -> Dict[str, Any]:
 
         if resp.status_code != 200:
             logger.error("Failed on question %s: %s", q_id, resp.text)
-            results.append({
-                "id": q_id,
-                "status": "FAILED",
-                "error": resp.text,
-                "latency_ms": elapsed_ms,
-            })
+            results.append(
+                {
+                    "id": q_id,
+                    "status": "FAILED",
+                    "error": resp.text,
+                    "latency_ms": elapsed_ms,
+                }
+            )
             continue
 
         data = resp.json()
 
         # 1. Intent Validation
         actual_intent = data.get("intent")
-        is_intent_ok = (actual_intent == expected_intent)
+        is_intent_ok = actual_intent == expected_intent
         if is_intent_ok:
             intent_correct += 1
 
@@ -82,7 +85,7 @@ def run_e2e_benchmark() -> Dict[str, Any]:
         # 3. Abstention Validation
         actual_abstention = data.get("abstention")
         is_abstaining = actual_abstention.get("is_abstaining", False) if actual_abstention else False
-        is_abstain_ok = (is_abstaining == must_abstain)
+        is_abstain_ok = is_abstaining == must_abstain
         if is_abstain_ok:
             abstention_correct += 1
 
@@ -100,16 +103,18 @@ def run_e2e_benchmark() -> Dict[str, Any]:
                 is_all_urls_valid = False
 
         status_str = "PASS" if (is_intent_ok and is_abstain_ok and is_all_urls_valid) else "WARN"
-        results.append({
-            "id": q_id,
-            "query": query_text,
-            "status": status_str,
-            "intent_match": is_intent_ok,
-            "tool_match": is_tool_ok,
-            "abstain_match": is_abstain_ok,
-            "citations_count": len(citations),
-            "latency_ms": elapsed_ms,
-        })
+        results.append(
+            {
+                "id": q_id,
+                "query": query_text,
+                "status": status_str,
+                "intent_match": is_intent_ok,
+                "tool_match": is_tool_ok,
+                "abstain_match": is_abstain_ok,
+                "citations_count": len(citations),
+                "latency_ms": elapsed_ms,
+            }
+        )
 
     # Metrics Summary
     latencies.sort()
@@ -122,7 +127,9 @@ def run_e2e_benchmark() -> Dict[str, Any]:
         "intent_accuracy_pct": round((intent_correct / total_questions) * 100, 1),
         "tool_recall_pct": round((tools_correct / total_questions) * 100, 1),
         "abstention_precision_pct": round((abstention_correct / total_questions) * 100, 1),
-        "citation_validity_pct": round((citations_valid / max(total_citations, 1)) * 100, 1) if total_citations > 0 else 100.0,
+        "citation_validity_pct": round((citations_valid / max(total_citations, 1)) * 100, 1)
+        if total_citations > 0
+        else 100.0,
         "total_citations_verified": citations_valid,
         "latency_p50_ms": round(p50_latency, 2),
         "latency_p95_ms": round(p95_latency, 2),
@@ -134,17 +141,17 @@ def run_e2e_benchmark() -> Dict[str, Any]:
     return summary
 
 
-def generate_markdown_report(summary: Dict[str, Any]) -> None:
+def generate_markdown_report(summary: dict[str, Any]) -> None:
     """Generate professional evaluation report in docs/EVALUATION_REPORT.md."""
     output_path = Path("docs/EVALUATION_REPORT.md")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     report_content = f"""# Corporate Filing Intelligence — End-to-End Evaluation Report (Day 15)
 
-> **Platform**: Corporate Filing Intelligence (Accelerated 16-Day Sprint)  
-> **Evaluation Date**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}  
-> **Ground Truth Dataset**: Certified N=50 SEC EDGAR Benchmark (`tests/fixtures/eval/agent_eval_questions.json`)  
-> **Architecture**: Local MinIO S3 Medallion Lakehouse + Qdrant Vector DB + DuckDB Gold Marts + DeepSeek API  
+> **Platform**: Corporate Filing Intelligence (Accelerated 16-Day Sprint)
+> **Evaluation Date**: {time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())}
+> **Ground Truth Dataset**: Certified N=50 SEC EDGAR Benchmark (`tests/fixtures/eval/agent_eval_questions.json`)
+> **Architecture**: Local MinIO S3 Medallion Lakehouse + Qdrant Vector DB + DuckDB Gold Marts + DeepSeek API
 
 ---
 
@@ -152,12 +159,12 @@ def generate_markdown_report(summary: Dict[str, Any]) -> None:
 
 | Metric | Target | Measured Result | Evaluation Status |
 | :--- | :---: | :---: | :---: |
-| **Intent Classification Accuracy** | $\ge 95.0\%$ | **{summary['intent_accuracy_pct']}%** | **PASSED** |
-| **Tool Selection Recall** | $\ge 95.0\%$ | **{summary['tool_recall_pct']}%** | **PASSED** |
-| **Abstention Precision (Negatives)** | $\ge 95.0\%$ | **{summary['abstention_precision_pct']}%** | **PASSED** |
-| **Clickable SEC Citation Validity** | $100.0\%$ | **{summary['citation_validity_pct']}%** ({summary['total_citations_verified']} links) | **PASSED** |
-| **End-to-End API Latency (p50)** | $< 3,000\\text{{ms}}$ | **{summary['latency_p50_ms']}\\text{{ms}}** | **PASSED** |
-| **End-to-End API Latency (p95)** | $< 6,000\\text{{ms}}$ | **{summary['latency_p95_ms']}\\text{{ms}}** | **PASSED** |
+| **Intent Classification Accuracy** | $\\ge 95.0\\%$ | **{summary["intent_accuracy_pct"]}%** | **PASSED** |
+| **Tool Selection Recall** | $\\ge 95.0\\%$ | **{summary["tool_recall_pct"]}%** | **PASSED** |
+| **Abstention Precision (Negatives)** | $\\ge 95.0\\%$ | **{summary["abstention_precision_pct"]}%** | **PASSED** |
+| **Clickable SEC Citation Validity** | $100.0\\%$ | **{summary["citation_validity_pct"]}%** ({summary["total_citations_verified"]} links) | **PASSED** |
+| **End-to-End API Latency (p50)** | $< 3,000\\text{{ms}}$ | **{summary["latency_p50_ms"]}\\text{{ms}}** | **PASSED** |
+| **End-to-End API Latency (p95)** | $< 6,000\\text{{ms}}$ | **{summary["latency_p95_ms"]}\\text{{ms}}** | **PASSED** |
 | **Total Cloud Infra Cost** | $\\$0.00$ | **\\$0.00 (Local Docker + FastEmbed ONNX CPU)** | **PASSED** |
 
 ---

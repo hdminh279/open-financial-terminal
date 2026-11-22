@@ -5,17 +5,18 @@ traverses both recent and paginated historical submission files, filters for tar
 builds authoritative SEC EDGAR archive URLs, and determines deterministic destination keys for MinIO storage.
 """
 
-from collections import defaultdict
-from dataclasses import dataclass
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from src.data.storage.s3_storage import S3Storage
 
 if TYPE_CHECKING:
-    from src.data.ingestion.sec_client import SECClient
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,9 @@ class FilingResolver:
 
     def __init__(
         self,
-        s3_storage: Optional[S3Storage] = None,
+        s3_storage: S3Storage | None = None,
         bronze_bucket: str = "sec-bronze",
-        sec_client: Optional[Any] = None,
+        sec_client: Any | None = None,
     ) -> None:
         """Initialize the resolver with an optional S3 storage adapter and SEC client.
 
@@ -96,18 +97,18 @@ class FilingResolver:
     @classmethod
     def _parse_entries_block(
         cls,
-        block: Dict[str, Any],
+        block: dict[str, Any],
         cik: str,
         ticker: str,
-        target_forms_set: Set[str],
-        min_year: Optional[int] = None,
-    ) -> List[ResolvedFiling]:
+        target_forms_set: set[str],
+        min_year: int | None = None,
+    ) -> list[ResolvedFiling]:
         """Extract and validate ResolvedFiling entries from a raw filing array block."""
-        form_list: List[str] = block.get("form", [])
-        accession_list: List[str] = block.get("accessionNumber", [])
-        filing_date_list: List[str] = block.get("filingDate", [])
-        report_date_list: List[str] = block.get("reportDate", [])
-        primary_doc_list: List[str] = block.get("primaryDocument", [])
+        form_list: list[str] = block.get("form", [])
+        accession_list: list[str] = block.get("accessionNumber", [])
+        filing_date_list: list[str] = block.get("filingDate", [])
+        report_date_list: list[str] = block.get("reportDate", [])
+        primary_doc_list: list[str] = block.get("primaryDocument", [])
 
         total = min(
             len(form_list),
@@ -116,7 +117,7 @@ class FilingResolver:
             len(report_date_list),
             len(primary_doc_list),
         )
-        items: List[ResolvedFiling] = []
+        items: list[ResolvedFiling] = []
 
         for i in range(total):
             form_clean = str(form_list[i]).strip().upper()
@@ -168,12 +169,12 @@ class FilingResolver:
 
     def resolve_from_submissions_dict(
         self,
-        submissions_data: Dict[str, Any],
+        submissions_data: dict[str, Any],
         target_forms: Sequence[str] = DEFAULT_TARGET_FORMS,
-        limit_per_form: Optional[int] = None,
-        min_year: Optional[int] = 2009,
-        additional_blocks: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[ResolvedFiling]:
+        limit_per_form: int | None = None,
+        min_year: int | None = 2009,
+        additional_blocks: list[dict[str, Any]] | None = None,
+    ) -> list[ResolvedFiling]:
         """Parse submissions payload and extract target filings up to limit_per_form.
 
         Args:
@@ -222,8 +223,8 @@ class FilingResolver:
 
         # Apply limit_per_form if specified and positive
         if limit_per_form is not None and limit_per_form > 0:
-            counts_per_form: Dict[str, int] = defaultdict(int)
-            filtered: List[ResolvedFiling] = []
+            counts_per_form: dict[str, int] = defaultdict(int)
+            filtered: list[ResolvedFiling] = []
             for item in all_resolved:
                 if counts_per_form[item.form] < limit_per_form:
                     filtered.append(item)
@@ -231,9 +232,9 @@ class FilingResolver:
             all_resolved = filtered
 
         # Deduplicate by accession number while preserving chronological order
-        seen_accessions: Set[str] = set()
-        deduped: List[ResolvedFiling] = []
-        counts: Dict[str, int] = defaultdict(int)
+        seen_accessions: set[str] = set()
+        deduped: list[ResolvedFiling] = []
+        counts: dict[str, int] = defaultdict(int)
         for item in all_resolved:
             if item.accession_number not in seen_accessions:
                 seen_accessions.add(item.accession_number)
@@ -254,9 +255,9 @@ class FilingResolver:
         ticker: str,
         cik: str,
         target_forms: Sequence[str] = DEFAULT_TARGET_FORMS,
-        limit_per_form: Optional[int] = None,
-        min_year: Optional[int] = 2009,
-    ) -> List[ResolvedFiling]:
+        limit_per_form: int | None = None,
+        min_year: int | None = 2009,
+    ) -> list[ResolvedFiling]:
         """Fetch submissions JSON from S3 Bronze bucket and resolve target filings.
 
         Also traverses and fetches any historical paginated submission files
@@ -284,7 +285,7 @@ class FilingResolver:
         submissions_dict = json.loads(raw_bytes.decode("utf-8"))
 
         # Inspect and load additional historical submissions files
-        additional_blocks: List[Dict[str, Any]] = []
+        additional_blocks: list[dict[str, Any]] = []
         hist_files = submissions_dict.get("filings", {}).get("files", [])
 
         for f_meta in hist_files:
@@ -295,7 +296,7 @@ class FilingResolver:
                 continue
 
             hist_s3_key = f"raw/submissions/{file_name}"
-            hist_bytes: Optional[bytes] = None
+            hist_bytes: bytes | None = None
 
             if self.s3_storage.object_exists(bucket=self.bronze_bucket, key=hist_s3_key):
                 hist_bytes = self.s3_storage.download_bytes(bucket=self.bronze_bucket, key=hist_s3_key)

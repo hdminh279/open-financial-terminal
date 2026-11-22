@@ -22,9 +22,7 @@ from src.ai.agent.tools.financial_sql_tool import FinancialSQLTool
 TICKERS = ["AAPL", "MSFT", "GOOGL"]
 YEARS = [2022, 2023, 2024]
 PERIODS = ["Q1", "Q2", "Q3", "Q4", "FY"]
-EDGAR_URL_PATTERN = re.compile(
-    r"^https://www\.sec\.gov/Archives/edgar/data/\d+/\d+/[\w-]+-index\.htm$"
-)
+EDGAR_URL_PATTERN = re.compile(r"^https://www\.sec\.gov/Archives/edgar/data/\d+/\d+/[\w-]+-index\.htm$")
 
 
 @pytest.fixture(scope="module")
@@ -38,9 +36,7 @@ class TestQualityGate2MetricAvailability:
 
     @pytest.mark.parametrize("ticker", TICKERS)
     @pytest.mark.parametrize("year", YEARS)
-    def test_annual_income_statement_metrics_exist(
-        self, tool: FinancialSQLTool, ticker: str, year: int
-    ):
+    def test_annual_income_statement_metrics_exist(self, tool: FinancialSQLTool, ticker: str, year: int):
         """Verify core income statement metrics exist for every company and year."""
         for metric in ["revenues", "operating_income", "net_income"]:
             resp = tool.get_metric(ticker=ticker, metric=metric, fiscal_year=year, fiscal_period="FY")
@@ -51,9 +47,7 @@ class TestQualityGate2MetricAvailability:
 
     @pytest.mark.parametrize("ticker", TICKERS)
     @pytest.mark.parametrize("year", YEARS)
-    def test_annual_balance_sheet_metrics_exist(
-        self, tool: FinancialSQLTool, ticker: str, year: int
-    ):
+    def test_annual_balance_sheet_metrics_exist(self, tool: FinancialSQLTool, ticker: str, year: int):
         """Verify core balance sheet snapshot metrics exist for every company and year."""
         for metric in ["total_assets", "total_liabilities", "cash_and_cash_equivalents"]:
             resp = tool.get_metric(ticker=ticker, metric=metric, fiscal_year=year, fiscal_period="FY")
@@ -75,12 +69,14 @@ class TestQualityGate2MetricAvailability:
     @pytest.mark.parametrize("ticker", TICKERS)
     def test_all_quarters_present_for_recent_year(self, tool: FinancialSQLTool, ticker: str):
         """Verify all 4 quarters (Q1-Q4) are present for FY2023."""
-        resp = tool.execute({
-            "ticker": ticker,
-            "metric": "revenues",
-            "fiscal_year": 2023,
-            "period_type": "quarterly",
-        })
+        resp = tool.execute(
+            {
+                "ticker": ticker,
+                "metric": "revenues",
+                "fiscal_year": 2023,
+                "period_type": "quarterly",
+            }
+        )
         periods_found = [r.fiscal_period for r in resp.data]
         assert sorted(periods_found) == ["Q1", "Q2", "Q3", "Q4"], (
             f"Expected all 4 quarters for {ticker} in 2023, found {periods_found}"
@@ -103,9 +99,7 @@ class TestQualityGate2AccountingSemantics:
 
     @pytest.mark.parametrize("ticker", ["AAPL", "MSFT"])
     @pytest.mark.parametrize("year", YEARS)
-    def test_apple_and_microsoft_gross_profit_is_populated(
-        self, tool: FinancialSQLTool, ticker: str, year: int
-    ):
+    def test_apple_and_microsoft_gross_profit_is_populated(self, tool: FinancialSQLTool, ticker: str, year: int):
         """Verify Apple and Microsoft report gross profit as positive values."""
         resp = tool.get_metric(ticker=ticker, metric="gross_profit", fiscal_year=year, fiscal_period="FY")
         assert resp.record_count == 1
@@ -120,12 +114,14 @@ class TestQualityGate2AccountingSemantics:
         assert fy_resp.record_count == 1
         fy_rev = fy_resp.data[0].metric_value
 
-        q_resp = tool.execute({
-            "ticker": ticker,
-            "metric": "revenues",
-            "fiscal_year": year,
-            "period_type": "quarterly",
-        })
+        q_resp = tool.execute(
+            {
+                "ticker": ticker,
+                "metric": "revenues",
+                "fiscal_year": year,
+                "period_type": "quarterly",
+            }
+        )
         assert q_resp.record_count == 4
         quarters_sum = sum(r.metric_value for r in q_resp.data if r.metric_value is not None)
 
@@ -142,17 +138,27 @@ class TestQualityGate2AccountingSemantics:
         if q4_eps.record_count > 0:
             rec = q4_eps.data[0]
             if rec.is_derived:
-                assert rec.metric_value is None, (
-                    f"Derived Q4 diluted EPS for {ticker} FY{year} must be NULL"
-                )
+                assert rec.metric_value is None, f"Derived Q4 diluted EPS for {ticker} FY{year} must be NULL"
 
     @pytest.mark.parametrize("ticker", TICKERS)
     @pytest.mark.parametrize("year", YEARS)
     def test_balance_sheet_identity(self, tool: FinancialSQLTool, ticker: str, year: int):
         """Verify Balance Sheet identity: Assets = Liabilities + Equity (within 2% tolerance)."""
-        assets = tool.get_metric(ticker=ticker, metric="total_assets", fiscal_year=year, fiscal_period="FY").data[0].metric_value
-        liabs = tool.get_metric(ticker=ticker, metric="total_liabilities", fiscal_year=year, fiscal_period="FY").data[0].metric_value
-        equity = tool.get_metric(ticker=ticker, metric="stockholders_equity_parent", fiscal_year=year, fiscal_period="FY").data[0].metric_value
+        assets = (
+            tool.get_metric(ticker=ticker, metric="total_assets", fiscal_year=year, fiscal_period="FY")
+            .data[0]
+            .metric_value
+        )
+        liabs = (
+            tool.get_metric(ticker=ticker, metric="total_liabilities", fiscal_year=year, fiscal_period="FY")
+            .data[0]
+            .metric_value
+        )
+        equity = (
+            tool.get_metric(ticker=ticker, metric="stockholders_equity_parent", fiscal_year=year, fiscal_period="FY")
+            .data[0]
+            .metric_value
+        )
 
         assert assets is not None and liabs is not None and equity is not None
         calculated_assets = liabs + equity
@@ -168,17 +174,13 @@ class TestQualityGate2AuditProvenanceAndLatency:
     """Validate citation provenance and performance SLA."""
 
     @pytest.mark.parametrize("ticker", TICKERS)
-    def test_as_reported_records_have_valid_edgar_provenance(
-        self, tool: FinancialSQLTool, ticker: str
-    ):
+    def test_as_reported_records_have_valid_edgar_provenance(self, tool: FinancialSQLTool, ticker: str):
         """Verify all as-reported financial statement records have valid SEC EDGAR URLs."""
         resp = tool.get_metric(ticker=ticker, metric="revenues", fiscal_year=2023, fiscal_period="FY")
         assert resp.record_count == 1
         rec = resp.data[0]
         assert rec.provenance_url is not None
-        assert EDGAR_URL_PATTERN.match(rec.provenance_url), (
-            f"Invalid SEC EDGAR citation URL: {rec.provenance_url}"
-        )
+        assert EDGAR_URL_PATTERN.match(rec.provenance_url), f"Invalid SEC EDGAR citation URL: {rec.provenance_url}"
 
     def test_query_latency_sla(self, tool: FinancialSQLTool):
         """Verify queries execute well below 250ms SLA."""

@@ -6,14 +6,15 @@ strictly handles fixed-point Decimal monetary quantities, classifies period dura
 and serializes clean observations to Parquet in MinIO sec-silver.
 """
 
-from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
 import hashlib
 import io
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Set, Tuple
+from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
@@ -31,42 +32,46 @@ class FactsParser:
     DEFAULT_COMPANIES_PATH = "configs/companies.yaml"
     ALLOWED_FORMS = ("10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A")
 
-    FACTS_SCHEMA = pa.schema([
-        ("fact_key", pa.string()),
-        ("observation_key", pa.string()),
-        ("cik", pa.string()),
-        ("ticker", pa.string()),
-        ("taxonomy", pa.string()),
-        ("tag", pa.string()),
-        ("value", pa.decimal128(28, 2)),
-        ("unit", pa.string()),
-        ("period_type", pa.string()),
-        ("start_date", pa.date32()),
-        ("end_date", pa.date32()),
-        ("fiscal_year", pa.int32()),
-        ("fiscal_period", pa.string()),
-        ("duration_days", pa.int32()),
-        ("duration_scope", pa.string()),
-        ("form", pa.string()),
-        ("filed_date", pa.date32()),
-        ("accession_number", pa.string()),
-        ("is_amendment", pa.bool_()),
-        ("source_file", pa.string()),
-    ])
+    FACTS_SCHEMA = pa.schema(
+        [
+            ("fact_key", pa.string()),
+            ("observation_key", pa.string()),
+            ("cik", pa.string()),
+            ("ticker", pa.string()),
+            ("taxonomy", pa.string()),
+            ("tag", pa.string()),
+            ("value", pa.decimal128(28, 2)),
+            ("unit", pa.string()),
+            ("period_type", pa.string()),
+            ("start_date", pa.date32()),
+            ("end_date", pa.date32()),
+            ("fiscal_year", pa.int32()),
+            ("fiscal_period", pa.string()),
+            ("duration_days", pa.int32()),
+            ("duration_scope", pa.string()),
+            ("form", pa.string()),
+            ("filed_date", pa.date32()),
+            ("accession_number", pa.string()),
+            ("is_amendment", pa.bool_()),
+            ("source_file", pa.string()),
+        ]
+    )
 
-    QUARANTINE_SCHEMA = pa.schema([
-        ("cik", pa.string()),
-        ("ticker", pa.string()),
-        ("tag", pa.string()),
-        ("raw_payload", pa.string()),
-        ("quarantine_reason", pa.string()),
-        ("source_file", pa.string()),
-        ("quarantined_at", pa.timestamp("us")),
-    ])
+    QUARANTINE_SCHEMA = pa.schema(
+        [
+            ("cik", pa.string()),
+            ("ticker", pa.string()),
+            ("tag", pa.string()),
+            ("raw_payload", pa.string()),
+            ("quarantine_reason", pa.string()),
+            ("source_file", pa.string()),
+            ("quarantined_at", pa.timestamp("us")),
+        ]
+    )
 
     def __init__(
         self,
-        s3_storage: Optional[S3Storage] = None,
+        s3_storage: S3Storage | None = None,
         taxonomy_path: str = DEFAULT_TAXONOMY_PATH,
         companies_path: str = DEFAULT_COMPANIES_PATH,
         bronze_bucket: str = "sec-bronze",
@@ -86,15 +91,15 @@ class FactsParser:
     @staticmethod
     def load_company_mappings(
         companies_path: str,
-    ) -> Tuple[Dict[str, str], Dict[str, str]]:
+    ) -> tuple[dict[str, str], dict[str, str]]:
         """Load company entity name and CIK to ticker mappings from YAML."""
-        name_to_ticker: Dict[str, str] = {}
-        cik_to_ticker: Dict[str, str] = {}
+        name_to_ticker: dict[str, str] = {}
+        cik_to_ticker: dict[str, str] = {}
         if not os.path.exists(companies_path):
             logger.warning("Companies config file not found at %s", companies_path)
             return name_to_ticker, cik_to_ticker
 
-        with open(companies_path, "r", encoding="utf-8") as f:
+        with open(companies_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         for comp in data.get("companies", []):
@@ -117,10 +122,10 @@ class FactsParser:
 
     def resolve_ticker(
         self,
-        cik: Optional[str] = None,
-        entity_name: Optional[str] = None,
-        explicit_ticker: Optional[str] = None,
-    ) -> Optional[str]:
+        cik: str | None = None,
+        entity_name: str | None = None,
+        explicit_ticker: str | None = None,
+    ) -> str | None:
         """Resolve trading ticker from explicit argument, CIK, or company entity name."""
         if explicit_ticker and explicit_ticker.strip():
             return explicit_ticker.strip().upper()
@@ -139,21 +144,21 @@ class FactsParser:
         return None
 
     @staticmethod
-    def load_taxonomy_config(taxonomy_path: str) -> Dict[str, Any]:
+    def load_taxonomy_config(taxonomy_path: str) -> dict[str, Any]:
         """Load and validate the YAML taxonomy mapping and validation configuration.
 
         Fails fast if the file is missing or contains invalid YAML content.
         """
         if not os.path.exists(taxonomy_path):
             raise FileNotFoundError(f"Taxonomy configuration not found: {taxonomy_path}")
-        with open(taxonomy_path, "r", encoding="utf-8") as f:
+        with open(taxonomy_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
         if not isinstance(config, dict):
             raise ValueError(f"Invalid YAML content in {taxonomy_path}: expected dictionary root")
         return config
 
     @staticmethod
-    def extract_allowed_units(config: Dict[str, Any]) -> Set[str]:
+    def extract_allowed_units(config: dict[str, Any]) -> set[str]:
         """Extract and validate allowed measurement units from YAML constraints."""
         constraints = config.get("constraints", {})
         units = constraints.get("allowed_units")
@@ -165,9 +170,9 @@ class FactsParser:
         return set(units)
 
     @staticmethod
-    def extract_whitelist_tags(config: Dict[str, Any]) -> Set[str]:
+    def extract_whitelist_tags(config: dict[str, Any]) -> set[str]:
         """Extract set of unique allowed GAAP tags across all metric rules in the YAML config."""
-        tags: Set[str] = set()
+        tags: set[str] = set()
         for metric_info in config.get("metrics", {}).values():
             if isinstance(metric_info, dict):
                 for rule in metric_info.get("rules", []):
@@ -180,7 +185,7 @@ class FactsParser:
         return tags
 
     @classmethod
-    def load_whitelist_tags(cls, taxonomy_path: str) -> Set[str]:
+    def load_whitelist_tags(cls, taxonomy_path: str) -> set[str]:
         """Backward-compatible helper to extract whitelist tags from a file path."""
         cfg = cls.load_taxonomy_config(taxonomy_path)
         return cls.extract_whitelist_tags(cfg)
@@ -192,7 +197,7 @@ class FactsParser:
         tag: str,
         unit: str,
         period_type: str,
-        start_str: Optional[str],
+        start_str: str | None,
         end_str: str,
         dimensions: str = CANONICAL_DIMENSIONS,
     ) -> str:
@@ -208,9 +213,7 @@ class FactsParser:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def classify_duration(
-        start_date: Optional[date], end_date: date
-    ) -> Tuple[Optional[int], str]:
+    def classify_duration(start_date: date | None, end_date: date) -> tuple[int | None, str]:
         """Classify the accounting period duration scope without altering official SEC metadata."""
         if start_date is None:
             return None, "instant"
@@ -233,9 +236,9 @@ class FactsParser:
         return duration_days, scope
 
     @classmethod
-    def validate_and_quantize_decimal(cls, val: Any) -> Optional[Decimal]:
+    def validate_and_quantize_decimal(cls, val: Any) -> Decimal | None:
         """Convert and validate numerical value to Decimal with scale 2.
-        
+
         Guarantees zero floating-point intermediate representation.
         Returns None if value exceeds precision or has unparseable precision.
         """
@@ -262,15 +265,15 @@ class FactsParser:
 
     def parse_facts_payload(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         source_file: str,
-        whitelist_tags: Optional[Set[str]] = None,
-        ticker: Optional[str] = None,
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        whitelist_tags: set[str] | None = None,
+        ticker: str | None = None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Parse raw company facts JSON payload into valid observations and quarantine anomalies."""
         tags_to_parse = whitelist_tags or self.whitelist_tags
-        valid_observations: Dict[str, Dict[str, Any]] = {}
-        quarantine_records: List[Dict[str, Any]] = []
+        valid_observations: dict[str, dict[str, Any]] = {}
+        quarantine_records: list[dict[str, Any]] = []
 
         cik_raw = data.get("cik")
         cik = str(cik_raw).zfill(10) if (cik_raw is not None and str(cik_raw).strip() != "") else None
@@ -309,25 +312,20 @@ class FactsParser:
                         fp = item.get("fp")
 
                         # Validate minimum required fields for Fact & Observation Identity
-                        if (
-                            not cik
-                            or not tag_name
-                            or not end_str
-                            or val is None
-                            or not accn
-                            or not filed_str
-                        ):
-                            quarantine_records.append({
-                                "cik": cik,
-                                "ticker": resolved_ticker,
-                                "tag": tag_name,
-                                "raw_payload": json.dumps(
-                                    {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
-                                ),
-                                "quarantine_reason": "INCOMPLETE_FACT_KEY",
-                                "source_file": source_file,
-                                "quarantined_at": datetime.utcnow(),
-                            })
+                        if not cik or not tag_name or not end_str or val is None or not accn or not filed_str:
+                            quarantine_records.append(
+                                {
+                                    "cik": cik,
+                                    "ticker": resolved_ticker,
+                                    "tag": tag_name,
+                                    "raw_payload": json.dumps(
+                                        {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
+                                    ),
+                                    "quarantine_reason": "INCOMPLETE_FACT_KEY",
+                                    "source_file": source_file,
+                                    "quarantined_at": datetime.now(UTC).replace(tzinfo=None),
+                                }
+                            )
                             continue
 
                         # Filter strictly to periodic reporting forms
@@ -337,17 +335,19 @@ class FactsParser:
                         # Validate Decimal
                         decimal_val = self.validate_and_quantize_decimal(val)
                         if decimal_val is None:
-                            quarantine_records.append({
-                                "cik": cik,
-                                "ticker": resolved_ticker,
-                                "tag": tag_name,
-                                "raw_payload": json.dumps(
-                                    {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
-                                ),
-                                "quarantine_reason": "UNSUPPORTED_DECIMAL_PRECISION",
-                                "source_file": source_file,
-                                "quarantined_at": datetime.utcnow(),
-                            })
+                            quarantine_records.append(
+                                {
+                                    "cik": cik,
+                                    "ticker": resolved_ticker,
+                                    "tag": tag_name,
+                                    "raw_payload": json.dumps(
+                                        {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
+                                    ),
+                                    "quarantine_reason": "UNSUPPORTED_DECIMAL_PRECISION",
+                                    "source_file": source_file,
+                                    "quarantined_at": datetime.now(UTC).replace(tzinfo=None),
+                                }
+                            )
                             continue
 
                         # Parse End Date and Filed Date
@@ -355,17 +355,19 @@ class FactsParser:
                             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
                             filed_date = datetime.strptime(filed_str, "%Y-%m-%d").date()
                         except ValueError:
-                            quarantine_records.append({
-                                "cik": cik,
-                                "ticker": resolved_ticker,
-                                "tag": tag_name,
-                                "raw_payload": json.dumps(
-                                    {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
-                                ),
-                                "quarantine_reason": "INVALID_DATE_FORMAT",
-                                "source_file": source_file,
-                                "quarantined_at": datetime.utcnow(),
-                            })
+                            quarantine_records.append(
+                                {
+                                    "cik": cik,
+                                    "ticker": resolved_ticker,
+                                    "tag": tag_name,
+                                    "raw_payload": json.dumps(
+                                        {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
+                                    ),
+                                    "quarantine_reason": "INVALID_DATE_FORMAT",
+                                    "source_file": source_file,
+                                    "quarantined_at": datetime.now(UTC).replace(tzinfo=None),
+                                }
+                            )
                             continue
 
                         # Period Type and Start Date
@@ -376,31 +378,35 @@ class FactsParser:
                             try:
                                 start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
                             except ValueError:
-                                quarantine_records.append({
-                                    "cik": cik,
-                                    "ticker": resolved_ticker,
-                                    "tag": tag_name,
-                                    "raw_payload": json.dumps(
-                                        {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
-                                    ),
-                                    "quarantine_reason": "INVALID_DATE_FORMAT",
-                                    "source_file": source_file,
-                                    "quarantined_at": datetime.utcnow(),
-                                })
+                                quarantine_records.append(
+                                    {
+                                        "cik": cik,
+                                        "ticker": resolved_ticker,
+                                        "tag": tag_name,
+                                        "raw_payload": json.dumps(
+                                            {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
+                                        ),
+                                        "quarantine_reason": "INVALID_DATE_FORMAT",
+                                        "source_file": source_file,
+                                        "quarantined_at": datetime.now(UTC).replace(tzinfo=None),
+                                    }
+                                )
                                 continue
 
                             if start_date > end_date:
-                                quarantine_records.append({
-                                    "cik": cik,
-                                    "ticker": resolved_ticker,
-                                    "tag": tag_name,
-                                    "raw_payload": json.dumps(
-                                        {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
-                                    ),
-                                    "quarantine_reason": "INVALID_DATE_RANGE",
-                                    "source_file": source_file,
-                                    "quarantined_at": datetime.utcnow(),
-                                })
+                                quarantine_records.append(
+                                    {
+                                        "cik": cik,
+                                        "ticker": resolved_ticker,
+                                        "tag": tag_name,
+                                        "raw_payload": json.dumps(
+                                            {k: str(v) if isinstance(v, Decimal) else v for k, v in item.items()}
+                                        ),
+                                        "quarantine_reason": "INVALID_DATE_RANGE",
+                                        "source_file": source_file,
+                                        "quarantined_at": datetime.now(UTC).replace(tzinfo=None),
+                                    }
+                                )
                                 continue
 
                         duration_days, duration_scope = self.classify_duration(start_date, end_date)
@@ -448,12 +454,12 @@ class FactsParser:
 
         return list(valid_observations.values()), quarantine_records
 
-    def build_facts_table(self, observations: List[Dict[str, Any]]) -> pa.Table:
+    def build_facts_table(self, observations: list[dict[str, Any]]) -> pa.Table:
         """Construct strongly typed PyArrow Table conforming to FACTS_SCHEMA."""
         columns = {field.name: [obs.get(field.name) for obs in observations] for field in self.FACTS_SCHEMA}
         return pa.Table.from_pydict(columns, schema=self.FACTS_SCHEMA)
 
-    def build_quarantine_table(self, anomalies: List[Dict[str, Any]]) -> pa.Table:
+    def build_quarantine_table(self, anomalies: list[dict[str, Any]]) -> pa.Table:
         """Construct strongly typed PyArrow Table conforming to QUARANTINE_SCHEMA."""
         columns = {field.name: [rec.get(field.name) for rec in anomalies] for field in self.QUARANTINE_SCHEMA}
         return pa.Table.from_pydict(columns, schema=self.QUARANTINE_SCHEMA)
@@ -470,18 +476,19 @@ class FactsParser:
         bronze_prefix: str = "raw/company_facts/",
         facts_output_key: str = "facts/facts.parquet",
         quarantine_output_key: str = "quarantine/anomalies.parquet",
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Execute complete Bronze to Silver ETL parsing and persistence pipeline."""
         logger.info("Executing FactsParser pipeline from %s to %s...", self.bronze_bucket, self.silver_bucket)
         self.s3.ensure_buckets_exist([self.silver_bucket])
 
         fact_keys = [
-            k for k in self.s3.list_objects(self.bronze_bucket, prefix=bronze_prefix)
+            k
+            for k in self.s3.list_objects(self.bronze_bucket, prefix=bronze_prefix)
             if k.endswith(".json") and not k.endswith("_metadata.json")
         ]
 
-        all_observations: Dict[str, Dict[str, Any]] = {}
-        all_quarantine: List[Dict[str, Any]] = []
+        all_observations: dict[str, dict[str, Any]] = {}
+        all_quarantine: list[dict[str, Any]] = []
 
         for key in fact_keys:
             raw_bytes = self.s3.download_bytes(self.bronze_bucket, key)
@@ -493,9 +500,7 @@ class FactsParser:
             ticker_from_key = key.split("/")[-1].split("_")[0]
 
             source_file = f"s3://{self.bronze_bucket}/{key}"
-            obs_list, q_list = self.parse_facts_payload(
-                payload, source_file=source_file, ticker=ticker_from_key
-            )
+            obs_list, q_list = self.parse_facts_payload(payload, source_file=source_file, ticker=ticker_from_key)
 
             for obs in obs_list:
                 all_observations[obs["observation_key"]] = obs
@@ -555,4 +560,3 @@ if __name__ == "__main__":
 """
 docker compose run --rm app uv run python -m src.cli process --facts
 """
-

@@ -1,12 +1,12 @@
 """Unit tests for Embedding Strategy and Factory."""
 
-import pytest
-import numpy as np
 from unittest.mock import MagicMock, patch
 
-from src.ai.embeddings.base import EmbeddingStrategy
-from src.ai.embeddings.fastembed_strategy import FastEmbedStrategy
+import numpy as np
+import pytest
+
 from src.ai.embeddings.factory import EmbeddingFactory
+from src.ai.embeddings.fastembed_strategy import FastEmbedStrategy
 
 
 class TestEmbeddingStrategyContract:

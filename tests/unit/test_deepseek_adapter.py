@@ -85,9 +85,7 @@ def make_mock_response(
         usage.prompt_cache_hit_tokens = cache_hit_tokens
         usage.prompt_cache_miss_tokens = cache_miss_tokens
         if reasoning_tokens is not None:
-            usage.completion_tokens_details = MagicMock(
-                reasoning_tokens=reasoning_tokens
-            )
+            usage.completion_tokens_details = MagicMock(reasoning_tokens=reasoning_tokens)
         else:
             usage.completion_tokens_details = None
         resp.usage = usage
@@ -131,9 +129,7 @@ class TestPayloadConstructionAndFiltering:
     def test_chat_profile_payload(self) -> None:
         mock_client = MagicMock()
         mock_client.chat.completions.create.return_value = make_mock_response()
-        adapter = DeepSeekAdapter(
-            client=mock_client, thinking=False, model="deepseek-flash"
-        )
+        adapter = DeepSeekAdapter(client=mock_client, thinking=False, model="deepseek-flash")
 
         adapter.generate(
             [ChatMessage(role="user", content="Hello")],
@@ -151,9 +147,7 @@ class TestPayloadConstructionAndFiltering:
     def test_reasoner_profile_payload(self) -> None:
         mock_client = MagicMock()
         mock_client.chat.completions.create.return_value = make_mock_response()
-        adapter = DeepSeekAdapter(
-            client=mock_client, thinking=True, model="deepseek-flash"
-        )
+        adapter = DeepSeekAdapter(client=mock_client, thinking=True, model="deepseek-flash")
 
         adapter.generate(
             [ChatMessage(role="user", content="Analyze filing")],
@@ -171,9 +165,7 @@ class TestPayloadConstructionAndFiltering:
 
     def test_json_mode_payload_success(self) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = make_mock_response(
-            content='{"revenue": 1000}'
-        )
+        mock_client.chat.completions.create.return_value = make_mock_response(content='{"revenue": 1000}')
         adapter = DeepSeekAdapter(client=mock_client, thinking=False)
 
         res = adapter.generate(
@@ -252,14 +244,10 @@ class TestResponseMappingAndSemantics:
         )
         adapter = DeepSeekAdapter(client=mock_client, thinking=True)
 
-        res = adapter.generate(
-            [ChatMessage(role="user", content="Explain reconciliation")]
-        )
+        res = adapter.generate([ChatMessage(role="user", content="Explain reconciliation")])
 
         assert res.content == "Final answer"
-        assert res.reasoning_content == (
-            "Step 1: Parse financial notes.\nStep 2: Compare GAAP vs non-GAAP."
-        )
+        assert res.reasoning_content == ("Step 1: Parse financial notes.\nStep 2: Compare GAAP vs non-GAAP.")
         assert "Step 1" not in res.content
 
     def test_map_token_usage_full(self) -> None:
@@ -306,9 +294,7 @@ class TestResponseMappingAndSemantics:
 
     def test_map_token_usage_none(self) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = make_mock_response(
-            has_usage=False
-        )
+        mock_client.chat.completions.create.return_value = make_mock_response(has_usage=False)
         adapter = DeepSeekAdapter(client=mock_client)
 
         res = adapter.generate([ChatMessage(role="user", content="Query")])
@@ -395,9 +381,7 @@ class TestStreamRetryBoundary:
 
         # First call raises RateLimitError; second call succeeds
         mock_client.chat.completions.create.side_effect = [
-            RateLimitError(
-                message="Rate limited", response=MagicMock(status_code=429), body=None
-            ),
+            RateLimitError(message="Rate limited", response=MagicMock(status_code=429), body=None),
             [c1],
         ]
         adapter = DeepSeekAdapter(client=mock_client, max_attempts=3)
@@ -438,12 +422,8 @@ class TestRetryRecoveryAndAttempts:
         mock_success = make_mock_response(content="Recovered answer")
 
         mock_client.chat.completions.create.side_effect = [
-            RateLimitError(
-                message="Rate limited", response=MagicMock(status_code=429), body=None
-            ),
-            InternalServerError(
-                message="Server error", response=MagicMock(status_code=500), body=None
-            ),
+            RateLimitError(message="Rate limited", response=MagicMock(status_code=429), body=None),
+            InternalServerError(message="Server error", response=MagicMock(status_code=500), body=None),
             mock_success,
         ]
         adapter = DeepSeekAdapter(client=mock_client, max_attempts=3)
@@ -551,9 +531,7 @@ class TestMaxAttemptsExhaustion:
 
     def test_persistent_timeout_raises_timeout_error(self) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = APITimeoutError(
-            request=MagicMock()
-        )
+        mock_client.chat.completions.create.side_effect = APITimeoutError(request=MagicMock())
         adapter = DeepSeekAdapter(client=mock_client, max_attempts=3)
 
         with pytest.raises(LLMTimeoutError) as exc_info:
@@ -564,9 +542,7 @@ class TestMaxAttemptsExhaustion:
 
     def test_persistent_connection_error_raises_provider_error(self) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = APIConnectionError(
-            request=MagicMock()
-        )
+        mock_client.chat.completions.create.side_effect = APIConnectionError(request=MagicMock())
         adapter = DeepSeekAdapter(client=mock_client, max_attempts=3)
 
         with pytest.raises(LLMProviderError) as exc_info:
@@ -579,9 +555,7 @@ class TestMaxAttemptsExhaustion:
 class TestSecurityAndKeyValidation:
     """8. Verify API key handling, validation timing, and zero log leakage."""
 
-    def test_missing_key_raises_auth_error_on_init(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_missing_key_raises_auth_error_on_init(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
 
         with pytest.raises(LLMAuthError) as exc_info:
@@ -589,16 +563,12 @@ class TestSecurityAndKeyValidation:
 
         assert "DeepSeek API key is required" in str(exc_info.value)
 
-    def test_injected_client_requires_no_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_injected_client_requires_no_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
         adapter = DeepSeekAdapter(client=MagicMock())
         assert adapter is not None
 
-    def test_key_and_prompt_not_leaked_in_logs(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_key_and_prompt_not_leaked_in_logs(self, caplog: pytest.LogCaptureFixture) -> None:
         secret_key = "sk-super-secret-key-123456789"
         secret_prompt = "confidential-user-prompt-987654"
 

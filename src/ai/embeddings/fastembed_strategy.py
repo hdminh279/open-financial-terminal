@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import List, Optional
+
 from fastembed import TextEmbedding
 
 from src.ai.embeddings.base import EmbeddingStrategy
@@ -19,9 +19,9 @@ class FastEmbedStrategy(EmbeddingStrategy):
 
     def __init__(
         self,
-        model_name: Optional[str] = None,
-        cache_dir: Optional[str] = None,
-        threads: Optional[int] = None,
+        model_name: str | None = None,
+        cache_dir: str | None = None,
+        threads: int | None = None,
     ) -> None:
         """Initialize FastEmbed strategy with lazy model loading.
 
@@ -33,8 +33,8 @@ class FastEmbedStrategy(EmbeddingStrategy):
         self._model_name = model_name or self.DEFAULT_MODEL
         self._cache_dir = cache_dir
         self._threads = threads
-        self._model: Optional[TextEmbedding] = None
-        self._dimension: Optional[int] = None
+        self._model: TextEmbedding | None = None
+        self._dimension: int | None = None
 
     def _ensure_loaded(self) -> None:
         """Lazily initialize the TextEmbedding model upon first request."""
@@ -76,7 +76,7 @@ class FastEmbedStrategy(EmbeddingStrategy):
         """Return model identifier."""
         return self._model_name
 
-    def embed_documents(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_documents(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Compute dense vector embeddings in batches using ONNX runtime."""
         if not texts:
             return []
@@ -87,7 +87,7 @@ class FastEmbedStrategy(EmbeddingStrategy):
         embeddings_generator = self._model.embed(texts, batch_size=batch_size)
         return [embedding.tolist() for embedding in embeddings_generator]
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Compute dense vector embedding for a single search query."""
         if not text or not text.strip():
             raise ValueError("Query text cannot be empty or whitespace.")

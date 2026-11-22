@@ -1,6 +1,7 @@
 """Unit tests for MetricRegistry and metadata resolution."""
 
 import pytest
+
 from src.core.financial.metric_registry import MetricRegistry
 
 
@@ -11,9 +12,9 @@ def registry() -> MetricRegistry:
 
 
 def test_registry_loads_all_taxonomy_metrics(registry: MetricRegistry):
-    """Verify registry loads all 47 defined taxonomy metrics."""
+    """Verify registry loads all 49 defined taxonomy metrics."""
     metrics = registry.list_metrics()
-    assert len(metrics) == 47
+    assert len(metrics) == 49
 
 
 def test_canonical_metric_retrieval(registry: MetricRegistry):
@@ -57,9 +58,9 @@ def test_storage_layer_partitioning(registry: MetricRegistry):
     sql_metrics = registry.list_metrics(storage_layer="sql_gold")
     rag_metrics = registry.list_metrics(storage_layer="rag_textual")
 
-    assert len(sql_metrics) == 24
+    assert len(sql_metrics) == 26
     assert len(rag_metrics) == 23
-    assert len(sql_metrics) + len(rag_metrics) == 47
+    assert len(sql_metrics) + len(rag_metrics) == 49
 
     assert registry.is_sql_metric("revenues") is True
     assert registry.is_sql_metric("adjusted_ebitda") is False

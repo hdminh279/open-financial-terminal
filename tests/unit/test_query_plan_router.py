@@ -9,7 +9,6 @@ Tests cover:
 from src.ai.agent.contracts import (
     ComparisonType,
     ExecutionStrategy,
-    FinancialQueryPlan,
     IntentType,
 )
 from src.ai.agent.router import IntentRouter, route_next_step
@@ -191,4 +190,3 @@ def test_historical_year_not_blocked() -> None:
     assert decision.query_plan.requires_sql is True
     assert decision.sql_params is not None
     assert decision.sql_params.fiscal_years == [2015]
-

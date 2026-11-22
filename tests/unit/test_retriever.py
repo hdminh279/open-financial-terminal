@@ -1,12 +1,13 @@
 """Unit tests for HybridRetriever, FlashRankReranker, and data contracts."""
 
 from unittest.mock import MagicMock
+
 import pytest
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter, RetrievedChunk
 from src.ai.retrieval.reranker import FlashRankReranker
+from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter, RetrievedChunk
 
 
 @pytest.fixture
@@ -97,11 +98,11 @@ class TestHybridRetriever:
     def test_filter_building(self, mock_retriever_setup):
         """Test conversion of RetrievalFilter to Qdrant Filter."""
         retriever = mock_retriever_setup
-        filter_params = RetrievalFilter(ticker="AAPL", fiscal_year=2024)
+        filter_params = RetrievalFilter(ticker="AAPL", fiscal_year=2024, min_fiscal_year=2022)
         qdrant_filter = retriever._build_qdrant_filter(filter_params)
 
         assert qdrant_filter is not None
-        assert len(qdrant_filter.must) == 2
+        assert len(qdrant_filter.must) == 3
 
     def test_retrieve_dense_mode(self, mock_retriever_setup):
         """Test dense vector retrieval returns top matching chunk."""

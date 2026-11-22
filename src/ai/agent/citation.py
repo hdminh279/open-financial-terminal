@@ -7,36 +7,27 @@ Mermaid xychart-beta visualizations, and structures deep research report section
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from src.ai.agent.chart_engine import ChartEngine
 from src.ai.agent.contracts import (
-    ChartData,
-    ChartType,
     Citation,
-    EvidenceItem,
     EvidenceSourceType,
     IntentType,
     ReportSection,
 )
-from src.ai.agent.chart_engine import ChartEngine
 from src.ai.agent.state import AgentState
 from src.ai.llm.base import BaseLLMAdapter
 from src.ai.llm.contracts import ChatMessage
 from src.ai.llm.factory import LLMFactory
-from src.core.financial.metric_registry import MetricRegistry
+from src.core.financial.company_registry import load_company_catalog
+from src.core.financial.response_templates import detect_query_language, render_template
 from src.core.financial.semantic_guardrails import FinancialOntology
+from src.core.financial.year_utils import is_shifted_fiscal_period
 
 logger = logging.getLogger(__name__)
 
-_metric_registry: Optional[MetricRegistry] = None
-_financial_ontology: Optional[FinancialOntology] = None
-
-
-def _get_metric_registry() -> MetricRegistry:
-    global _metric_registry
-    if _metric_registry is None:
-        _metric_registry = MetricRegistry()
-    return _metric_registry
+_financial_ontology: FinancialOntology | None = None
 
 
 def _get_financial_ontology() -> FinancialOntology:
@@ -44,6 +35,7 @@ def _get_financial_ontology() -> FinancialOntology:
     if _financial_ontology is None:
         _financial_ontology = FinancialOntology()
     return _financial_ontology
+
 
 SYNTHESIS_SYSTEM_PROMPT = """You are a senior financial research analyst and corporate intelligence specialist.
 Your mission is to synthesize a factual, clear, and comprehensive answer to the user's question,
@@ -57,20 +49,25 @@ grounded strictly and objectively in the provided verified evidence (including o
    - NEVER confuse, mix, or aggregate Geographic revenue with Product Line revenue.
 3. Layer 3 (Two-Tier Structured Organization):
    Your answer should be well-organized into two clear sections:
-   - `### [Official Disclosures]`:
+   - `### Official Disclosures`:
      * Core factual figures, standard Markdown tables with pipes (|), and inline citations [1], [2].
-   - `### [Analysis & Commentary]`:
+   - `### Analysis & Commentary`:
      * Growth rates, margins, business dynamics, and strategic commentary directly backed by the evidence.
 4. Layer 4 (Mathematical Consistency):
    - Operating Margin = Operating Income / Revenues.
    - Net Margin = Net Income / Revenues.
    - Never hallucinate margins or figures that contradict the raw evidence.
+5. Layer 5 (Multi-Currency & Fiscal Calendar Integrity):
+   - Always label the exact reporting currency (e.g. USD, VND, TWD, EUR, INR, JPY) alongside monetary figures.
+   - NEVER compare raw monetary figures across different currencies as if they shared the same unit, and NEVER invent exchange rates not present in the evidence.
+   - When evidence includes exact period dates (start_date to end_date), state the exact fiscal period and date coverage clearly to avoid calendar-year vs fiscal-year confusion.
+   - Clearly separate audited filing facts from unaudited live web news sources when both are present.
 
 ### Language Enforcement:
-- If the user's inquiry is in Vietnamese (or another language), synthesize the entire answer fluently in that language, translating the two-tier section headers naturally (e.g. `### [Công bố Chính thức & Bằng chứng]`, `### [Phân tích & Bình luận]`).
+- If the user's inquiry is in Vietnamese (or another language), synthesize the entire answer fluently in that language, translating the two-tier section headers naturally without square brackets (e.g. `### Công bố Chính thức & Bằng chứng`, `### Phân tích & Bình luận`).
 - For English queries, use:
-  * `### [Official Disclosures]`
-  * `### [Analysis & Commentary]`
+  * `### Official Disclosures`
+  * `### Analysis & Commentary`
 
 ### Markdown Table Formatting Rule:
 - When presenting multiple fiscal periods, product categories, or metric comparisons, format the data as a clean, standard GitHub Flavored Markdown Table with pipe syntax:
@@ -82,11 +79,15 @@ grounded strictly and objectively in the provided verified evidence (including o
 
 ### Clean Content Rules:
 - Do NOT output raw Mermaid `xychart-beta` blocks or raw `### Sources & References` footnote sections in the body. The UI automatically displays interactive charts and collapsible references from structured state.
+- NEVER insert horizontal divider lines (`---`, `***`, `___`) between sections.
+- NEVER wrap section headings in square brackets `[...]`.
+- Minimize parentheses `(...)` as much as possible across prose, bullet points, and table cells. Write years, currencies, and clarifications naturally inline using colons, commas, or prepositions (e.g. `từ 60,9 tỷ USD năm FY2024 lên 215,9 tỷ USD năm FY2026`, `khoảng 15–18%/năm`, `478,8 tỷ USD trong FY2026`) rather than wrapping them in parentheses.
+- Use consistent decimal and thousand separators matching the response language across all figures in the same answer (e.g. in Vietnamese, consistently use `.` for thousands and `,` for decimals; never mix `201.183 tỷ` with `245,122 tỷ`).
 - Keep the analytical answer focused, clear, and easy to read. Do not use graphical emojis.
 
 ### Grounding & Citation Rules:
 1. Strict Grounding: Rely ONLY on the facts, numerical metrics, and text excerpts in the provided evidence.
-   Do not speculate, extrapolate, or inject outside knowledge.
+   Do not speculate, extrapolate, or inject outside knowledge. If a Yes/No question asks about a missing breakdown (e.g. geographic revenue split when only consolidated revenue exists), NEVER answer 'Yes' or 'No'; state transparently that it cannot be confirmed from the provided evidence.
 2. Inline Citations: Every statement containing numbers, dates, strategic claims, or risk disclosures
    MUST cite the corresponding evidence index using square brackets (e.g. [1], [2], or [1][2]).
 3. Partial Evidence Handling: If the user asked for both metrics and explanations, but only one type of
@@ -106,7 +107,7 @@ class CitationEngine:
     """Manages sequential citation indexing and authoritative SEC URL formatting."""
 
     @staticmethod
-    def build_citations(evidence_dicts: List[Dict[str, Any]]) -> List[Citation]:
+    def build_citations(evidence_dicts: list[dict[str, Any]]) -> list[Citation]:
         """Convert accumulated evidence items into verified sequential Citation objects.
 
         Args:
@@ -115,7 +116,7 @@ class CitationEngine:
         Returns:
             List of sequential, validated Citation models.
         """
-        citations: List[Citation] = []
+        citations: list[Citation] = []
         for idx, ev_dict in enumerate(evidence_dicts):
             citation_id = idx + 1
             source_type = ev_dict.get("source_type")
@@ -129,7 +130,11 @@ class CitationEngine:
 
             if source_type == EvidenceSourceType.WEB.value or form == "WEB_NEWS":
                 formatted_ref = f"[{citation_id}] {item_or_metric} — [Live Web Source]({source_url})"
-            elif form in ("BCTC", "VAS", "VAS-BANK", "VAS-SECURITIES", "VAS-INSURANCE") or "vndirect" in source_url or "vietstock" in source_url:
+            elif (
+                form in ("BCTC", "VAS", "VAS-BANK", "VAS-SECURITIES", "VAS-INSURANCE")
+                or "vndirect" in source_url
+                or "vietstock" in source_url
+            ):
                 formatted_ref = f"[{citation_id}] {ticker} BCTC {period_str} {item_or_metric} — [Financial Statement Source]({source_url})"
             else:
                 formatted_ref = (
@@ -142,13 +147,21 @@ class CitationEngine:
                     citation_id=citation_id,
                     formatted_reference=formatted_ref,
                     source_url=source_url,
+                    ticker=ticker,
+                    form=form,
+                    fiscal_year=int(fy) if fy is not None else None,
+                    fiscal_period=str(fp) if fp else None,
+                    item_or_metric=item_or_metric,
+                    excerpt=ev_dict.get("content_summary") or None,
+                    accession_number=ev_dict.get("accession_number") or None,
+                    source_type=str(source_type) if source_type else None,
                 )
             )
 
         return citations
 
     @staticmethod
-    def format_references_markdown(citations: List[Citation], draft_answer: str = "") -> str:
+    def format_references_markdown(citations: list[Citation], draft_answer: str = "") -> str:
         """Render ordered references section in Markdown, prioritizing cited items.
 
         Args:
@@ -174,14 +187,112 @@ class CitationEngine:
         return "\n".join(lines)
 
 
+def build_fiscal_period_notes(
+    sql_data: dict[str, Any] | None,
+    query: str = "",
+) -> list[str]:
+    """Generate deterministic localized footnotes for shifted fiscal-year periods.
+
+    Inspects returned SQL metric records and emits at most one explanatory footnote
+    per company ticker when the reported period falls predominantly (>= 75% of days)
+    in a calendar year different from its SEC/VAS fiscal year label.
+
+    Args:
+        sql_data: Serialized FinancialQueryResponse dictionary from AgentState.
+        query: Original user query used to select response language (VI/EN).
+
+    Returns:
+        List of formatted Markdown footnote strings (one per affected ticker).
+    """
+    if not sql_data or not isinstance(sql_data, dict):
+        return []
+
+    records = sql_data.get("data") or []
+    if not records:
+        return []
+
+    # Track the latest shifted period per ticker to keep footnotes concise
+    shifted_by_ticker: dict[str, dict[str, Any]] = {}
+    for rec in records:
+        if not isinstance(rec, dict) or rec.get("metric_value") is None:
+            continue
+        ticker = str(rec.get("ticker") or "").strip().upper()
+        fy = rec.get("fiscal_year")
+        start_date = rec.get("start_date")
+        end_date = rec.get("end_date")
+        if not ticker or fy is None or not start_date or not end_date:
+            continue
+
+        is_shifted, dom_year = is_shifted_fiscal_period(
+            fiscal_year=int(fy),
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if not is_shifted or dom_year is None:
+            continue
+
+        end_str = str(end_date)[:10]
+        prev = shifted_by_ticker.get(ticker)
+        if prev is None or end_str > prev["end_date"]:
+            shifted_by_ticker[ticker] = {
+                "ticker": ticker,
+                "fiscal_year": int(fy),
+                "fiscal_period": str(rec.get("fiscal_period") or "FY").upper(),
+                "calendar_year": dom_year,
+                "start_date": str(start_date)[:10],
+                "end_date": end_str,
+            }
+
+    if not shifted_by_ticker:
+        return []
+
+    catalog = load_company_catalog()
+    name_map = {
+        str(c.get("ticker", "")).upper(): str(c.get("name", c.get("ticker", ""))) for c in catalog if c.get("ticker")
+    }
+    lang = detect_query_language(query)
+
+    notes: list[str] = []
+    for ticker in sorted(shifted_by_ticker.keys()):
+        info = shifted_by_ticker[ticker]
+        fp = info["fiscal_period"]
+        fy = info["fiscal_year"]
+        period_label = f"FY{fy}" if fp == "FY" else f"{fp} FY{fy}"
+        note = render_template(
+            "fiscal_period_footnote",
+            lang=lang,
+            company_name=name_map.get(ticker, ticker),
+            ticker=ticker,
+            period_label=period_label,
+            calendar_year=info["calendar_year"],
+            start_date=info["start_date"],
+            end_date=info["end_date"],
+        )
+        if note:
+            notes.append(note)
+
+    return notes
+
+
+def sanitize_answer_formatting(text: str) -> str:
+    """Remove horizontal dividers and square brackets around section headings."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"(?m)^\s*(?:---+|\*\*\*+|___+)\s*$", "", text)
+    cleaned = re.sub(r"(?m)^(#{1,4}\s+)\[([^\]]+)\]\s*$", r"\1\2", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 # ---------------------------------------------------------------------------
 # LangGraph Node Functions
 # ---------------------------------------------------------------------------
 
+
 def synthesis_node(
     state: AgentState,
-    llm_adapter: Optional[BaseLLMAdapter] = None,
-) -> Dict[str, Any]:
+    llm_adapter: BaseLLMAdapter | None = None,
+) -> dict[str, Any]:
     """LangGraph node synthesizing a fully grounded response with [1], [2] citation tags.
 
     Args:
@@ -204,7 +315,7 @@ def synthesis_node(
     abstention_info = state.get("abstention_info") or {}
 
     # Format collected evidence blocks
-    evidence_text_blocks: List[str] = []
+    evidence_text_blocks: list[str] = []
     for idx, ev in enumerate(evidence_dicts):
         cid = idx + 1
         src = ev.get("source_type", "evidence").upper()
@@ -244,15 +355,23 @@ def synthesis_node(
     unavail_note = ""
     if unavail_items:
         unavail_note = (
-            f"\n\n=== EXCLUDED / UNPUBLISHED PERIODS ===\n"
+            "\n\n=== EXCLUDED / UNPUBLISHED PERIODS ===\n"
             "The following requested periods cannot be reported from verified SEC filings:\n"
             + "\n".join(unavail_items)
             + "\nExplicitly disclose in your answer why these periods are excluded (e.g. fiscal year has not ended or Form 10-K is not published yet).\n"
         )
 
+    query_lang = detect_query_language(query)
+    lang_directive = (
+        "Response Language: VIETNAMESE (write 100% in Vietnamese, including headers '### Công bố Chính thức & Bằng chứng' and '### Phân tích & Bình luận', with no square brackets, no --- dividers, and minimal parentheses)."
+        if query_lang == "vi"
+        else "Response Language: ENGLISH (write 100% in English, including headers '### Official Disclosures' and '### Analysis & Commentary', with no square brackets, no --- dividers, and minimal parentheses)."
+    )
+
     user_prompt = (
         f"User Inquiry: {query}\n"
         f"Detected Intent: {intent_str}\n"
+        f"{lang_directive}\n"
         f"{partial_note}{ontology_note}{unavail_note}\n\n"
         f"=== COLLECTED EVIDENCE FROM SEC FILINGS ===\n"
         f"{formatted_context}\n\n"
@@ -275,13 +394,12 @@ def synthesis_node(
         logger.error("Synthesis node failed: %s", exc, exc_info=True)
         return {
             "draft_answer": (
-                f"Error synthesizing response: {exc}. "
-                f"Raw evidence collected: {len(evidence_dicts)} items."
+                f"Error synthesizing response: {exc}. Raw evidence collected: {len(evidence_dicts)} items."
             )
         }
 
 
-def citation_node(state: AgentState) -> Dict[str, Any]:
+def citation_node(state: AgentState) -> dict[str, Any]:
     """LangGraph node appending verified references, generating visual charts, and parsing report sections.
 
     Args:
@@ -314,17 +432,12 @@ def citation_node(state: AgentState) -> Dict[str, Any]:
 
     query = state.get("query", "")
 
-    # 1. Build Citations & Footnotes Markdown
+    # 1. Build Citations
     citations = CitationEngine.build_citations(evidence_dicts)
-    references_md = CitationEngine.format_references_markdown(citations, draft_answer=draft_answer)
 
     # 2. Extract & Build Charts with Router preference
     query_plan = state.get("query_plan") or {}
-    chart_pref = (
-        query_plan.get("chart_preference")
-        or routing_decision.get("chart_preference")
-        or "none"
-    )
+    chart_pref = query_plan.get("chart_preference") or routing_decision.get("chart_preference") or "none"
     chart_engine = ChartEngine()
     charts = chart_engine.extract_financial_charts(
         sql_data=sql_data,
@@ -358,10 +471,17 @@ def citation_node(state: AgentState) -> Dict[str, Any]:
     ).strip()
     clean_draft = re.sub(r"```(?:mermaid)?\s*xychart-beta[\s\S]*?```", "", clean_draft).strip()
     clean_draft = re.sub(r"\bxychart-beta\s+title[\s\S]*?(?=\n\n|\Z)", "", clean_draft).strip()
-    final_answer = clean_draft if clean_draft else draft_answer.strip()
+    final_answer = sanitize_answer_formatting(clean_draft if clean_draft else draft_answer.strip())
+
+    # 3b. Deterministically append localized fiscal-calendar footnotes when periods are shifted
+    fiscal_notes = build_fiscal_period_notes(sql_data=sql_data, query=query)
+    if fiscal_notes:
+        missing_notes = [n for n in fiscal_notes if n not in final_answer]
+        if missing_notes:
+            final_answer = f"{final_answer}\n\n" + "\n".join(missing_notes)
 
     # 4. Parse Report Sections if DEEP_RESEARCH_REPORT
-    report_sections: List[Dict[str, Any]] = []
+    report_sections: list[dict[str, Any]] = []
     if intent_str == IntentType.DEEP_RESEARCH_REPORT.value:
         raw_sections = re.split(r"\n(?=#{1,2}\s+)", draft_answer)
         for idx, sec in enumerate(raw_sections):

@@ -2,6 +2,7 @@
 
 import uuid
 from unittest.mock import MagicMock, patch
+
 import pytest
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -57,13 +58,15 @@ class TestCorpusSyncEngine:
         # Seed storage with 1 orphan point
         storage.create_collection(dense_dim=4)
         orphan_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, "orphan_chunk"))
-        storage.upsert_points([
-            models.PointStruct(
-                id=orphan_uuid,
-                vector={"dense": [0.0] * 4, "bm25": models.SparseVector(indices=[1], values=[1.0])},
-                payload={"chunk_id": "orphan_chunk"},
-            )
-        ])
+        storage.upsert_points(
+            [
+                models.PointStruct(
+                    id=orphan_uuid,
+                    vector={"dense": [0.0] * 4, "bm25": models.SparseVector(indices=[1], values=[1.0])},
+                    payload={"chunk_id": "orphan_chunk"},
+                )
+            ]
+        )
         assert len(storage.scroll_all_ids()) == 1
 
         # Mock Parquet chunk records

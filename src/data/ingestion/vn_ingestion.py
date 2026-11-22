@@ -7,21 +7,21 @@ provenance hashes, and idempotently uploads them to MinIO `sec-bronze`.
 """
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import httpx
+import yaml
 from tenacity import (
     retry,
     retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
-import yaml
 
 from src.data.ingestion.rate_limiter import RateLimiter
 from src.data.storage.s3_storage import S3Storage
@@ -33,7 +33,7 @@ PERIOD_TYPES = ["yearly", "quarterly"]
 
 # Dynamic modelType registry by accounting standard (zero hardcoding of tickers)
 # Governed by Circular 200/2014/TT-BTC, Circular 49/2014/TT-NHNN, Circular 334/2016/TT-BTC, and Circular 199/2014/TT-BTC
-ACCOUNTING_STANDARD_MODELS: Dict[str, Dict[str, int]] = {
+ACCOUNTING_STANDARD_MODELS: dict[str, dict[str, int]] = {
     "VAS": {
         "balancesheet": 1,
         "incomestatement": 2,
@@ -87,7 +87,7 @@ class VNFinancialClient:
 
     def __init__(
         self,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
         timeout_seconds: float = 15.0,
         min_year: int = 2019,
     ) -> None:
@@ -112,7 +112,7 @@ class VNFinancialClient:
         report_type: str,
         period: str = "yearly",
         accounting_standard: str = "VAS",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fetch raw financial statement JSON for a specific ticker and report type.
 
         Dynamically routes to the compliant modelType based on the company's accounting
@@ -192,7 +192,7 @@ class VNIngestionPipeline:
         ticker: str,
         force: bool = False,
         accounting_standard: str = "VAS",
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Ingest all 3 financial reports (yearly and quarterly) for a given ticker.
 
         Strictly differentiates between successful uploads, skipped existing items,
@@ -278,7 +278,7 @@ class VNIngestionPipeline:
 
                 payload_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
                 sha256_hash = self.compute_sha256(payload_bytes)
-                fetched_at = datetime.now(timezone.utc).isoformat()
+                fetched_at = datetime.now(UTC).isoformat()
 
                 # 3. Robust Idempotency Check: Require BOTH raw payload and companion metadata to exist
                 raw_exists = self.storage.object_exists(self.bronze_bucket, s3_raw_key)
@@ -306,7 +306,7 @@ class VNIngestionPipeline:
                         )
 
                 # 4. Atomic Two-Object Upload with Rollback Compensation
-                metadata_dict: Dict[str, Any] = {
+                metadata_dict: dict[str, Any] = {
                     "market": "VN",
                     "ticker": ticker,
                     "report_type": report_type,
@@ -343,7 +343,9 @@ class VNIngestionPipeline:
                         content_type="application/json",
                     )
 
-                    logger.info("Successfully ingested s3://%s/%s (%d records)", self.bronze_bucket, s3_raw_key, len(data))
+                    logger.info(
+                        "Successfully ingested s3://%s/%s (%d records)", self.bronze_bucket, s3_raw_key, len(data)
+                    )
                     stats["uploaded"] += 1
 
                 except Exception as upload_exc:
@@ -377,23 +379,19 @@ class VNIngestionPipeline:
     def run(
         self,
         config_path: str = "configs/companies_vn.yaml",
-        target_tickers: Optional[List[str]] = None,
+        target_tickers: list[str] | None = None,
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute ingestion pipeline for companies listed in configuration."""
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
 
         companies = cfg.get("companies", [])
         available_tickers = [c["ticker"].upper() for c in companies if "ticker" in c]
-        standards_map = {
-            c["ticker"].upper(): c.get("accounting_standard", "VAS")
-            for c in companies
-            if "ticker" in c
-        }
+        standards_map = {c["ticker"].upper(): c.get("accounting_standard", "VAS") for c in companies if "ticker" in c}
 
         if target_tickers:
             tickers_to_process = [t.upper() for t in target_tickers if t.upper() in available_tickers]

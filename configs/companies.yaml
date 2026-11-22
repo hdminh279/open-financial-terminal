@@ -172,3 +172,361 @@ companies:
     cik: "0001306965"
     sector: Energy
     form_type: 20-F
+
+  # ----------------------------------------------------------------------------
+  # EXPANDED INTERNATIONAL 20-F & GLOBAL LEADERS (+40 Verified Foreign Issuers)
+  # ----------------------------------------------------------------------------
+  - ticker: SAP
+    name: SAP SE
+    cik: "0001000184"
+    sector: Technology
+    form_type: 20-F
+  - ticker: SONY
+    name: Sony Group Corporation
+    cik: "0000313838"
+    sector: Technology
+    form_type: 20-F
+  - ticker: ARM
+    name: Arm Holdings plc
+    cik: "0001973239"
+    sector: Technology
+    form_type: 20-F
+  - ticker: STM
+    name: STMicroelectronics N.V.
+    cik: "0000932787"
+    sector: Technology
+    form_type: 20-F
+  - ticker: ERIC
+    name: Telefonaktiebolaget LM Ericsson
+    cik: "0000717826"
+    sector: Technology
+    form_type: 20-F
+  - ticker: NOK
+    name: Nokia Corporation
+    cik: "0000924613"
+    sector: Technology
+    form_type: 20-F
+  - ticker: UMC
+    name: United Microelectronics Corporation
+    cik: "0001033767"
+    sector: Technology
+    form_type: 20-F
+  - ticker: WIT
+    name: Wipro Limited
+    cik: "0001123799"
+    sector: Technology
+    form_type: 20-F
+  - ticker: SE
+    name: Sea Limited
+    cik: "0001703399"
+    sector: Technology
+    form_type: 20-F
+  - ticker: SPOT
+    name: Spotify Technology S.A.
+    cik: "0001639920"
+    sector: Technology
+    form_type: 20-F
+  - ticker: BABA
+    name: Alibaba Group Holding Limited
+    cik: "0001577552"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: JD
+    name: JD.com, Inc.
+    cik: "0001549802"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: PDD
+    name: PDD Holdings Inc.
+    cik: "0001737806"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: BIDU
+    name: Baidu, Inc.
+    cik: "0001329099"
+    sector: Technology
+    form_type: 20-F
+  - ticker: SNY
+    name: Sanofi
+    cik: "0001121404"
+    sector: Healthcare
+    form_type: 20-F
+  - ticker: GSK
+    name: GSK plc
+    cik: "0001131399"
+    sector: Healthcare
+    form_type: 20-F
+  - ticker: NVS
+    name: Novartis AG
+    cik: "0001114448"
+    sector: Healthcare
+    form_type: 20-F
+  - ticker: TAK
+    name: Takeda Pharmaceutical Company Limited
+    cik: "0001395064"
+    sector: Healthcare
+    form_type: 20-F
+  - ticker: MUFG
+    name: Mitsubishi UFJ Financial Group, Inc.
+    cik: "0000067088"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: SMFG
+    name: Sumitomo Mitsui Financial Group, Inc.
+    cik: "0001022837"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: SAN
+    name: Banco Santander, S.A.
+    cik: "0000891478"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: BCS
+    name: Barclays PLC
+    cik: "0000312069"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: ING
+    name: ING Groep N.V.
+    cik: "0001039765"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: UBS
+    name: UBS Group AG
+    cik: "0001610520"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: DB
+    name: Deutsche Bank Aktiengesellschaft
+    cik: "0001159508"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: ITUB
+    name: Itaú Unibanco Holding S.A.
+    cik: "0001132597"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: NU
+    name: Nu Holdings Ltd.
+    cik: "0001691493"
+    sector: Financial Services
+    form_type: 20-F
+  - ticker: RACE
+    name: Ferrari N.V.
+    cik: "0001648416"
+    sector: Industrials
+    form_type: 20-F
+  - ticker: STLA
+    name: Stellantis N.V.
+    cik: "0001605484"
+    sector: Industrials
+    form_type: 20-F
+  - ticker: HMC
+    name: Honda Motor Co., Ltd.
+    cik: "0000715153"
+    sector: Industrials
+    form_type: 20-F
+  - ticker: UL
+    name: Unilever PLC
+    cik: "0000217410"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: DEO
+    name: Diageo plc
+    cik: "0000835403"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: BUD
+    name: Anheuser-Busch InBev SA/NV
+    cik: "0001668717"
+    sector: Consumer & Retail
+    form_type: 20-F
+  - ticker: BP
+    name: BP p.l.c.
+    cik: "0000313807"
+    sector: Energy
+    form_type: 20-F
+  - ticker: TTE
+    name: TotalEnergies SE
+    cik: "0000879764"
+    sector: Energy
+    form_type: 20-F
+  - ticker: EQNR
+    name: Equinor ASA
+    cik: "0001140625"
+    sector: Energy
+    form_type: 20-F
+  - ticker: PBR
+    name: Petróleo Brasileiro S.A. - Petrobras
+    cik: "0001119639"
+    sector: Energy
+    form_type: 20-F
+  - ticker: RIO
+    name: Rio Tinto plc
+    cik: "0000863064"
+    sector: Materials & Mining
+    form_type: 20-F
+  - ticker: BHP
+    name: BHP Group Limited
+    cik: "0000811809"
+    sector: Materials & Mining
+    form_type: 20-F
+  - ticker: VALE
+    name: Vale S.A.
+    cik: "0000917851"
+    sector: Materials & Mining
+    form_type: 20-F
+
+  # ----------------------------------------------------------------------------
+  # EXPANDED US 10-K SECTOR LEADERS (+30 Verified Issuers)
+  # ----------------------------------------------------------------------------
+  - ticker: META
+    name: Meta Platforms, Inc.
+    cik: "0001326801"
+    sector: Technology
+    form_type: 10-K
+  - ticker: TSLA
+    name: Tesla, Inc.
+    cik: "0001318605"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: AVGO
+    name: Broadcom Inc.
+    cik: "0001730168"
+    sector: Technology
+    form_type: 10-K
+  - ticker: AMD
+    name: Advanced Micro Devices, Inc.
+    cik: "0000002488"
+    sector: Technology
+    form_type: 10-K
+  - ticker: ORCL
+    name: Oracle Corporation
+    cik: "0001341439"
+    sector: Technology
+    form_type: 10-K
+  - ticker: CRM
+    name: Salesforce, Inc.
+    cik: "0001108524"
+    sector: Technology
+    form_type: 10-K
+  - ticker: ADBE
+    name: Adobe Inc.
+    cik: "0000796343"
+    sector: Technology
+    form_type: 10-K
+  - ticker: INTC
+    name: Intel Corporation
+    cik: "0000050863"
+    sector: Technology
+    form_type: 10-K
+  - ticker: QCOM
+    name: QUALCOMM Incorporated
+    cik: "0000804328"
+    sector: Technology
+    form_type: 10-K
+  - ticker: MU
+    name: Micron Technology, Inc.
+    cik: "0000723125"
+    sector: Technology
+    form_type: 10-K
+  - ticker: AMAT
+    name: Applied Materials, Inc.
+    cik: "0000006951"
+    sector: Technology
+    form_type: 10-K
+  - ticker: IBM
+    name: International Business Machines Corporation
+    cik: "0000051143"
+    sector: Technology
+    form_type: 10-K
+  - ticker: NOW
+    name: ServiceNow, Inc.
+    cik: "0001373715"
+    sector: Technology
+    form_type: 10-K
+  - ticker: PANW
+    name: Palo Alto Networks, Inc.
+    cik: "0001327567"
+    sector: Technology
+    form_type: 10-K
+  - ticker: NFLX
+    name: Netflix, Inc.
+    cik: "0001065280"
+    sector: Technology
+    form_type: 10-K
+  - ticker: PLTR
+    name: Palantir Technologies Inc.
+    cik: "0001321655"
+    sector: Technology
+    form_type: 10-K
+  - ticker: UNH
+    name: UnitedHealth Group Incorporated
+    cik: "0000731766"
+    sector: Healthcare
+    form_type: 10-K
+  - ticker: MRK
+    name: Merck & Co., Inc.
+    cik: "0000310158"
+    sector: Healthcare
+    form_type: 10-K
+  - ticker: ABBV
+    name: AbbVie Inc.
+    cik: "0001551152"
+    sector: Healthcare
+    form_type: 10-K
+  - ticker: TMO
+    name: Thermo Fisher Scientific Inc.
+    cik: "0000097745"
+    sector: Healthcare
+    form_type: 10-K
+  - ticker: MELI
+    name: MercadoLibre, Inc.
+    cik: "0001099590"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: COST
+    name: Costco Wholesale Corporation
+    cik: "0000909832"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: HD
+    name: The Home Depot, Inc.
+    cik: "0000354950"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: MCD
+    name: McDonald's Corporation
+    cik: "0000063908"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: PEP
+    name: PepsiCo, Inc.
+    cik: "0000077476"
+    sector: Consumer & Retail
+    form_type: 10-K
+  - ticker: GS
+    name: The Goldman Sachs Group, Inc.
+    cik: "0000886982"
+    sector: Financial Services
+    form_type: 10-K
+  - ticker: MS
+    name: Morgan Stanley
+    cik: "0000895421"
+    sector: Financial Services
+    form_type: 10-K
+  - ticker: BLK
+    name: BlackRock, Inc.
+    cik: "0002012383"
+    sector: Financial Services
+    form_type: 10-K
+  - ticker: BRK-B
+    name: Berkshire Hathaway Inc.
+    cik: "0001067983"
+    sector: Financial Services
+    form_type: 10-K
+  - ticker: LMT
+    name: Lockheed Martin Corporation
+    cik: "0000936468"
+    sector: Industrials
+    form_type: 10-K

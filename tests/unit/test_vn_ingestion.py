@@ -2,6 +2,7 @@
 
 import json
 from unittest.mock import MagicMock, patch
+
 import httpx
 import pytest
 
@@ -18,7 +19,7 @@ class TestVNFinancialClientRetry:
     def test_retryable_error_predicate(self):
         """Ensure retryable errors are properly separated from terminal client errors."""
         req = httpx.Request("GET", "https://test.com")
-        
+
         # 5xx and 429 must be retryable
         res_503 = httpx.Response(503, request=req)
         assert _is_retryable_error(httpx.HTTPStatusError("503", request=req, response=res_503)) is True
@@ -69,9 +70,7 @@ class TestVNFinancialClientRetry:
         req = httpx.Request("GET", "https://test.com")
         res_404 = httpx.Response(404, request=req)
 
-        client.client.get = MagicMock(
-            side_effect=httpx.HTTPStatusError("404", request=req, response=res_404)
-        )
+        client.client.get = MagicMock(side_effect=httpx.HTTPStatusError("404", request=req, response=res_404))
 
         with pytest.raises(httpx.HTTPStatusError):
             client.fetch_financial_report(ticker="FPT", report_type="incomestatement", period="yearly")
@@ -98,8 +97,10 @@ class TestVNIngestionPipelineAtomicityAndClassification:
             "data": [],
         }
 
-        with patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]), \
-             patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]):
+        with (
+            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+        ):
             stats = pipeline.ingest_ticker("FPT")
 
         assert stats["empty"] == 1
@@ -112,8 +113,10 @@ class TestVNIngestionPipelineAtomicityAndClassification:
             "503", request=req, response=httpx.Response(503, request=req)
         )
 
-        with patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]), \
-             patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]):
+        with (
+            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+        ):
             stats_fail = pipeline.ingest_ticker("FPT")
 
         assert stats_fail["failed_http"] == 1
@@ -141,8 +144,10 @@ class TestVNIngestionPipelineAtomicityAndClassification:
             Exception("S3 metadata write timeout"),  # Second call (meta upload) fails
         ]
 
-        with patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]), \
-             patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]):
+        with (
+            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+        ):
             stats = pipeline.ingest_ticker("FPT")
 
         # Compensation rollback must be called to delete raw object
@@ -169,8 +174,10 @@ class TestVNIngestionPipelineAtomicityAndClassification:
 
         # Case 1: Raw exists, but meta does NOT exist -> Must NOT skip, must upload
         mock_storage.object_exists.side_effect = lambda bucket, key: "_metadata.json" not in key
-        with patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]), \
-             patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]):
+        with (
+            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+        ):
             stats = pipeline.ingest_ticker("FPT")
 
         assert stats["uploaded"] == 1
@@ -184,12 +191,12 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         ).encode("utf-8")
         calc_sha = pipeline.compute_sha256(payload_bytes)
 
-        mock_storage.get_metadata.return_value = {
-            "metadata": {"sha256": calc_sha}
-        }
+        mock_storage.get_metadata.return_value = {"metadata": {"sha256": calc_sha}}
 
-        with patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]), \
-             patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]):
+        with (
+            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+        ):
             stats_skip = pipeline.ingest_ticker("FPT")
 
         assert stats_skip["skipped"] == 1

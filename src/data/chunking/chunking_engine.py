@@ -4,17 +4,15 @@ Implements semantic structure-first chunking respecting Item boundaries,
 subsections, paragraphs, lists, and tables. Preserves rich provenance metadata.
 """
 
-from enum import Enum
 import hashlib
 import logging
 import re
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+
 import tiktoken
+from pydantic import BaseModel
 
 from src.data.processing.section_extractor import (
     ContentNodeType,
-    ExtractedContentNode,
     ExtractedSection,
 )
 from src.data.processing.table_processor import TableProcessor
@@ -24,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class TextChunk(BaseModel):
     """Normalized chunk data contract with full 18-field SEC EDGAR provenance metadata."""
+
     chunk_id: str
     cik: str
     ticker: str
@@ -32,9 +31,9 @@ class TextChunk(BaseModel):
     fiscal_year: int
     filed_date: str
     period_end: str
-    part: Optional[str] = None
+    part: str | None = None
     item: str
-    subsection: Optional[str] = None
+    subsection: str | None = None
     content_type: str  # text, table, list
     chunk_index: int
     token_count: int
@@ -56,26 +55,24 @@ class StructureAwareChunkingEngine:
         self.target_tokens = target_tokens
         self.overlap_tokens = overlap_tokens
         self.tokenizer = tiktoken.get_encoding(encoding_name)
-        self.table_processor = TableProcessor(
-            target_tokens=target_tokens, encoding_name=encoding_name
-        )
+        self.table_processor = TableProcessor(target_tokens=target_tokens, encoding_name=encoding_name)
 
     def count_tokens(self, text: str) -> int:
         """Count tokens using tokenizer."""
         return len(self.tokenizer.encode(text))
 
-    def _split_long_text(self, text: str) -> List[str]:
+    def _split_long_text(self, text: str) -> list[str]:
         """Split a long text block exceeding target tokens at sentence boundaries with overlap."""
         sentences = re.split(r"(?<=[.?!;])\s+", text)
-        chunks: List[str] = []
-        current_sentences: List[str] = []
+        chunks: list[str] = []
+        current_sentences: list[str] = []
         current_len = 0
 
         for sent in sentences:
             sent_len = self.count_tokens(sent)
             if current_len + sent_len > self.target_tokens and current_sentences:
                 chunks.append(" ".join(current_sentences))
-                overlap: List[str] = []
+                overlap: list[str] = []
                 overlap_len = 0
                 for s in reversed(current_sentences):
                     sl = self.count_tokens(s)
@@ -106,11 +103,11 @@ class StructureAwareChunkingEngine:
         period_end: str,
         source_url: str,
         start_chunk_index: int = 0,
-    ) -> List[TextChunk]:
+    ) -> list[TextChunk]:
         """Chunk an extracted section into TextChunks adhering to Item and subsection boundaries."""
-        chunks: List[TextChunk] = []
-        current_subsection: Optional[str] = None
-        text_buffer: List[str] = []
+        chunks: list[TextChunk] = []
+        current_subsection: str | None = None
+        text_buffer: list[str] = []
         buffer_tokens = 0
         chunk_idx = start_chunk_index
 
@@ -167,9 +164,7 @@ class StructureAwareChunkingEngine:
                 # Flush text buffer before table
                 flush_buffer()
                 # Process table into row-grouped chunks with repeated headers
-                table_chunks = self.table_processor.process_table(
-                    node, max_tokens=self.target_tokens
-                )
+                table_chunks = self.table_processor.process_table(node, max_tokens=self.target_tokens)
                 for t_text, t_count in table_chunks:
                     content_hash = hashlib.sha256(t_text.encode("utf-8")).hexdigest()
                     chunk_id_str = (
@@ -207,9 +202,7 @@ class StructureAwareChunkingEngine:
                 sub_chunks = self._split_long_text(node.text)
                 for sc in sub_chunks:
                     text_buffer.append(sc)
-                    flush_buffer(
-                        c_type="list" if node.node_type == ContentNodeType.LIST else "text"
-                    )
+                    flush_buffer(c_type="list" if node.node_type == ContentNodeType.LIST else "text")
             elif buffer_tokens + node_tokens > self.target_tokens:
                 flush_buffer()
                 text_buffer.append(node.text)

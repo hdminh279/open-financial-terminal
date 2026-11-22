@@ -4,8 +4,9 @@ Defines request and response payloads for natural language research queries,
 direct financial metrics, company metadata, chat session persistence, and health probes.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from src.ai.agent.contracts import (
@@ -24,12 +25,18 @@ class QueryRequest(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    query: str = Field(..., min_length=1, description="Natural language user question")
-    session_id: Optional[str] = Field(
+    query: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Natural language user question",
+    )
+    session_id: str | None = Field(
         default=None,
+        pattern=r"^[A-Za-z0-9_-]{1,64}$",
         description="Optional conversation session ID to persist or append to chat history",
     )
-    user_context: Optional[Dict[str, Any]] = Field(
+    user_context: dict[str, Any] | None = Field(
         default=None,
         description="Optional contextual filters or user preferences",
     )
@@ -44,31 +51,31 @@ class QueryResponse(BaseModel):
     session_id: str = Field(..., description="Active conversation session ID")
     intent: IntentType = Field(..., description="Classified intent from the LangGraph agent")
     answer: str = Field(..., description="Synthesized grounded answer with citation markers")
-    citations: List[Citation] = Field(
+    citations: list[Citation] = Field(
         default_factory=list,
         description="Clickable citations with verified SEC EDGAR URLs",
     )
-    charts: List[ChartData] = Field(
+    charts: list[ChartData] = Field(
         default_factory=list,
         description="Visual chart data specifications (Bar / Line / Mermaid)",
     )
-    report_sections: List[ReportSection] = Field(
+    report_sections: list[ReportSection] = Field(
         default_factory=list,
         description="Structured chapters if deep equity research report was requested",
     )
-    abstention: Optional[AbstentionInfo] = Field(
+    abstention: AbstentionInfo | None = Field(
         default=None,
         description="Abstention metadata if query was out of scope or evidence insufficient",
     )
-    tool_results: List[ToolExecutionResult] = Field(
+    tool_results: list[ToolExecutionResult] = Field(
         default_factory=list,
         description="Telemetry and raw results from executed tools",
     )
-    request_id: Optional[str] = Field(
+    request_id: str | None = Field(
         default=None,
         description="Unique correlation identifier matching backend telemetry",
     )
-    activity_timeline: List[ActivityTimelineStep] = Field(
+    activity_timeline: list[ActivityTimelineStep] = Field(
         default_factory=list,
         description="Ordered sequence of executed pipeline steps with latencies and statuses",
     )
@@ -88,11 +95,11 @@ class MetricRecordResponse(BaseModel):
     fiscal_period: str = Field(..., description="Fiscal period (Q1-Q4, FY)")
     period_type: str = Field(..., description="Duration or instant period type")
     metric_name: str = Field(..., description="Standardized canonical metric name")
-    value: Optional[float] = Field(default=None, description="Numeric metric value")
+    value: float | None = Field(default=None, description="Numeric metric value")
     unit: str = Field(..., description="Unit of measurement (USD, Shares, etc.)")
-    filed_date: Optional[str] = Field(default=None, description="Official SEC filing date")
-    form: Optional[str] = Field(default=None, description="SEC filing form (10-K or 10-Q)")
-    provenance_url: Optional[str] = Field(
+    filed_date: str | None = Field(default=None, description="Official SEC filing date")
+    form: str | None = Field(default=None, description="SEC filing form (10-K or 10-Q)")
+    provenance_url: str | None = Field(
         default=None,
         description="Clickable SEC EDGAR archive provenance URL",
     )
@@ -103,10 +110,10 @@ class MetricResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    tickers: List[str] = Field(default_factory=list, description="Queried company tickers")
-    metrics: List[str] = Field(default_factory=list, description="Queried canonical metric names")
+    tickers: list[str] = Field(default_factory=list, description="Queried company tickers")
+    metrics: list[str] = Field(default_factory=list, description="Queried canonical metric names")
     count: int = Field(..., description="Total observation records returned")
-    records: List[MetricRecordResponse] = Field(
+    records: list[MetricRecordResponse] = Field(
         default_factory=list,
         description="Chronological metric records",
     )
@@ -134,11 +141,11 @@ class CompanyItem(BaseModel):
     ticker: str = Field(..., description="Trading ticker symbol")
     name: str = Field(..., description="Official company entity name")
     cik: str = Field(..., description="10-digit SEC Central Index Key")
-    supported_years: List[int] = Field(
+    supported_years: list[int] = Field(
         default_factory=list,
         description="Available reporting fiscal years in Gold Marts",
     )
-    available_forms: List[str] = Field(
+    available_forms: list[str] = Field(
         default=["10-K", "10-Q"],
         description="Supported SEC filing form types",
     )
@@ -149,7 +156,7 @@ class CompanyListResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    companies: List[CompanyItem] = Field(
+    companies: list[CompanyItem] = Field(
         default_factory=list,
         description="List of configured enterprise entities",
     )
@@ -164,10 +171,10 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant"] = Field(..., description="Author role")
     content: str = Field(..., description="Message text or synthesized response")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO-8601 UTC timestamp",
     )
-    metadata: Optional[Dict[str, Any]] = Field(
+    metadata: dict[str, Any] | None = Field(
         default=None,
         description="Optional telemetry, intent, citations, or chart payload",
     )
@@ -179,14 +186,14 @@ class ChatSession(BaseModel):
     session_id: str = Field(..., description="Unique session UUID")
     title: str = Field(default="New Research Session", description="Session conversation topic")
     created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Creation ISO-8601 timestamp",
     )
     updated_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Last updated ISO-8601 timestamp",
     )
-    messages: List[ChatMessage] = Field(
+    messages: list[ChatMessage] = Field(
         default_factory=list,
         description="Chronological ordered conversation turns",
     )
@@ -209,7 +216,7 @@ class ChatSessionListResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    sessions: List[ChatSessionSummary] = Field(
+    sessions: list[ChatSessionSummary] = Field(
         default_factory=list,
         description="List of active or archived chat sessions",
     )
@@ -228,6 +235,6 @@ class HealthResponse(BaseModel):
     qdrant_connected: bool = Field(..., description="Qdrant vector database accessibility")
     duckdb_ready: bool = Field(..., description="DuckDB Gold Parquet lakehouse accessibility")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Probe execution timestamp",
     )

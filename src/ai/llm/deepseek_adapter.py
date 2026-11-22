@@ -61,9 +61,7 @@ def _is_retryable_error(exc: BaseException) -> bool:
         - Insufficient balance (HTTP 402)
         - Bad request or unprocessable entity (HTTP 400, 422)
     """
-    if isinstance(
-        exc, (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
-    ):
+    if isinstance(exc, (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)):
         return True
     status_code = getattr(exc, "status_code", None)
     return status_code in (429, 500, 502, 503, 504)
@@ -108,9 +106,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
 
         timeout_env = os.getenv("LLM_TIMEOUT_SECONDS")
         self.timeout = (
-            timeout
-            if timeout is not None
-            else (float(timeout_env) if timeout_env else self.DEFAULT_TIMEOUT_SECONDS)
+            timeout if timeout is not None else (float(timeout_env) if timeout_env else self.DEFAULT_TIMEOUT_SECONDS)
         )
 
         attempts_env = os.getenv("LLM_MAX_ATTEMPTS")
@@ -129,9 +125,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
                     "DeepSeek API key is required. Set DEEPSEEK_API_KEY environment variable "
                     "or pass api_key to DeepSeekAdapter."
                 )
-            resolved_base_url = (
-                base_url or os.getenv("DEEPSEEK_BASE_URL") or self.DEFAULT_BASE_URL
-            )
+            resolved_base_url = base_url or os.getenv("DEEPSEEK_BASE_URL") or self.DEFAULT_BASE_URL
             # max_retries=0 avoids duplicate internal SDK retries; tenacity handles all retries
             self.client = OpenAI(
                 api_key=resolved_key,
@@ -162,26 +156,14 @@ class DeepSeekAdapter(BaseLLMAdapter):
         if isinstance(exc, AuthenticationError) or status_code == 401:
             return LLMAuthError(f"Authentication failed (HTTP 401): {exc}")
         if status_code == 402:
-            return LLMInsufficientBalanceError(
-                f"Insufficient account balance (HTTP 402): {exc}"
-            )
-        if isinstance(
-            exc, (BadRequestError, UnprocessableEntityError)
-        ) or status_code in (400, 422):
-            return LLMInvalidRequestError(
-                f"Invalid request ({status_code or 'bad_request'}): {exc}"
-            )
+            return LLMInsufficientBalanceError(f"Insufficient account balance (HTTP 402): {exc}")
+        if isinstance(exc, (BadRequestError, UnprocessableEntityError)) or status_code in (400, 422):
+            return LLMInvalidRequestError(f"Invalid request ({status_code or 'bad_request'}): {exc}")
         if isinstance(exc, RateLimitError) or status_code == 429:
-            return LLMRateLimitError(
-                f"Rate limit exceeded after {self.max_attempts} attempts: {exc}"
-            )
+            return LLMRateLimitError(f"Rate limit exceeded after {self.max_attempts} attempts: {exc}")
         if isinstance(exc, APITimeoutError):
-            return LLMTimeoutError(
-                f"Request timed out after {self.max_attempts} attempts: {exc}"
-            )
-        if isinstance(
-            exc, (InternalServerError, APIConnectionError)
-        ) or status_code in (500, 502, 503, 504):
+            return LLMTimeoutError(f"Request timed out after {self.max_attempts} attempts: {exc}")
+        if isinstance(exc, (InternalServerError, APIConnectionError)) or status_code in (500, 502, 503, 504):
             return LLMProviderError(
                 f"Provider error ({status_code or 'connection'}) after {self.max_attempts} attempts: {exc}"
             )
@@ -247,9 +229,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
 
         prompt_tokens = getattr(raw_usage, "prompt_tokens", 0)
         completion_tokens = getattr(raw_usage, "completion_tokens", 0)
-        total_tokens = getattr(
-            raw_usage, "total_tokens", prompt_tokens + completion_tokens
-        )
+        total_tokens = getattr(raw_usage, "total_tokens", prompt_tokens + completion_tokens)
 
         reasoning_tokens = None
         details = getattr(raw_usage, "completion_tokens_details", None)
@@ -319,9 +299,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
             try:
                 json.loads(content)
             except json.JSONDecodeError as exc:
-                raise LLMError(
-                    f"Model returned malformed JSON (finish_reason='{finish_reason}'): {exc}"
-                ) from exc
+                raise LLMError(f"Model returned malformed JSON (finish_reason='{finish_reason}'): {exc}") from exc
 
         logger.info(
             "LLM call completed: model=%s, latency_ms=%.1f, usage=%s",
@@ -359,12 +337,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
         is_final = bool(finish_reason is not None or usage is not None)
 
         # Skip empty chunks (no content delta, no reasoning, no finish, no usage)
-        if (
-            not content_delta
-            and reasoning_delta is None
-            and finish_reason is None
-            and usage is None
-        ):
+        if not content_delta and reasoning_delta is None and finish_reason is None and usage is None:
             return None
 
         return LLMStreamChunk(
@@ -423,9 +396,7 @@ class DeepSeekAdapter(BaseLLMAdapter):
             except Exception as exc:
                 if has_yielded_content:
                     # Content was already emitted to consumer: do NOT restart stream
-                    logger.error(
-                        "Error during streaming after content was yielded: %s", exc
-                    )
+                    logger.error("Error during streaming after content was yielded: %s", exc)
                     raise self._map_exception(exc) from exc
 
                 if not _is_retryable_error(exc) or attempt >= self.max_attempts:

@@ -41,6 +41,4 @@ class LLMFactory:
             return DeepSeekAdapter(thinking=True, **kwargs)
         else:
             valid_str = ", ".join(repr(p) for p in cls.VALID_PROFILES)
-            raise ValueError(
-                f"Unknown profile {profile!r}. Valid profiles are: {valid_str}."
-            )
+            raise ValueError(f"Unknown profile {profile!r}. Valid profiles are: {valid_str}.")

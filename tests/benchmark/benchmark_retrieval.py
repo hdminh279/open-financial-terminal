@@ -14,7 +14,8 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -41,7 +42,7 @@ def is_strict_item_match(expected_item: Any, chunk_item: str, chunk_part: str = 
     return False
 
 
-def is_content_relevant(text: str, expected_keywords: List[str]) -> bool:
+def is_content_relevant(text: str, expected_keywords: list[str]) -> bool:
     """Tighter content relevance check requiring at least 2 distinct keywords (or all if < 2)."""
     if not expected_keywords:
         return True
@@ -53,10 +54,10 @@ def is_content_relevant(text: str, expected_keywords: List[str]) -> bool:
 
 def evaluate_positive_query(
     retriever: HybridRetriever,
-    query_item: Dict[str, Any],
+    query_item: dict[str, Any],
     mode: str,
     top_k: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Evaluate a single positive query strictly measuring ranking metrics."""
     query = query_item["query"]
     filter_dict = query_item.get("filter", {})
@@ -98,10 +99,10 @@ def evaluate_positive_query(
 
 def evaluate_negative_query(
     retriever: HybridRetriever,
-    query_item: Dict[str, Any],
+    query_item: dict[str, Any],
     mode: str = "hybrid_rerank",
     threshold: float = 0.15,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Evaluate a single negative out-of-scope query for abstention / confidence."""
     query = query_item["query"]
     filter_dict = query_item.get("filter", {})
@@ -127,7 +128,7 @@ def evaluate_negative_query(
 def run_benchmark() -> None:
     """Execute evaluation across Dense, BM25, Hybrid RRF, and Hybrid+Reranker."""
     gt_path = "tests/fixtures/eval/retrieval_ground_truth.json"
-    with open(gt_path, "r", encoding="utf-8") as f:
+    with open(gt_path, encoding="utf-8") as f:
         ground_truth = json.load(f)
 
     positive_queries = [q for q in ground_truth if q.get("category") != "negative_out_of_scope"]
@@ -149,7 +150,7 @@ def run_benchmark() -> None:
         "hybrid_rerank": "Hybrid RRF + MiniLM Reranker (top_k=5)",
     }
 
-    results_by_mode: Dict[str, List[Dict[str, Any]]] = {m: [] for m in modes}
+    results_by_mode: dict[str, list[dict[str, Any]]] = {m: [] for m in modes}
 
     logger.info(
         "Benchmarking %d positive questions across %d retrieval modes...",
@@ -167,12 +168,11 @@ def run_benchmark() -> None:
         len(negative_queries),
     )
     negative_results = [
-        evaluate_negative_query(retriever, q, mode="hybrid_rerank", threshold=0.15)
-        for q in negative_queries
+        evaluate_negative_query(retriever, q, mode="hybrid_rerank", threshold=0.15) for q in negative_queries
     ]
 
     # Aggregate Metrics for Positive Queries
-    summary: Dict[str, Dict[str, Any]] = {}
+    summary: dict[str, dict[str, Any]] = {}
     for m in modes:
         records = results_by_mode[m]
         hit1 = np.mean([1 if r["hit_at_1"] else 0 for r in records]) * 100
@@ -277,10 +277,6 @@ def run_benchmark() -> None:
     print("=" * 110)
 
     # Target comparisons
-    target_hit1 = 50.0
-    target_hit3 = 70.0
-    target_hit5 = 85.0
-    target_hit10 = 90.0
     target_mrr = 0.750
     target_lat = 100.0
 
@@ -336,8 +332,12 @@ def run_benchmark() -> None:
     print("\n" + "=" * 80)
     print("CROSS-ENCODER SCORE DISTRIBUTION & SEPARATION MARGIN:")
     print("=" * 80)
-    print(f"Positive Top Scores (N={len(positive_queries)}): min={pos_min:.4f}, p10={pos_p10:.4f}, median={pos_med:.4f}, max={pos_max:.4f}")
-    print(f"Negative Top Scores (N={len(negative_queries)}):  min={neg_min:.4f}, median={neg_med:.4f}, max={neg_max:.4f}")
+    print(
+        f"Positive Top Scores (N={len(positive_queries)}): min={pos_min:.4f}, p10={pos_p10:.4f}, median={pos_med:.4f}, max={pos_max:.4f}"
+    )
+    print(
+        f"Negative Top Scores (N={len(negative_queries)}):  min={neg_min:.4f}, median={neg_med:.4f}, max={neg_max:.4f}"
+    )
     print(f"Separation Margin (Pos Min - Neg Max): {separation_margin:.4f}")
     if separation_margin < 0:
         print("  WARNING: Overlap detected! A static score threshold will induce False Negatives.")
@@ -352,8 +352,8 @@ def run_benchmark() -> None:
     per_query_table_md = "\n".join(per_query_rows_md)
     neg_table_md = "\n".join(neg_rows_md)
 
-    mrr_status = "PASS" if summary['hybrid_rerank']['mrr'] >= target_mrr else "FAIL"
-    lat_status = "PASS" if summary['hybrid_rerank']['p50_ms'] <= target_lat else "FAIL"
+    mrr_status = "PASS" if summary["hybrid_rerank"]["mrr"] >= target_mrr else "FAIL"
+    lat_status = "PASS" if summary["hybrid_rerank"]["p50_ms"] <= target_lat else "FAIL"
 
     total_count = len(ground_truth)
     pos_count = len(positive_queries)
@@ -361,11 +361,11 @@ def run_benchmark() -> None:
 
     md = f"""# RETRIEVAL BENCHMARK REPORT — DAY 10 (CERTIFIED N={total_count} GROUND TRUTH DATASET)
 
-**Evaluation Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}  
-**Corpus Size:** 6,674 chunks (SEC EDGAR Form 10-K & 10-Q for AAPL, MSFT, GOOGL)  
-**Evaluated Questions:** {total_count} Ground Truth Financial Questions ({pos_count} Positive Ranking + {neg_count} Negative Out-of-Scope)  
-**Retrieval Pipeline:** BGE-Small (384-dim ONNX CPU) + Qdrant Sparse BM25 + Reciprocal Rank Fusion ($k=60$) + FlashRank MiniLM Cross-Encoder  
-**Timer:** `time.perf_counter()` with pre-benchmark model warm-up  
+**Evaluation Date:** {time.strftime("%Y-%m-%d %H:%M:%S")}
+**Corpus Size:** 6,674 chunks (SEC EDGAR Form 10-K & 10-Q for AAPL, MSFT, GOOGL)
+**Evaluated Questions:** {total_count} Ground Truth Financial Questions ({pos_count} Positive Ranking + {neg_count} Negative Out-of-Scope)
+**Retrieval Pipeline:** BGE-Small (384-dim ONNX CPU) + Qdrant Sparse BM25 + Reciprocal Rank Fusion ($k=60$) + FlashRank MiniLM Cross-Encoder
+**Timer:** `time.perf_counter()` with pre-benchmark model warm-up
 
 ---
 
@@ -373,13 +373,13 @@ def run_benchmark() -> None:
 
 | Metric | Dense Only (BGE-Small) | BM25 Only (Qdrant Sparse) | Hybrid RRF (k=60) | Hybrid + MiniLM Reranker | Target Threshold | Quality Gate Status |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Hit Rate@1** | {summary['dense']['hit_at_1']}% | {summary['bm25']['hit_at_1']}% | {summary['hybrid']['hit_at_1']}% | **{summary['hybrid_rerank']['hit_at_1']}%** | $\ge 50.0\%$ | **PASS** |
-| **Hit Rate@3** | {summary['dense']['hit_at_3']}% | {summary['bm25']['hit_at_3']}% | {summary['hybrid']['hit_at_3']}% | **{summary['hybrid_rerank']['hit_at_3']}%** | $\ge 70.0\%$ | **PASS** |
-| **Hit Rate@5** | {summary['dense']['hit_at_5']}% | {summary['bm25']['hit_at_5']}% | {summary['hybrid']['hit_at_5']}% | **{summary['hybrid_rerank']['hit_at_5']}%** | $\ge 85.0\%$ | **PASS** |
-| **Hit Rate@10**| {summary['dense']['hit_at_10']}% | {summary['bm25']['hit_at_10']}% | {summary['hybrid']['hit_at_10']}% | **{summary['hybrid_rerank']['hit_at_10']}%** | $\ge 90.0\%$ | **PASS** |
-| **MRR**        | {summary['dense']['mrr']} | {summary['bm25']['mrr']} | {summary['hybrid']['mrr']} | **{summary['hybrid_rerank']['mrr']}** | **$\ge 0.750$** | **{mrr_status}** |
-| **Latency p50**| {summary['dense']['p50_ms']} ms | {summary['bm25']['p50_ms']} ms | {summary['hybrid']['p50_ms']} ms | **{summary['hybrid_rerank']['p50_ms']} ms** | $< 100.0$ ms | **{lat_status}** |
-| **Latency p95**| {summary['dense']['p95_ms']} ms | {summary['bm25']['p95_ms']} ms | {summary['hybrid']['p95_ms']} ms | **{summary['hybrid_rerank']['p95_ms']} ms** | $< 250.0$ ms | **FAIL** |
+| **Hit Rate@1** | {summary["dense"]["hit_at_1"]}% | {summary["bm25"]["hit_at_1"]}% | {summary["hybrid"]["hit_at_1"]}% | **{summary["hybrid_rerank"]["hit_at_1"]}%** | $\\ge 50.0\\%$ | **PASS** |
+| **Hit Rate@3** | {summary["dense"]["hit_at_3"]}% | {summary["bm25"]["hit_at_3"]}% | {summary["hybrid"]["hit_at_3"]}% | **{summary["hybrid_rerank"]["hit_at_3"]}%** | $\\ge 70.0\\%$ | **PASS** |
+| **Hit Rate@5** | {summary["dense"]["hit_at_5"]}% | {summary["bm25"]["hit_at_5"]}% | {summary["hybrid"]["hit_at_5"]}% | **{summary["hybrid_rerank"]["hit_at_5"]}%** | $\\ge 85.0\\%$ | **PASS** |
+| **Hit Rate@10**| {summary["dense"]["hit_at_10"]}% | {summary["bm25"]["hit_at_10"]}% | {summary["hybrid"]["hit_at_10"]}% | **{summary["hybrid_rerank"]["hit_at_10"]}%** | $\\ge 90.0\\%$ | **PASS** |
+| **MRR**        | {summary["dense"]["mrr"]} | {summary["bm25"]["mrr"]} | {summary["hybrid"]["mrr"]} | **{summary["hybrid_rerank"]["mrr"]}** | **$\\ge 0.750$** | **{mrr_status}** |
+| **Latency p50**| {summary["dense"]["p50_ms"]} ms | {summary["bm25"]["p50_ms"]} ms | {summary["hybrid"]["p50_ms"]} ms | **{summary["hybrid_rerank"]["p50_ms"]} ms** | $< 100.0$ ms | **{lat_status}** |
+| **Latency p95**| {summary["dense"]["p95_ms"]} ms | {summary["bm25"]["p95_ms"]} ms | {summary["hybrid"]["p95_ms"]} ms | **{summary["hybrid_rerank"]["p95_ms"]} ms** | $< 250.0$ ms | **FAIL** |
 
 ---
 

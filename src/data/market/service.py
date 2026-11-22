@@ -4,15 +4,14 @@ Combines Token Bucket rate limiting, in-memory TTL caching, and MinIO S3 Lakehou
 persistence (sec-silver/user_settings/watchlist.json) with fallback in-memory caching.
 """
 
-from datetime import datetime, timezone
 import concurrent.futures
 import json
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Set, Tuple
+from datetime import UTC, datetime
 
-from src.core.financial.company_registry import get_supported_tickers, load_company_catalog
+from src.core.financial.company_registry import load_company_catalog
 from src.data.ingestion.rate_limiter import RateLimiter
 from src.data.market.contracts import (
     Market,
@@ -22,7 +21,7 @@ from src.data.market.contracts import (
     WatchlistItem,
     WatchlistResponse,
 )
-from src.data.market.providers import BaseQuoteProvider, QuoteProviderFactory
+from src.data.market.providers import QuoteProviderFactory
 from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
@@ -33,9 +32,9 @@ class QuoteService:
 
     def __init__(
         self,
-        factory: Optional[QuoteProviderFactory] = None,
+        factory: QuoteProviderFactory | None = None,
         ttl_seconds: float = 60.0,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         """Initialize QuoteService.
 
@@ -47,7 +46,7 @@ class QuoteService:
         self.factory = factory or QuoteProviderFactory()
         self.ttl_seconds = ttl_seconds
         self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=5.0)
-        self._cache: Dict[str, Tuple[StockQuote, float]] = {}
+        self._cache: dict[str, tuple[StockQuote, float]] = {}
 
     def get_quote(self, ticker: str, force_refresh: bool = False) -> StockQuote:
         """Retrieve quote with in-memory TTL caching."""
@@ -73,24 +72,22 @@ class QuoteService:
                 price=None,
                 change=None,
                 percent_change=None,
-                as_of=datetime.now(timezone.utc).isoformat(),
+                as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.UNSUPPORTED,
             )
 
         self._cache[symbol] = (quote, now + self.ttl_seconds)
         return quote
 
-    def get_quotes_batch(self, tickers: List[str], force_refresh: bool = False) -> List[StockQuote]:
+    def get_quotes_batch(self, tickers: list[str], force_refresh: bool = False) -> list[StockQuote]:
         """Retrieve quotes for a list of tickers in parallel."""
         if not tickers:
             return []
 
         workers = min(len(tickers), 8)
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_ticker = {
-                executor.submit(self.get_quote, t, force_refresh): t for t in tickers
-            }
-            results: Dict[str, StockQuote] = {}
+            future_to_ticker = {executor.submit(self.get_quote, t, force_refresh): t for t in tickers}
+            results: dict[str, StockQuote] = {}
             for future in concurrent.futures.as_completed(future_to_ticker):
                 t = future_to_ticker[future]
                 try:
@@ -101,7 +98,7 @@ class QuoteService:
                         ticker=t,
                         market=Market.US,
                         price=None,
-                        as_of=datetime.now(timezone.utc).isoformat(),
+                        as_of=datetime.now(UTC).isoformat(),
                         status=QuoteStatus.ERROR,
                     )
 
@@ -116,7 +113,7 @@ class WatchlistRepository:
     STORAGE_KEY = "user_settings/watchlist.json"
     MAX_ITEMS = 20
 
-    DEFAULT_TICKERS: List[Tuple[str, Market]] = [
+    DEFAULT_TICKERS: tuple[tuple[str, Market], ...] = (
         ("AAPL", Market.US),
         ("MSFT", Market.US),
         ("GOOGL", Market.US),
@@ -124,12 +121,12 @@ class WatchlistRepository:
         ("FPT", Market.VN),
         ("VNM", Market.VN),
         ("HPG", Market.VN),
-    ]
+    )
 
     def __init__(
         self,
-        s3_storage: Optional[S3Storage] = None,
-        quote_service: Optional[QuoteService] = None,
+        s3_storage: S3Storage | None = None,
+        quote_service: QuoteService | None = None,
     ) -> None:
         """Initialize repository.
 
@@ -138,12 +135,13 @@ class WatchlistRepository:
             quote_service: Optional QuoteService for quote enrichment.
         """
         self._s3 = s3_storage
-        self._s3_enabled = os.getenv("ENABLE_S3_WATCHLIST", "true").lower() == "true"
-        self._memory_cache: Optional[WatchlistConfig] = None
+        self._s3_enabled = (
+            True if s3_storage is not None else os.getenv("ENABLE_S3_WATCHLIST", "true").lower() == "true"
+        )
+        self._memory_cache: WatchlistConfig | None = None
         self.quote_service = quote_service or QuoteService()
-        self._supported_tickers: Optional[Set[str]] = None
 
-    def _init_s3(self) -> Optional[S3Storage]:
+    def _init_s3(self) -> S3Storage | None:
         """Lazy-initialize S3Storage adapter."""
         if self._s3 is not None:
             return self._s3
@@ -157,22 +155,10 @@ class WatchlistRepository:
             self._s3 = None
             return None
 
-    def _get_supported_tickers(self) -> Set[str]:
-        """Load known tickers from all company registries for validation."""
-        if self._supported_tickers is None:
-            tickers = set(get_supported_tickers("configs/companies.yaml"))
-            vn_catalog = load_company_catalog("configs/companies_vn.yaml")
-            tickers.update(str(c["ticker"]).upper() for c in vn_catalog if "ticker" in c)
-            self._supported_tickers = tickers
-        return self._supported_tickers
-
     def _create_default_config(self, user_id: str = "default_user") -> WatchlistConfig:
         """Create a default populated watchlist configuration."""
-        now = datetime.now(timezone.utc).isoformat()
-        items = [
-            WatchlistItem(ticker=ticker, market=market, added_at=now)
-            for ticker, market in self.DEFAULT_TICKERS
-        ]
+        now = datetime.now(UTC).isoformat()
+        items = [WatchlistItem(ticker=ticker, market=market, added_at=now) for ticker, market in self.DEFAULT_TICKERS]
         return WatchlistConfig(
             version="1.0",
             user_id=user_id,
@@ -180,14 +166,14 @@ class WatchlistRepository:
             updated_at=now,
         )
 
-    def _load_from_s3(self) -> Optional[WatchlistConfig]:
+    def _load_from_s3(self) -> WatchlistConfig | None:
         """Attempt to load watchlist JSON from MinIO S3 Lakehouse."""
         s3 = self._init_s3()
         if not s3:
             return None
 
         try:
-            if not s3.exists(self.BUCKET_NAME, self.STORAGE_KEY):
+            if not s3.object_exists(self.BUCKET_NAME, self.STORAGE_KEY):
                 logger.info("Watchlist not found in S3 (%s/%s); creating default.", self.BUCKET_NAME, self.STORAGE_KEY)
                 default_cfg = self._create_default_config()
                 self._save_to_s3(default_cfg)
@@ -238,7 +224,7 @@ class WatchlistRepository:
     def add_ticker(
         self,
         ticker: str,
-        market: Optional[Market] = None,
+        market: Market | None = None,
         user_id: str = "default_user",
     ) -> WatchlistConfig:
         """Add a ticker symbol to the user's watchlist."""
@@ -262,7 +248,7 @@ class WatchlistRepository:
             vn_tickers = {str(c["ticker"]).upper() for c in vn_catalog if "ticker" in c}
             market = Market.VN if symbol in vn_tickers else Market.US
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         new_item = WatchlistItem(ticker=symbol, market=market, added_at=now)
         config.items.append(new_item)
         config.updated_at = now
@@ -280,7 +266,7 @@ class WatchlistRepository:
         config.items = [item for item in config.items if item.ticker != symbol]
 
         if len(config.items) != initial_len:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             config.updated_at = now
             self._memory_cache = config
             self._save_to_s3(config)
@@ -306,5 +292,5 @@ class WatchlistRepository:
         return WatchlistResponse(
             items=quotes,
             total=len(quotes),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
         )

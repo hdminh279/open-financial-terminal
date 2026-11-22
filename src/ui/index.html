@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Corporate Filing Intelligence | Open Financial Terminal</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261121_v7">
+  <link rel="stylesheet" href="/static/styles.css?v=20261122_v8">
   <!-- Chart.js for High-Fidelity Financial Canvas Visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <!-- Marked.js for Markdown Formatting -->
+  <!-- Marked.js for Markdown Formatting & DOMPurify for XSS Sanitization -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 </head>
 <body>
   <!-- Root OS Desktop Window Frame -->
@@ -174,6 +175,14 @@
               <span class="welcome-sparkle">✦</span>
               <span>AI Financial Terminal</span>
             </div>
+            <p class="welcome-subtitle">Tra cứu số liệu BCTC chuẩn hóa, phân tích thuyết minh 10-K/10-Q và đối soát trích dẫn gốc.</p>
+            <div class="quick-suggestions-row">
+              <button type="button" class="action-chip" data-query="So sánh doanh thu AAPL, MSFT và NVDA 3 năm gần nhất">So sánh AAPL, MSFT &amp; NVDA</button>
+              <button type="button" class="action-chip" data-query="Phân tích rủi ro chuỗi cung ứng của Apple trong báo cáo 10-K">Rủi ro chuỗi cung ứng Apple</button>
+              <button type="button" class="action-chip" data-query="So sánh doanh thu và biên lợi nhuận FPT và Vinamilk">FPT vs Vinamilk</button>
+              <button type="button" class="action-chip" data-query="Biên lợi nhuận hoạt động của Microsoft từ FY2022 đến FY2025">Biên hoạt động Microsoft</button>
+              <button type="button" class="action-chip" data-query="Tin tức tài chính mới nhất về NVIDIA hôm nay">Tin tức NVIDIA hôm nay</button>
+            </div>
           </div>
         </div>
 
@@ -241,13 +250,13 @@
               </svg>
               <span>Đường / Cột</span>
             </button>
-            <button class="canvas-action-btn" id="export-chart-btn" title="Tải ảnh biểu đồ PNG / CSV">
+            <button class="canvas-action-btn" id="export-chart-btn" title="Tải ảnh biểu đồ PNG">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              <span>Xuất PNG / CSV</span>
+              <span>Xuất PNG</span>
             </button>
           </div>
         </div>
@@ -269,7 +278,11 @@
         <div class="canvas-table-section">
           <div class="table-section-tabs">
             <div class="tab-item active">
-              <span>Trích dẫn & Bằng chứng SEC EDGAR</span>
+              <span>Bảng số liệu tài chính</span>
+            </div>
+            <div class="table-export-actions">
+              <button type="button" class="btn-mini-export" id="export-canvas-csv-btn" title="Xuất bảng số liệu ra CSV">CSV</button>
+              <button type="button" class="btn-mini-export" id="export-canvas-json-btn" title="Xuất bảng số liệu ra JSON">JSON</button>
             </div>
           </div>
 
@@ -502,7 +515,55 @@
     </div>
   </div>
 
+  <!-- Citation Preview Drawer -->
+  <div class="citation-drawer-backdrop" id="citation-drawer-backdrop" style="display: none;"></div>
+  <aside class="citation-drawer" id="citation-drawer" aria-hidden="true">
+    <div class="citation-drawer-header">
+      <div class="citation-drawer-title-group">
+        <span class="citation-badge" id="drawer-cit-id">[1]</span>
+        <div>
+          <div class="citation-drawer-title" id="drawer-cit-company">SEC EDGAR</div>
+          <div class="citation-drawer-meta" id="drawer-cit-meta">Form 10-K</div>
+        </div>
+      </div>
+      <button type="button" id="citation-drawer-close" class="btn-icon-subtle" aria-label="Đóng xem trước trích dẫn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="citation-drawer-body">
+      <div class="drawer-field-row" id="drawer-item-row">
+        <span class="drawer-field-label">Mục / Chỉ tiêu</span>
+        <span class="drawer-field-val" id="drawer-cit-item">--</span>
+      </div>
+      <div class="drawer-field-row" id="drawer-accession-row" style="display: none;">
+        <span class="drawer-field-label">Accession No.</span>
+        <span class="drawer-field-val mono" id="drawer-cit-accession">--</span>
+      </div>
+      <div class="drawer-excerpt-section">
+        <div class="drawer-field-label">Nội dung trích dẫn gốc</div>
+        <div class="drawer-excerpt-box" id="drawer-cit-excerpt"></div>
+      </div>
+      <div class="drawer-ref-section">
+        <div class="drawer-field-label">Tham chiếu chuẩn hóa</div>
+        <div class="drawer-ref-text" id="drawer-cit-ref"></div>
+      </div>
+    </div>
+    <div class="citation-drawer-footer">
+      <a id="citation-drawer-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-open-official-source">
+        <span>Mở hồ sơ gốc chính thức</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+      </a>
+    </div>
+  </aside>
+
   <!-- Application Controller Scripts -->
-  <script src="/static/app.js?v=20261121_v7"></script>
+  <script src="/static/app.js?v=20261122_v8"></script>
 </body>
 </html>

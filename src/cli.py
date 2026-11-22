@@ -8,15 +8,14 @@ import argparse
 import logging
 import os
 import sys
-from typing import List, Optional
 
 from dotenv import load_dotenv
 
 from src.data.ingestion.fetch_facts import FactsIngestionPipeline
 from src.data.ingestion.fetch_filings import FilingsIngestionPipeline
 from src.data.ingestion.rate_limiter import RateLimiter
-from src.data.storage.s3_storage import S3Storage
 from src.data.ingestion.sec_client import SECClient
+from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger("corporate_filing_cli")
 
@@ -330,7 +329,9 @@ def run_index(args: argparse.Namespace) -> int:
     if args.verify or (not args.sync and not args.recreate):
         logger.info("Running Parquet vs Qdrant integrity audit...")
         report = sync_engine.verify_integrity(local_path=args.parquet_path, sample_size=50)
-        logger.info("Integrity check result: status=%s (audited=%d samples)", report["status"], report["sampled_audited"])
+        logger.info(
+            "Integrity check result: status=%s (audited=%d samples)", report["status"], report["sampled_audited"]
+        )
         if report["status"] != "PASSED":
             logger.error("Corpus integrity check FAILED: %s", report["discrepancies"])
             return 1
@@ -385,7 +386,8 @@ def run_coverage(args: argparse.Namespace) -> int:
         prefix = f"raw/filings/{args.ticker.upper()}/"
 
     filing_keys = [
-        k for k in s3_storage.list_objects(bronze_bucket, prefix=prefix)
+        k
+        for k in s3_storage.list_objects(bronze_bucket, prefix=prefix)
         if (k.endswith(".htm") or k.endswith(".html")) and not k.endswith("_metadata.json")
     ]
     if not filing_keys:
@@ -452,6 +454,7 @@ def run_process(args: argparse.Namespace) -> int:
 
     if do_vn:
         from src.data.processing.vn_facts_parser import VNFactsParser
+
         logger.info("Starting VNFactsParser (Bronze VN statements -> Silver Parquet observations)...")
         parser = VNFactsParser(
             s3_storage=s3_storage,
@@ -464,6 +467,7 @@ def run_process(args: argparse.Namespace) -> int:
 
     if do_facts:
         from src.data.processing.facts_parser import FactsParser
+
         logger.info("Starting FactsParser (Bronze XBRL facts -> Silver Parquet observations)...")
         parser = FactsParser(
             s3_storage=s3_storage,
@@ -474,11 +478,14 @@ def run_process(args: argparse.Namespace) -> int:
         logger.info("Facts processing complete: %s", stats)
 
     if do_text:
-        from src.data.pipelines.text_pipeline import FilingsTextPipeline
         from src.core.financial.company_registry import get_supported_tickers
+        from src.data.pipelines.text_pipeline import FilingsTextPipeline
+
         logger.info("Starting FilingsTextPipeline (Bronze HTML -> Silver sections -> Gold chunks)...")
         pipeline = FilingsTextPipeline(s3_storage=s3_storage)
-        target_tickers = [args.ticker.upper()] if getattr(args, "ticker", None) else sorted(list(get_supported_tickers()))
+        target_tickers = (
+            [args.ticker.upper()] if getattr(args, "ticker", None) else sorted(list(get_supported_tickers()))
+        )
         summary = pipeline.process_all(tickers=target_tickers, force=args.force)
         report_md = pipeline.format_verification_report(summary)
         print("\n" + report_md + "\n")
@@ -491,7 +498,7 @@ def run_process(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main CLI entrypoint."""
     load_dotenv()
     parser = build_parser()

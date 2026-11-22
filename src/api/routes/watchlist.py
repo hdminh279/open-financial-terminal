@@ -1,13 +1,12 @@
 """FastAPI route handlers for dynamic real-time user watchlist and stock quotes."""
 
 import logging
-from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from src.data.market.contracts import (
     AddWatchlistRequest,
     StockQuote,
-    WatchlistConfig,
     WatchlistResponse,
 )
 from src.data.market.service import QuoteService, WatchlistRepository
@@ -17,8 +16,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Watchlist & Quotes"])
 
 # Global repository and quote service instances (singleton per process)
-_watchlist_repo: Optional[WatchlistRepository] = None
-_quote_service: Optional[QuoteService] = None
+_watchlist_repo: WatchlistRepository | None = None
+_quote_service: QuoteService | None = None
 
 
 def get_watchlist_repository() -> WatchlistRepository:
@@ -66,7 +65,7 @@ def add_ticker_to_watchlist(request: AddWatchlistRequest) -> WatchlistResponse:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
 
 
 @router.delete(
@@ -95,13 +94,13 @@ def reset_watchlist() -> WatchlistResponse:
 
 @router.get(
     "/quotes",
-    response_model=List[StockQuote],
+    response_model=list[StockQuote],
     summary="Fetch live quotes for arbitrary tickers",
 )
 def get_stock_quotes(
     tickers: str = Query(..., description="Comma-separated ticker list, e.g. AAPL,FPT,MSFT"),
     refresh: bool = Query(False, description="Force refresh bypassing TTL cache"),
-) -> List[StockQuote]:
+) -> list[StockQuote]:
     """Retrieve real-time quotes for an ad-hoc list of stock tickers."""
     quote_svc = get_quote_service()
     symbols = [s.strip().upper() for s in tickers.split(",") if s.strip()]

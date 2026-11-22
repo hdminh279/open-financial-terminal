@@ -1083,3 +1083,38 @@ metrics:
       - "ebitda"
       - "ebitda điều chỉnh"
     rules: []
+
+  # ----------------------------------------------------------------------------
+  # SECTION 8: Banking Income Statement Metrics (VAS-BANK - sql_gold)
+  # ----------------------------------------------------------------------------
+  net_interest_income:
+    display_name: "Net Interest Income (NII)"
+    category: "banking_income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Interest income minus interest expense for commercial banks under VAS-BANK."
+    synonyms:
+      - "net interest income"
+      - "nii"
+      - "thu nhập lãi thuần"
+      - "lãi thuần"
+    rules: []
+
+  total_operating_income:
+    display_name: "Total Operating Income (TOI)"
+    category: "banking_income_statement"
+    classification: "gaap"
+    period_type: "duration"
+    default_unit: "VND"
+    storage_layer: "sql_gold"
+    is_dimensional: false
+    description: "Total banking operating income (net interest income plus non-interest income) under VAS-BANK."
+    synonyms:
+      - "total operating income"
+      - "toi"
+      - "tổng thu nhập hoạt động"
+      - "doanh thu ngân hàng"
+    rules: []

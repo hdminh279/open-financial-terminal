@@ -7,12 +7,13 @@ Provides 4-layer financial guardrails:
 4. Deterministic mathematical checks (Operating/Net Margin formula and unit consistency).
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -21,10 +22,10 @@ logger = logging.getLogger(__name__)
 class SegmentType(str, Enum):
     """Authoritative semantic type of corporate reporting segment."""
 
-    GEOGRAPHIC = "geographic"          # Regional markets: Americas, Europe, Greater China, APAC
-    PRODUCT_LINE = "product_line"      # Product/service lines: iPhone, Mac, Azure, Google Cloud
-    REPORTABLE_OPERATING = "operating" # Official operating segments under ASC 280
-    CONSOLIDATED = "consolidated"      # Company-wide total
+    GEOGRAPHIC = "geographic"  # Regional markets: Americas, Europe, Greater China, APAC
+    PRODUCT_LINE = "product_line"  # Product/service lines: iPhone, Mac, Azure, Google Cloud
+    REPORTABLE_OPERATING = "operating"  # Official operating segments under ASC 280
+    CONSOLIDATED = "consolidated"  # Company-wide total
 
 
 @dataclass(frozen=True)
@@ -34,8 +35,8 @@ class SegmentMetadata:
     ticker: str
     name: str
     segment_type: SegmentType
-    aliases: List[str] = field(default_factory=list)
-    parent_segment: Optional[str] = None
+    aliases: list[str] = field(default_factory=list)
+    parent_segment: str | None = None
     note_reference: str = "Item 8 Note - Segment Information"
 
 
@@ -47,7 +48,7 @@ class FinancialOntology:
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
         """Initialize company segment definitions from YAML configuration."""
         self.config_path = config_path
-        self._segments: Dict[str, List[SegmentMetadata]] = {}
+        self._segments: dict[str, list[SegmentMetadata]] = {}
         self._load_segments()
 
     def _load_segments(self) -> None:
@@ -56,7 +57,7 @@ class FinancialOntology:
             logger.warning("Segments config file not found: %s", self.config_path)
             return
 
-        with open(self.config_path, "r", encoding="utf-8") as f:
+        with open(self.config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         raw_segments = data.get("segments", {})
@@ -79,7 +80,7 @@ class FinancialOntology:
                 )
                 self._segments[ticker].append(metadata)
 
-    def identify_segments(self, text: str, ticker: Optional[str] = None) -> List[SegmentMetadata]:
+    def identify_segments(self, text: str, ticker: str | None = None) -> list[SegmentMetadata]:
         """Identify mentioned corporate segments and their semantic classification.
 
         Args:
@@ -92,7 +93,7 @@ class FinancialOntology:
         if not text:
             return []
         text_lower = text.lower()
-        matched: List[SegmentMetadata] = []
+        matched: list[SegmentMetadata] = []
 
         tickers_to_check = [ticker] if ticker and ticker in self._segments else list(self._segments.keys())
         for t in tickers_to_check:
@@ -100,24 +101,20 @@ class FinancialOntology:
                 all_names = [seg.name.lower()] + [a.lower() for a in seg.aliases]
                 matched_alias = False
                 for alias in all_names:
-                    # Require boundary and minimum 3 chars unless exact match
-                    if len(alias) >= 3 and re.search(rf"\b{re.escape(alias)}\b", text_lower):
-                        matched_alias = True
-                        break
-                    elif alias == "u.s." and re.search(rf"\b{re.escape(alias)}\b", text_lower):
+                    # Require boundary and minimum 3 chars unless exact match for "u.s."
+                    if (len(alias) >= 3 or alias == "u.s.") and re.search(rf"\b{re.escape(alias)}\b", text_lower):
                         matched_alias = True
                         break
 
                 # Separate case-sensitive check for uppercase 'US'
-                if not matched_alias and seg.name == "United States":
-                    if re.search(r"\bUS\b", text):
-                        matched_alias = True
+                if not matched_alias and seg.name == "United States" and re.search(r"\bUS\b", text):
+                    matched_alias = True
 
                 if matched_alias and seg not in matched:
                     matched.append(seg)
         return matched
 
-    def disambiguate_query(self, query: str, ticker: Optional[str] = None) -> Dict[str, Any]:
+    def disambiguate_query(self, query: str, ticker: str | None = None) -> dict[str, Any]:
         """Detect whether query mixes Geographic and Product Line categories.
 
         Args:
@@ -139,7 +136,8 @@ class FinancialOntology:
             "guidance": (
                 "Notice: Geographic segment reporting (ASC 280) is distinct from product-line disclosures. "
                 "Both dimensions are resolved and reported separately."
-                if has_conflict else ""
+                if has_conflict
+                else ""
             ),
         }
 
@@ -153,7 +151,7 @@ class FinancialSemanticValidator:
         income: float,
         reported_margin: float,
         tolerance_pct: float = 1.5,
-    ) -> Tuple[bool, float, str]:
+    ) -> tuple[bool, float, str]:
         """Validate whether reported margin matches income / revenue within tolerance.
 
         Args:
@@ -169,8 +167,8 @@ class FinancialSemanticValidator:
             return False, 0.0, "Invalid revenue denominator (<= 0)."
 
         expected_ratio = income / revenue
-        # Normalize reported_margin if passed as ratio (0.298 -> 29.8)
-        norm_reported_pct = reported_margin * 100 if reported_margin < 1.0 else reported_margin
+        # Normalize reported_margin if passed as ratio (0.298 -> 29.8, -0.05 -> -5.0)
+        norm_reported_pct = reported_margin * 100 if abs(reported_margin) <= 1.0 else reported_margin
         expected_pct = expected_ratio * 100
 
         diff_pct = abs(expected_pct - norm_reported_pct)
@@ -178,8 +176,8 @@ class FinancialSemanticValidator:
 
         msg = (
             f"Margin valid: calculated={expected_pct:.2f}%, reported={norm_reported_pct:.2f}% (diff: {diff_pct:.2f}% <= {tolerance_pct}%)"
-            if is_valid else
-            f"Margin mismatch: expected {expected_pct:.2f}% based on {income}/{revenue}, but reported {norm_reported_pct:.2f}% (diff: {diff_pct:.2f}% > {tolerance_pct}%)"
+            if is_valid
+            else f"Margin mismatch: expected {expected_pct:.2f}% based on {income}/{revenue}, but reported {norm_reported_pct:.2f}% (diff: {diff_pct:.2f}% > {tolerance_pct}%)"
         )
         return is_valid, round(expected_pct, 2), msg
 
@@ -194,7 +192,7 @@ class FinancialSemanticValidator:
         return val
 
     @staticmethod
-    def audit_response_structure(answer: str) -> Dict[str, Any]:
+    def audit_response_structure(answer: str) -> dict[str, Any]:
         """Verify Layer 3 requirement: response contains both official disclosure and analysis sections.
 
         Enforces strict header or table structure, rejecting arbitrary narrative prose.
@@ -206,9 +204,7 @@ class FinancialSemanticValidator:
                 re.IGNORECASE,
             )
         )
-        has_table = bool(
-            re.search(r"\|[^\n]+\|\n\|[\s:-]+\|", answer)
-        )
+        has_table = bool(re.search(r"\|[^\n]+\|\n\|[\s:-]+\|", answer))
         has_official = has_official_header or has_table
 
         has_analysis_header = bool(

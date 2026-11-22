@@ -1,10 +1,11 @@
 """Market Quote Providers implementing the Strategy Pattern for multi-market data ingestion."""
 
-from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from abc import ABC, abstractmethod
+from datetime import UTC, datetime
+from typing import Any
+
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -33,7 +34,7 @@ class BaseQuoteProvider(ABC):
         pass
 
     @abstractmethod
-    def fetch_quote(self, ticker: str) -> Optional[StockQuote]:
+    def fetch_quote(self, ticker: str) -> StockQuote | None:
         """Fetch real-time or snapshot quote for a single ticker symbol.
 
         Args:
@@ -52,9 +53,9 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: float = 8.0,
-        client: Optional[httpx.Client] = None,
+        client: httpx.Client | None = None,
     ) -> None:
         """Initialize Finnhub provider.
 
@@ -66,7 +67,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         self.api_key = api_key or os.getenv("FINNHUB_API_KEY", "")
         self.timeout = timeout
         self._client = client
-        self._name_cache: Dict[str, str] = {}
+        self._name_cache: dict[str, str] = {}
         self._load_catalog_names()
 
     def _load_catalog_names(self) -> None:
@@ -82,7 +83,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         except Exception as exc:
             logger.debug("Failed to preload catalog names in Finnhub provider: %s", exc)
 
-    def _resolve_company_name(self, client: httpx.Client, ticker: str) -> Optional[str]:
+    def _resolve_company_name(self, client: httpx.Client, ticker: str) -> str | None:
         """Resolve human-readable company name from cache or Finnhub profile2."""
         symbol = ticker.upper()
         if symbol in self._name_cache:
@@ -123,7 +124,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         wait=wait_exponential(multiplier=0.5, min=0.5, max=3.0),
         reraise=True,
     )
-    def _execute_request(self, client: httpx.Client, ticker: str) -> Dict[str, Any]:
+    def _execute_request(self, client: httpx.Client, ticker: str) -> dict[str, Any]:
         """Execute HTTP GET to Finnhub /quote endpoint with retry."""
         url = f"{self.BASE_URL}/quote"
         params = {"symbol": ticker, "token": self.api_key}
@@ -131,7 +132,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         resp.raise_for_status()
         return resp.json()
 
-    def fetch_quote(self, ticker: str) -> Optional[StockQuote]:
+    def fetch_quote(self, ticker: str) -> StockQuote | None:
         """Fetch quote from Finnhub API."""
         if not self.api_key:
             logger.warning("Finnhub API key is not configured; cannot fetch quote for %s", ticker)
@@ -142,7 +143,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
                 change=None,
                 percent_change=None,
                 currency="USD",
-                as_of=datetime.now(timezone.utc).isoformat(),
+                as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.ERROR,
             )
 
@@ -163,7 +164,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
                     change=None,
                     percent_change=None,
                     currency="USD",
-                    as_of=datetime.now(timezone.utc).isoformat(),
+                    as_of=datetime.now(UTC).isoformat(),
                     status=QuoteStatus.UNSUPPORTED,
                 )
 
@@ -173,11 +174,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
             day_low = data.get("l")
             day_open = data.get("o")
             ts = data.get("t")
-            as_of = (
-                datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
-                if ts
-                else datetime.now(timezone.utc).isoformat()
-            )
+            as_of = datetime.fromtimestamp(ts, tz=UTC).isoformat() if ts else datetime.now(UTC).isoformat()
 
             company_name = self._resolve_company_name(client, ticker)
 
@@ -207,7 +204,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
                 change=None,
                 percent_change=None,
                 currency="USD",
-                as_of=datetime.now(timezone.utc).isoformat(),
+                as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.ERROR,
             )
         finally:
@@ -223,7 +220,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
     def __init__(
         self,
         timeout: float = 6.0,
-        client: Optional[httpx.Client] = None,
+        client: httpx.Client | None = None,
     ) -> None:
         """Initialize SSI quote provider."""
         self.timeout = timeout
@@ -250,14 +247,14 @@ class SSIQuoteProvider(BaseQuoteProvider):
         wait=wait_exponential(multiplier=0.4, min=0.4, max=2.0),
         reraise=True,
     )
-    def _execute_request(self, client: httpx.Client, ticker: str) -> Dict[str, Any]:
+    def _execute_request(self, client: httpx.Client, ticker: str) -> dict[str, Any]:
         """Execute HTTP GET to SSI iBoard endpoint."""
         url = f"{self.BASE_URL}/{ticker}"
         resp = client.get(url)
         resp.raise_for_status()
         return resp.json()
 
-    def fetch_quote(self, ticker: str) -> Optional[StockQuote]:
+    def fetch_quote(self, ticker: str) -> StockQuote | None:
         """Fetch quote from SSI iBoard API."""
         client = self._get_client()
         should_close = self._client is None
@@ -273,7 +270,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
                     change=None,
                     percent_change=None,
                     currency="VND",
-                    as_of=datetime.now(timezone.utc).isoformat(),
+                    as_of=datetime.now(UTC).isoformat(),
                     status=QuoteStatus.UNSUPPORTED,
                 )
 
@@ -302,7 +299,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
                 day_open=float(data.get("openPrice")) if data.get("openPrice") is not None else None,
                 previous_close=float(ref_price) if ref_price is not None else None,
                 volume=int(data.get("stockVol") or data.get("nmTotalTradedQty") or 0) or None,
-                as_of=datetime.now(timezone.utc).isoformat(),
+                as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.REAL_TIME,
                 is_delayed=False,
             )
@@ -315,7 +312,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
                 change=None,
                 percent_change=None,
                 currency="VND",
-                as_of=datetime.now(timezone.utc).isoformat(),
+                as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.ERROR,
             )
         finally:
@@ -326,10 +323,10 @@ class SSIQuoteProvider(BaseQuoteProvider):
 class MockQuoteProvider(BaseQuoteProvider):
     """Deterministic Mock quote provider for offline testing and zero-cost test suite runs."""
 
-    def __init__(self, market: Market = Market.US, mock_data: Optional[Dict[str, StockQuote]] = None) -> None:
+    def __init__(self, market: Market = Market.US, mock_data: dict[str, StockQuote] | None = None) -> None:
         """Initialize mock provider with optional canned responses."""
         self._market = market
-        self._mock_data: Dict[str, StockQuote] = mock_data or {}
+        self._mock_data: dict[str, StockQuote] = mock_data or {}
 
     @property
     def market(self) -> Market:
@@ -340,7 +337,7 @@ class MockQuoteProvider(BaseQuoteProvider):
         """Register a canned quote for a ticker."""
         self._mock_data[ticker.upper()] = quote
 
-    def fetch_quote(self, ticker: str) -> Optional[StockQuote]:
+    def fetch_quote(self, ticker: str) -> StockQuote | None:
         """Return canned quote or generate deterministic synthetic quote."""
         symbol = ticker.upper()
         if symbol in self._mock_data:
@@ -360,7 +357,7 @@ class MockQuoteProvider(BaseQuoteProvider):
             day_open=44800.0 if is_vn else 149.0,
             previous_close=44500.0 if is_vn else 147.5,
             volume=1000000,
-            as_of=datetime.now(timezone.utc).isoformat(),
+            as_of=datetime.now(UTC).isoformat(),
             status=QuoteStatus.REAL_TIME,
             is_delayed=False,
         )
@@ -371,13 +368,13 @@ class QuoteProviderFactory:
 
     def __init__(
         self,
-        us_provider: Optional[BaseQuoteProvider] = None,
-        vn_provider: Optional[BaseQuoteProvider] = None,
+        us_provider: BaseQuoteProvider | None = None,
+        vn_provider: BaseQuoteProvider | None = None,
     ) -> None:
         """Initialize factory with optional custom or mocked providers."""
         self._us_provider = us_provider
         self._vn_provider = vn_provider
-        self._vn_tickers: Optional[set] = None
+        self._vn_tickers: set | None = None
 
     def _get_vn_tickers(self) -> set:
         """Lazily load known Vietnamese company tickers from config."""

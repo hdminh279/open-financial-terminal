@@ -3,30 +3,33 @@
 Provides metadata regarding covered enterprises, CIK identifiers, and reporting ranges.
 """
 
+import logging
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List
-from fastapi import APIRouter, status
-import yaml
 
+from fastapi import APIRouter, Depends, status
+
+from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
 from src.api.contracts import CompanyItem, CompanyListResponse
+from src.api.deps import get_duckdb_repository
+from src.core.financial.company_registry import load_company_catalog
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
 
-def _get_lakehouse_supported_years() -> Dict[str, List[int]]:
+def _get_lakehouse_supported_years(repo: DuckDBFinancialRepository) -> dict[str, list[int]]:
     """Retrieve verified fiscal years for all tickers directly from DuckDB Lakehouse."""
-    years_by_ticker: Dict[str, List[int]] = defaultdict(list)
+    years_by_ticker: dict[str, list[int]] = defaultdict(list)
     try:
-        from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-        repo = DuckDBFinancialRepository()
-        query = f"SELECT ticker, fiscal_year FROM '{repo.statements_path}' GROUP BY ticker, fiscal_year ORDER BY ticker, fiscal_year"
-        rows = repo.conn.execute(query).fetchall()
-        for t, y in rows:
-            years_by_ticker[str(t).upper()].append(int(y))
-    except Exception:
-        pass
+        rows = repo.execute_fetchall(
+            "SELECT ticker, fiscal_year FROM read_parquet(?) GROUP BY ticker, fiscal_year ORDER BY ticker, fiscal_year",
+            [repo.statements_path],
+        )
+        for ticker_val, year_val in rows:
+            years_by_ticker[str(ticker_val).upper()].append(int(year_val))
+    except Exception as exc:
+        logger.warning("Failed to inspect lakehouse years for companies catalog: %s", exc)
     return dict(years_by_ticker)
 
 
@@ -37,31 +40,33 @@ def _get_lakehouse_supported_years() -> Dict[str, List[int]]:
     summary="List supported enterprise entities",
     description="Returns universe of analyzed public corporations with CIKs and dynamically verified fiscal years.",
 )
-async def list_companies() -> CompanyListResponse:
+def list_companies(
+    repository: DuckDBFinancialRepository = Depends(get_duckdb_repository),
+) -> CompanyListResponse:
     """Return catalog of covered companies from configuration and lakehouse."""
-    companies_path = Path("configs/companies.yaml")
-    companies_data = []
-
-    if companies_path.exists():
-        with open(companies_path, "r", encoding="utf-8") as f:
-            raw_cfg = yaml.safe_load(f)
-            companies_data = raw_cfg.get("companies", [])
-
-    lakehouse_years = _get_lakehouse_supported_years()
+    companies_data = load_company_catalog()
+    lakehouse_years = _get_lakehouse_supported_years(repository)
     current_year = datetime.now().year
 
     items = []
     for c in companies_data:
-        ticker = c["ticker"].upper()
-        # Prefer dynamic lakehouse years; fallback to config or dynamic range
+        ticker = str(c["ticker"]).upper()
         years = lakehouse_years.get(ticker) or c.get("supported_years") or list(range(2009, current_year + 1))
+        form_type = str(c.get("form_type", "")).upper()
+        if c.get("market") == "VN" or str(c.get("cik", "")).startswith("VN:"):
+            available_forms = ["BCTC"]
+        elif form_type == "20-F":
+            available_forms = ["20-F", "6-K"]
+        else:
+            available_forms = ["10-K", "10-Q"]
+
         items.append(
             CompanyItem(
-                ticker=c["ticker"],
+                ticker=ticker,
                 name=c["name"],
-                cik=str(c["cik"]),
+                cik=str(c.get("cik") or f"VN:{ticker}"),
                 supported_years=years,
-                available_forms=["10-K", "10-Q"],
+                available_forms=available_forms,
             )
         )
 

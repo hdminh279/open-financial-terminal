@@ -6,28 +6,29 @@ structured chart data, report sections, and unified agent request/response envel
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class IntentType(str, Enum):
     """Authoritative classification of user query intent."""
 
-    FINANCIAL_METRIC = "FINANCIAL_METRIC"      # Structured numerical metrics via SQL Tool
-    TEXTUAL_RESEARCH = "TEXTUAL_RESEARCH"      # Qualitative textual research via RAG
-    MIXED_RESEARCH = "MIXED_RESEARCH"          # Hybrid requiring both SQL and RAG
+    FINANCIAL_METRIC = "FINANCIAL_METRIC"  # Structured numerical metrics via SQL Tool
+    TEXTUAL_RESEARCH = "TEXTUAL_RESEARCH"  # Qualitative textual research via RAG
+    MIXED_RESEARCH = "MIXED_RESEARCH"  # Hybrid requiring both SQL and RAG
     DEEP_RESEARCH_REPORT = "DEEP_RESEARCH_REPORT"  # Comprehensive multi-section report with charts
-    OUT_OF_SCOPE = "OUT_OF_SCOPE"              # Unsupported company, general knowledge, or speculative prediction
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"  # Unsupported company, general knowledge, or speculative prediction
 
 
 class ComparisonType(str, Enum):
     """Classification of analytical comparison in the user query."""
 
-    NONE = "none"                      # Single company, single metric, single period
-    TIME_SERIES = "time_series"        # Multi-year or multi-period trend
-    CROSS_COMPANY = "cross_company"    # Peer comparison across multiple companies
-    MULTI_METRIC = "multi_metric"      # Multiple metrics for single entity
-    COMPREHENSIVE = "comprehensive"    # Multi-company and multi-year/multi-metric
+    NONE = "none"  # Single company, single metric, single period
+    TIME_SERIES = "time_series"  # Multi-year or multi-period trend
+    CROSS_COMPANY = "cross_company"  # Peer comparison across multiple companies
+    MULTI_METRIC = "multi_metric"  # Multiple metrics for single entity
+    COMPREHENSIVE = "comprehensive"  # Multi-company and multi-year/multi-metric
 
 
 class ChartType(str, Enum):
@@ -46,16 +47,16 @@ class FinancialQueryPlan(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     intent: IntentType = Field(..., description="High-level query intent")
-    tickers: List[str] = Field(default_factory=list, description="Target companies")
-    metrics: List[str] = Field(default_factory=list, description="Resolved canonical metric keys")
-    fiscal_years: List[int] = Field(default_factory=list, description="Target fiscal years")
-    fiscal_periods: List[str] = Field(default_factory=list, description="Target fiscal periods")
+    tickers: list[str] = Field(default_factory=list, description="Target companies")
+    metrics: list[str] = Field(default_factory=list, description="Resolved canonical metric keys")
+    fiscal_years: list[int] = Field(default_factory=list, description="Target fiscal years")
+    fiscal_periods: list[str] = Field(default_factory=list, description="Target fiscal periods")
     requires_sql: bool = Field(default=False, description="Flag indicating if SQL Gold layer is needed")
     requires_rag: bool = Field(default=False, description="Flag indicating if RAG Textual layer is needed")
     requires_web: bool = Field(default=False, description="Flag indicating if Live Web Search is needed")
     comparison_type: ComparisonType = Field(default=ComparisonType.NONE, description="Analytical comparison type")
-    sql_metrics: List[str] = Field(default_factory=list, description="Canonical metrics routed to SQL Gold")
-    rag_metrics: List[str] = Field(default_factory=list, description="Canonical or segment metrics routed to RAG")
+    sql_metrics: list[str] = Field(default_factory=list, description="Canonical metrics routed to SQL Gold")
+    rag_metrics: list[str] = Field(default_factory=list, description="Canonical or segment metrics routed to RAG")
     chart_preference: Literal["line", "bar", "scatter", "area", "none"] = Field(
         default="none",
         description="LLM-selected visualization style: 'line', 'bar', 'scatter', 'area', or 'none'",
@@ -69,21 +70,23 @@ class ChartData(BaseModel):
 
     title: str = Field(..., description="Descriptive title of the chart")
     chart_type: ChartType = Field(..., description="Visualization format: bar or line")
-    x_labels: List[str] = Field(..., description="Ordered category labels (e.g. ['FY2022', 'FY2023', 'FY2024', 'FY2025'])")
-    datasets: List[Dict[str, Any]] = Field(
+    x_labels: list[str] = Field(
+        ..., description="Ordered category labels (e.g. ['FY2022', 'FY2023', 'FY2024', 'FY2025'])"
+    )
+    datasets: list[dict[str, Any]] = Field(
         ...,
         description="Dataset series, e.g. [{'label': 'Revenues ($B)', 'values': [394.33, 383.29, 391.04]}]",
     )
     unit: str = Field(default="USD", description="Unit of measurement (USD, Percent, Ratio)")
-    mermaid_code: Optional[str] = Field(
+    mermaid_code: str | None = Field(
         default=None,
         description="Renderable Mermaid xychart-beta block for native Markdown rendering",
     )
-    ascii_chart: Optional[str] = Field(
+    ascii_chart: str | None = Field(
         default=None,
         description="Terminal-friendly ASCII bar representation",
     )
-    plotly_figure_json: Optional[Dict[str, Any]] = Field(
+    plotly_figure_json: dict[str, Any] | None = Field(
         default=None,
         description="Spec-driven Plotly figure JSON (data, layout, config) for modern workstation rendering",
     )
@@ -97,16 +100,16 @@ class ReportSection(BaseModel):
     section_id: str = Field(..., description="Unique section identifier (e.g. 'sec_financial_overview')")
     title: str = Field(..., description="Section heading")
     content: str = Field(..., description="Factual analysis with citation markers [1], [2]")
-    citations: List[int] = Field(default_factory=list, description="Citation IDs referenced in this section")
-    chart: Optional[ChartData] = Field(default=None, description="Optional embedded visualization")
+    citations: list[int] = Field(default_factory=list, description="Citation IDs referenced in this section")
+    chart: ChartData | None = Field(default=None, description="Optional embedded visualization")
 
 
 class ToolExecutionStatus(str, Enum):
     """Execution status for agent tools."""
 
-    SUCCESS = "success"              # Tool executed cleanly and retrieved records
+    SUCCESS = "success"  # Tool executed cleanly and retrieved records
     NO_DATA_FOUND = "no_data_found"  # Tool executed cleanly but returned zero records
-    TOOL_FAILED = "tool_failed"      # System exception, network error, or runtime crash
+    TOOL_FAILED = "tool_failed"  # System exception, network error, or runtime crash
 
 
 class EvidenceSourceType(str, Enum):
@@ -120,21 +123,21 @@ class EvidenceSourceType(str, Enum):
 class ExecutionStrategy(str, Enum):
     """Tool invocation orchestration strategy decided by LLM."""
 
-    PARALLEL = "parallel"          # Execute tools concurrently (e.g. independent SQL and RAG)
-    SEQUENTIAL = "sequential"      # Execute sequentially with dependency
+    PARALLEL = "parallel"  # Execute tools concurrently (e.g. independent SQL and RAG)
+    SEQUENTIAL = "sequential"  # Execute sequentially with dependency
     DIRECT_ABSTAIN = "direct_abstain"  # Immediate abstention without calling any tool
 
 
 class AbstentionReason(str, Enum):
     """Granular categorization of why an answer or portion was abstained."""
 
-    UNSUPPORTED_COMPANY = "unsupported_company"      # Outside AAPL, MSFT, GOOGL universe
-    OUT_OF_RANGE_YEAR = "out_of_range_year"          # Outside verified available filing periods in lakehouse
-    SPECULATIVE_PREDICTION = "speculative_prediction"# Stock price target, future forecast
-    INVESTMENT_ADVICE = "investment_advice"          # Buy/sell financial recommendations
-    UNSUPPORTED_TOPIC = "unsupported_topic"          # Completely unrelated to SEC filings
+    UNSUPPORTED_COMPANY = "unsupported_company"  # Outside AAPL, MSFT, GOOGL universe
+    OUT_OF_RANGE_YEAR = "out_of_range_year"  # Outside verified available filing periods in lakehouse
+    SPECULATIVE_PREDICTION = "speculative_prediction"  # Stock price target, future forecast
+    INVESTMENT_ADVICE = "investment_advice"  # Buy/sell financial recommendations
+    UNSUPPORTED_TOPIC = "unsupported_topic"  # Completely unrelated to SEC filings
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"  # Context does not contain the answer
-    TOOL_ERROR = "tool_error"                        # Underlying tool failed execution
+    TOOL_ERROR = "tool_error"  # Underlying tool failed execution
 
 
 class SQLQueryParams(BaseModel):
@@ -142,10 +145,10 @@ class SQLQueryParams(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    tickers: List[str] = Field(default_factory=list, description="Target ticker symbols (AAPL, MSFT, GOOGL)")
-    metrics: List[str] = Field(default_factory=list, description="Canonical metric names from statements or ratios")
-    fiscal_years: List[int] = Field(default_factory=list, description="Fiscal years")
-    fiscal_periods: List[str] = Field(default_factory=list, description="Periods (Q1, Q2, Q3, Q4, FY)")
+    tickers: list[str] = Field(default_factory=list, description="Target ticker symbols (AAPL, MSFT, GOOGL)")
+    metrics: list[str] = Field(default_factory=list, description="Canonical metric names from statements or ratios")
+    fiscal_years: list[int] = Field(default_factory=list, description="Fiscal years")
+    fiscal_periods: list[str] = Field(default_factory=list, description="Periods (Q1, Q2, Q3, Q4, FY)")
 
 
 class RAGQueryParams(BaseModel):
@@ -157,9 +160,9 @@ class RAGQueryParams(BaseModel):
         ...,
         description="Refined semantic search query optimized for vector and BM25 retrieval",
     )
-    ticker: Optional[str] = Field(default=None, description="Filter ticker if applicable")
-    fiscal_year: Optional[int] = Field(default=None, description="Filter fiscal year if applicable")
-    item: Optional[str] = Field(
+    ticker: str | None = Field(default=None, description="Filter ticker if applicable")
+    fiscal_year: int | None = Field(default=None, description="Filter fiscal year if applicable")
+    item: str | None = Field(
         default=None,
         description="Filing section filter (e.g. 'Item 1A', 'Item 7', 'Item 1')",
     )
@@ -188,7 +191,7 @@ class RoutingDecision(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     intent: IntentType = Field(..., description="Classified intent of the user query")
-    target_tools: List[str] = Field(
+    target_tools: list[str] = Field(
         default_factory=list,
         description="Names of tools to execute (e.g. ['financial_sql_tool', 'hybrid_retriever'])",
     )
@@ -196,35 +199,35 @@ class RoutingDecision(BaseModel):
         default=ExecutionStrategy.PARALLEL,
         description="Execution workflow selected by LLM",
     )
-    sql_params: Optional[SQLQueryParams] = Field(
+    sql_params: SQLQueryParams | None = Field(
         default=None,
         description="Targeted parameters for SQL Tool if selected",
     )
-    rag_params: Optional[RAGQueryParams] = Field(
+    rag_params: RAGQueryParams | None = Field(
         default=None,
         description="Targeted parameters for RAG Retriever if selected",
     )
-    web_params: Optional[WebSearchQueryParams] = Field(
+    web_params: WebSearchQueryParams | None = Field(
         default=None,
         description="Targeted parameters for Web Search Tool if selected",
     )
-    tickers: List[str] = Field(
+    tickers: list[str] = Field(
         default_factory=list,
         description="Primary normalized ticker symbols (AAPL, MSFT, GOOGL)",
     )
-    fiscal_years: List[int] = Field(
+    fiscal_years: list[int] = Field(
         default_factory=list,
         description="Primary fiscal years",
     )
-    fiscal_periods: List[str] = Field(
+    fiscal_periods: list[str] = Field(
         default_factory=list,
         description="Primary fiscal periods (Q1-Q4, FY)",
     )
-    reasoning: Optional[str] = Field(
+    reasoning: str | None = Field(
         default=None,
         description="LLM explanation of tool selection and workflow planning",
     )
-    missing_information: List[str] = Field(
+    missing_information: list[str] = Field(
         default_factory=list,
         description="Any missing parameters needed for complete answering",
     )
@@ -232,7 +235,15 @@ class RoutingDecision(BaseModel):
         default="none",
         description="LLM-selected visualization style: 'line', 'bar', 'scatter', 'area', or 'none'",
     )
-    query_plan: Optional[FinancialQueryPlan] = Field(
+    is_followup: bool = Field(
+        default=False,
+        description="True when the current query depends on prior conversation turns",
+    )
+    is_realtime_news: bool = Field(
+        default=False,
+        description="True when the query asks for real-time news or current events",
+    )
+    query_plan: FinancialQueryPlan | None = Field(
         default=None,
         description="Structured analytical query plan with Metric Registry routing",
     )
@@ -245,12 +256,12 @@ class ToolExecutionResult(BaseModel):
 
     tool_name: str = Field(..., description="Canonical tool identifier")
     status: ToolExecutionStatus = Field(..., description="Execution outcome")
-    data: Optional[Any] = Field(
+    data: Any | None = Field(
         default=None,
         description="Raw output data (e.g., FinancialQueryResponse or RetrievalResponse)",
     )
     execution_time_ms: float = Field(default=0.0, description="Latency in milliseconds")
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None,
         description="Detailed exception message if status == TOOL_FAILED",
     )
@@ -264,9 +275,9 @@ class EvidenceItem(BaseModel):
     citation_id: int = Field(..., description="Sequential reference identifier [1], [2]")
     source_type: EvidenceSourceType = Field(..., description="Originating engine (sql/rag)")
     ticker: str = Field(..., description="Company ticker symbol")
-    form: Optional[str] = Field(default=None, description="SEC filing form (10-K, 10-Q)")
-    fiscal_year: Optional[int] = Field(default=None, description="Fiscal year")
-    fiscal_period: Optional[str] = Field(default=None, description="Fiscal period (Q1-Q4, FY)")
+    form: str | None = Field(default=None, description="SEC filing form (10-K, 10-Q)")
+    fiscal_year: int | None = Field(default=None, description="Fiscal year")
+    fiscal_period: str | None = Field(default=None, description="Fiscal period (Q1-Q4, FY)")
     item_or_metric: str = Field(
         ...,
         description="Item title (e.g. 'Item 1A. Risk Factors') or canonical metric name",
@@ -276,14 +287,14 @@ class EvidenceItem(BaseModel):
         ...,
         description="Authoritative clickable SEC EDGAR URL preserved from source",
     )
-    accession_number: Optional[str] = Field(
+    accession_number: str | None = Field(
         default=None,
         description="SEC filing accession number",
     )
 
 
 class Citation(BaseModel):
-    """Formatted reference entry suitable for display in response footnotes."""
+    """Formatted reference entry suitable for display in response footnotes and preview drawer."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -293,6 +304,14 @@ class Citation(BaseModel):
         description="Human-readable citation string with clickable Markdown link",
     )
     source_url: str = Field(..., description="Underlying destination SEC URL")
+    ticker: str | None = Field(default=None, description="Company ticker symbol")
+    form: str | None = Field(default=None, description="Filing form or source type")
+    fiscal_year: int | None = Field(default=None, description="Fiscal year")
+    fiscal_period: str | None = Field(default=None, description="Fiscal period (FY, Q1-Q4)")
+    item_or_metric: str | None = Field(default=None, description="Filing section or metric name")
+    excerpt: str | None = Field(default=None, description="Grounded source excerpt or metric summary")
+    accession_number: str | None = Field(default=None, description="SEC filing accession number")
+    source_type: str | None = Field(default=None, description="Originating engine (sql, rag, web)")
 
 
 class AbstentionInfo(BaseModel):
@@ -305,7 +324,7 @@ class AbstentionInfo(BaseModel):
         default=False,
         description="True if some parts were answered while other parts were abstained",
     )
-    reason: Optional[AbstentionReason] = Field(
+    reason: AbstentionReason | None = Field(
         default=None,
         description="Primary cause of abstention",
     )
@@ -313,7 +332,7 @@ class AbstentionInfo(BaseModel):
         default="",
         description="User-facing transparent explanation of the abstention reason",
     )
-    unsupported_aspects: List[str] = Field(
+    unsupported_aspects: list[str] = Field(
         default_factory=list,
         description="Specific unsupported sub-topics or entities",
     )
@@ -329,11 +348,11 @@ class ActivityTimelineStep(BaseModel):
         default="completed",
         description="Execution status of this specific step",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Detailed context, row counts, or tool latency",
     )
-    duration_ms: Optional[float] = Field(
+    duration_ms: float | None = Field(
         default=None,
         description="Execution latency in milliseconds",
     )
@@ -343,7 +362,7 @@ class AgentRequest(BaseModel):
     """Input query request payload for the Research Agent."""
 
     query: str = Field(..., min_length=1, description="Natural language user question")
-    user_context: Optional[Dict[str, Any]] = Field(
+    user_context: dict[str, Any] | None = Field(
         default=None,
         description="Optional session context or preferences",
     )
@@ -357,32 +376,32 @@ class AgentResponse(BaseModel):
     query: str = Field(..., description="Original user question")
     intent: IntentType = Field(..., description="Detected query intent")
     answer: str = Field(..., description="Synthesized answer text with [1] citation markers")
-    citations: List[Citation] = Field(
+    citations: list[Citation] = Field(
         default_factory=list,
         description="Ordered list of verifiable source citations",
     )
-    charts: List[ChartData] = Field(
+    charts: list[ChartData] = Field(
         default_factory=list,
         description="Generated financial visual charts (Mermaid & structured datasets)",
     )
-    report_sections: List[ReportSection] = Field(
+    report_sections: list[ReportSection] = Field(
         default_factory=list,
         description="Structured report chapters if intent == DEEP_RESEARCH_REPORT",
     )
-    abstention: Optional[AbstentionInfo] = Field(
+    abstention: AbstentionInfo | None = Field(
         default=None,
         description="Abstention metadata if applicable",
     )
-    tool_results: List[ToolExecutionResult] = Field(
+    tool_results: list[ToolExecutionResult] = Field(
         default_factory=list,
         description="Execution trace and telemetry from involved tools",
     )
-    query_plan: Optional[FinancialQueryPlan] = Field(
+    query_plan: FinancialQueryPlan | None = Field(
         default=None,
         description="Execution query plan with tool routing and comparison semantics",
     )
     execution_time_ms: float = Field(default=0.0, description="Total pipeline latency in ms")
-    activity_timeline: List[ActivityTimelineStep] = Field(
+    activity_timeline: list[ActivityTimelineStep] = Field(
         default_factory=list,
         description="Ordered sequence of executed pipeline steps with latencies and statuses",
     )

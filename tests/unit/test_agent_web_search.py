@@ -5,20 +5,13 @@ web_node execution, AbstentionGate evaluation, and CitationEngine reference form
 """
 
 from unittest.mock import MagicMock
-import pytest
 
 from src.ai.agent.abstention import AbstentionGate
 from src.ai.agent.citation import CitationEngine
 from src.ai.agent.contracts import (
-    EvidenceItem,
     EvidenceSourceType,
-    ExecutionStrategy,
-    FinancialQueryPlan,
     IntentType,
-    RoutingDecision,
-    ToolExecutionResult,
     ToolExecutionStatus,
-    WebSearchQueryParams,
 )
 from src.ai.agent.graph import web_node
 from src.ai.agent.router import IntentRouter, route_next_step

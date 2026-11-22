@@ -9,9 +9,10 @@ Provides deterministic chart extraction, validation, and serialization:
 6. Multi-ticker unit consistency check and Plotly Figure JSON synthesis.
 """
 
-from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from src.ai.agent.contracts import ChartData, ChartType
 from src.core.financial.metric_registry import MetricRegistry
@@ -19,7 +20,7 @@ from src.core.financial.metric_registry import MetricRegistry
 logger = logging.getLogger(__name__)
 
 # Point-in-time instant metrics that MUST NOT undergo duration subtraction
-POINT_IN_TIME_METRICS: Set[str] = {
+POINT_IN_TIME_METRICS: set[str] = {
     "total_assets",
     "current_assets",
     "cash_and_cash_equivalents",
@@ -39,9 +40,9 @@ class NormalizedPeriodPoint:
     period_label: str  # e.g. 'FY2023' or '2023 Q1'
     fiscal_year: int
     fiscal_period: str  # 'FY', 'Q1', 'Q2', 'Q3', 'Q4'
-    value: Optional[float]
+    value: float | None
     is_derived: bool = False
-    provenance_url: Optional[str] = None
+    provenance_url: str | None = None
 
 
 @dataclass
@@ -54,14 +55,14 @@ class NormalizedTimeSeries:
     unit: str
     is_percentage: bool
     is_point_in_time: bool
-    x_labels: List[str]
-    points: List[NormalizedPeriodPoint]
+    x_labels: list[str]
+    points: list[NormalizedPeriodPoint]
 
 
 class TimeSeriesNormalizer:
     """Normalizes raw SQL financial records into ordered, arithmetically sound time series."""
 
-    def __init__(self, metric_registry: Optional[MetricRegistry] = None) -> None:
+    def __init__(self, metric_registry: MetricRegistry | None = None) -> None:
         self.metric_registry = metric_registry or MetricRegistry()
 
     def is_point_in_time_metric(self, metric_name: str) -> bool:
@@ -70,18 +71,17 @@ class TimeSeriesNormalizer:
         if norm_name in POINT_IN_TIME_METRICS:
             return True
         definition = self.metric_registry.resolve(norm_name)
-        if definition and definition.period_type == "instant":
-            return True
-        return False
+        return bool(definition and definition.period_type == "instant")
 
     def normalize(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         metric_name: str,
         ticker: str,
-        target_periods: Optional[Sequence[str]] = None,
-        target_years: Optional[Sequence[int]] = None,
-    ) -> Optional[NormalizedTimeSeries]:
+        target_periods: Sequence[str] | None = None,
+        target_years: Sequence[int] | None = None,
+        min_points: int = 2,
+    ) -> NormalizedTimeSeries | None:
         """Normalize records into either an Annual or Quarterly time series.
 
         Args:
@@ -98,9 +98,9 @@ class TimeSeriesNormalizer:
         m_norm = metric_name.strip().lower()
         t_norm = ticker.strip().upper()
         matched = [
-            r for r in records
-            if r.get("metric_name", "").strip().lower() == m_norm
-            and r.get("ticker", "").strip().upper() == t_norm
+            r
+            for r in records
+            if r.get("metric_name", "").strip().lower() == m_norm and r.get("ticker", "").strip().upper() == t_norm
         ]
 
         if not matched:
@@ -111,6 +111,12 @@ class TimeSeriesNormalizer:
         display_name = definition.display_name if definition else m_norm.replace("_", " ").title()
         default_unit = definition.default_unit if definition else "USD"
         is_percentage = default_unit == "%" or "margin" in m_norm or "growth" in m_norm
+        record_currency = next(
+            (str(r["currency"]).strip().upper() for r in matched if r.get("currency")),
+            None,
+        )
+        if not is_percentage and default_unit != "ratio" and record_currency:
+            default_unit = record_currency
         is_pit = self.is_point_in_time_metric(m_norm)
 
         # Determine granularity: check target_periods or record contents
@@ -128,36 +134,51 @@ class TimeSeriesNormalizer:
 
         if prefer_quarterly:
             return self._normalize_quarterly(
-                matched, m_norm, display_name, t_norm, default_unit, is_percentage, is_pit, target_years=target_years
+                matched,
+                m_norm,
+                display_name,
+                t_norm,
+                default_unit,
+                is_percentage,
+                is_pit,
+                target_years=target_years,
+                min_points=min_points,
             )
         else:
             return self._normalize_annual(
-                matched, m_norm, display_name, t_norm, default_unit, is_percentage, is_pit, target_years=target_years
+                matched,
+                m_norm,
+                display_name,
+                t_norm,
+                default_unit,
+                is_percentage,
+                is_pit,
+                target_years=target_years,
+                min_points=min_points,
             )
 
     def _normalize_annual(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         metric_name: str,
         display_name: str,
         ticker: str,
         default_unit: str,
         is_percentage: bool,
         is_pit: bool,
-        target_years: Optional[Sequence[int]] = None,
-    ) -> Optional[NormalizedTimeSeries]:
+        target_years: Sequence[int] | None = None,
+        min_points: int = 2,
+    ) -> NormalizedTimeSeries | None:
         """Process annual FY time series sorted by fiscal year."""
         fy_records = [
-            r for r in records
-            if str(r.get("fiscal_period", "")).upper() == "FY"
-            and r.get("fiscal_year") is not None
+            r for r in records if str(r.get("fiscal_period", "")).upper() == "FY" and r.get("fiscal_year") is not None
         ]
 
         if not fy_records:
             return None
 
         # Group by fiscal_year to eliminate duplicates
-        year_to_record: Dict[int, Dict[str, Any]] = {}
+        year_to_record: dict[int, dict[str, Any]] = {}
         for r in fy_records:
             fy = int(r["fiscal_year"])
             # Keep as-reported record or latest observation
@@ -169,11 +190,11 @@ class TimeSeriesNormalizer:
         else:
             sorted_years = sorted(year_to_record.keys())
 
-        if len(sorted_years) < 2:
+        if len(sorted_years) < min_points:
             return None
 
-        points: List[NormalizedPeriodPoint] = []
-        x_labels: List[str] = []
+        points: list[NormalizedPeriodPoint] = []
+        x_labels: list[str] = []
 
         for fy in sorted_years:
             rec = year_to_record.get(fy)
@@ -193,7 +214,7 @@ class TimeSeriesNormalizer:
             )
 
         valid_points = [p for p in points if p.value is not None]
-        if len(valid_points) < 2:
+        if len(valid_points) < min_points:
             return None
 
         return NormalizedTimeSeries(
@@ -207,7 +228,7 @@ class TimeSeriesNormalizer:
             points=points,
         )
 
-    def _is_ytd_record(self, r: Dict[str, Any]) -> bool:
+    def _is_ytd_record(self, r: dict[str, Any]) -> bool:
         """Check whether a record represents a cumulative year-to-date observation."""
         if r.get("is_cumulative") is True:
             return True
@@ -218,25 +239,24 @@ class TimeSeriesNormalizer:
         if "cumulative" in ptype or "ytd" in ptype:
             return True
         fp = str(r.get("fiscal_period", "")).lower()
-        if "ytd" in fp:
-            return True
-        return False
+        return "ytd" in fp
 
     def _normalize_quarterly(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         metric_name: str,
         display_name: str,
         ticker: str,
         default_unit: str,
         is_percentage: bool,
         is_pit: bool,
-        target_years: Optional[Sequence[int]] = None,
-    ) -> Optional[NormalizedTimeSeries]:
+        target_years: Sequence[int] | None = None,
+        min_points: int = 2,
+    ) -> NormalizedTimeSeries | None:
         """Process quarterly time series Q1->Q4 with discrete/YTD accounting derivation."""
-        discrete_data: Dict[Tuple[int, str], Dict[str, Any]] = {}
-        ytd_data: Dict[Tuple[int, str], Dict[str, Any]] = {}
-        fy_data: Dict[int, Dict[str, Any]] = {}
+        discrete_data: dict[tuple[int, str], dict[str, Any]] = {}
+        ytd_data: dict[tuple[int, str], dict[str, Any]] = {}
+        fy_data: dict[int, dict[str, Any]] = {}
 
         for r in records:
             fy = r.get("fiscal_year")
@@ -261,23 +281,23 @@ class TimeSeriesNormalizer:
                     discrete_data[(fy_int, fp)] = r
 
         # Collect unique fiscal years across all observed periods
-        all_years = sorted(list({fy for (fy, _) in discrete_data.keys()} | {fy for (fy, _) in ytd_data.keys()} | set(fy_data.keys())))
+        all_years = sorted(list({fy for (fy, _) in discrete_data} | {fy for (fy, _) in ytd_data} | set(fy_data.keys())))
         if target_years:
             target_year_set = set(target_years)
             all_years = [y for y in all_years if y in target_year_set]
         if not all_years:
             return None
 
-        points: List[NormalizedPeriodPoint] = []
-        x_labels: List[str] = []
+        points: list[NormalizedPeriodPoint] = []
+        x_labels: list[str] = []
 
         for fy in all_years:
             for q_str in ("Q1", "Q2", "Q3", "Q4"):
                 key = (fy, q_str)
                 disc_rec = discrete_data.get(key)
-                val_float: Optional[float] = None
+                val_float: float | None = None
                 is_derived = False
-                prov_url: Optional[str] = None
+                prov_url: str | None = None
 
                 # 1. Point-in-time metrics: strictly NO cumulative subtraction
                 if is_pit:
@@ -317,7 +337,7 @@ class TimeSeriesNormalizer:
 
         # Drop trailing/leading empty quarters if entire series is empty (< 2 non-null observations)
         valid_points = [p for p in points if p.value is not None]
-        if len(valid_points) < 2:
+        if len(valid_points) < min_points:
             return None
 
         return NormalizedTimeSeries(
@@ -335,10 +355,10 @@ class TimeSeriesNormalizer:
         self,
         fy: int,
         quarter: str,
-        ytd_data: Dict[Tuple[int, str], Dict[str, Any]],
-        fy_data: Dict[int, Dict[str, Any]],
-        discrete_data: Dict[Tuple[int, str], Dict[str, Any]],
-    ) -> Tuple[Optional[float], bool, Optional[str]]:
+        ytd_data: dict[tuple[int, str], dict[str, Any]],
+        fy_data: dict[int, dict[str, Any]],
+        discrete_data: dict[tuple[int, str], dict[str, Any]],
+    ) -> tuple[float | None, bool, str | None]:
         """Perform arithmetic subtraction for cumulative duration metrics:
         - Q1 = YTD_Q1
         - Q2 = YTD_Q2 - YTD_Q1
@@ -349,7 +369,8 @@ class TimeSeriesNormalizer:
         - Must have compatible fiscal year, unit, and non-null values.
         - Never fabricate values if source data is missing.
         """
-        def _get_val_and_unit(rec: Optional[Dict[str, Any]]) -> Tuple[Optional[float], Optional[str]]:
+
+        def _get_val_and_unit(rec: dict[str, Any] | None) -> tuple[float | None, str | None]:
             if not rec or rec.get("metric_value") is None:
                 return None, None
             try:
@@ -412,16 +433,18 @@ class TimeSeriesNormalizer:
 class ChartEngine:
     """Spec-driven visualization engine synthesizing Plotly and Mermaid charts."""
 
-    _EXCLUDED_METRIC_SUBSTRINGS: Set[str] = {"cik", "accession", "hash", "key"}
+    _EXCLUDED_METRIC_SUBSTRINGS: frozenset[str] = frozenset({"cik", "accession", "hash", "key"})
 
-    def __init__(self, metric_registry: Optional[MetricRegistry] = None) -> None:
+    def __init__(self, metric_registry: MetricRegistry | None = None) -> None:
         """Initialize ChartEngine with in-memory MetricRegistry SSOT."""
-        self.metric_registry = metric_registry or MetricRegistry()
+        from src.core.financial.metric_registry import get_metric_registry
+
+        self.metric_registry = metric_registry or get_metric_registry()
         self.normalizer = TimeSeriesNormalizer(self.metric_registry)
 
     def should_render_chart(
         self,
-        chart_preference: Optional[str],
+        chart_preference: str | None,
         has_sql_data: bool,
     ) -> bool:
         """Check whether visualization was explicitly requested or planned by the Router LLM.
@@ -445,12 +468,12 @@ class ChartEngine:
     @classmethod
     def extract_charts(
         cls,
-        sql_data: Optional[Dict[str, Any]],
-        chart_preference: Optional[str] = "none",
-        ticker: Optional[str] = None,
-        query_plan: Optional[Dict[str, Any]] = None,
+        sql_data: dict[str, Any] | None,
+        chart_preference: str | None = "none",
+        ticker: str | None = None,
+        query_plan: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> List[ChartData]:
+    ) -> list[ChartData]:
         """Convenience classmethod for extracting financial charts without manual instantiation."""
         return cls().extract_financial_charts(
             sql_data=sql_data,
@@ -462,12 +485,12 @@ class ChartEngine:
 
     def extract_financial_charts(
         self,
-        sql_data: Optional[Dict[str, Any]],
-        chart_preference: Optional[str] = "none",
-        ticker: Optional[str] = None,
-        query_plan: Optional[Dict[str, Any]] = None,
+        sql_data: dict[str, Any] | None,
+        chart_preference: str | None = "none",
+        ticker: str | None = None,
+        query_plan: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> List[ChartData]:
+    ) -> list[ChartData]:
         """Extract validated time series and construct Plotly-ready ChartData objects.
 
         Args:
@@ -479,7 +502,7 @@ class ChartEngine:
         Returns:
             List of validated ChartData instances with plotly_figure_json.
         """
-        charts: List[ChartData] = []
+        charts: list[ChartData] = []
         if not sql_data or not sql_data.get("data"):
             logger.debug("ChartEngine: Skipped, no SQL data available.")
             return charts
@@ -489,7 +512,7 @@ class ChartEngine:
             logger.info("ChartEngine: Chart skipped because chart_preference is '%s'.", chart_preference)
             return charts
 
-        records: List[Dict[str, Any]] = sql_data["data"]
+        records: list[dict[str, Any]] = sql_data["data"]
         pref_norm = str(chart_preference).strip().lower()
 
         # Map chart_preference string to ChartType enum
@@ -502,8 +525,8 @@ class ChartEngine:
         selected_chart_type = chart_type_map.get(pref_norm, ChartType.BAR)
 
         # Extract target metrics and tickers present in records
-        found_metrics: List[str] = []
-        found_tickers: List[str] = []
+        found_metrics: list[str] = []
+        found_tickers: list[str] = []
         for r in records:
             m = r.get("metric_name", "").strip().lower()
             t = r.get("ticker", "").strip().upper()
@@ -514,13 +537,19 @@ class ChartEngine:
 
         target_periods = query_plan.get("fiscal_periods") if query_plan else None
         target_years = query_plan.get("fiscal_years") if query_plan else None
-        if target_years and len(target_years) == 2 and target_years[0] < target_years[1]:
-            if target_years[1] - target_years[0] <= 30:
-                target_years = list(range(target_years[0], target_years[1] + 1))
+        if (
+            target_years
+            and len(target_years) == 2
+            and target_years[0] < target_years[1]
+            and target_years[1] - target_years[0] <= 30
+        ):
+            target_years = list(range(target_years[0], target_years[1] + 1))
 
         # 2. Iterate each metric, normalize series, and validate
+        # Cross-company comparisons (>= 2 tickers) allow 1 period per company (e.g. single-year bar chart)
+        min_points_per_series = 1 if len(found_tickers) >= 2 else 2
         for m_name in found_metrics:
-            series_list: List[NormalizedTimeSeries] = []
+            series_list: list[NormalizedTimeSeries] = []
             for t_name in found_tickers:
                 ts = self.normalizer.normalize(
                     records=records,
@@ -528,6 +557,7 @@ class ChartEngine:
                     ticker=t_name,
                     target_periods=target_periods,
                     target_years=target_years,
+                    min_points=min_points_per_series,
                 )
                 if ts:
                     series_list.append(ts)
@@ -541,14 +571,14 @@ class ChartEngine:
             is_percentage = series_list[0].is_percentage
 
             # 3. Unit Scaling & Missing Value Preservation (None is never converted to 0)
-            flat_non_nulls: List[float] = [
-                pt.value for s in series_list for pt in s.points if pt.value is not None
-            ]
+            flat_non_nulls: list[float] = [pt.value for s in series_list for pt in s.points if pt.value is not None]
             if len(flat_non_nulls) < 2:
-                logger.warning("ChartEngine: Metric '%s' has insufficient data points (%d < 2).", m_name, len(flat_non_nulls))
+                logger.warning(
+                    "ChartEngine: Metric '%s' has insufficient data points (%d < 2).", m_name, len(flat_non_nulls)
+                )
                 continue
 
-            datasets: List[Dict[str, Any]] = []
+            datasets: list[dict[str, Any]] = []
 
             if is_percentage:
                 unit_label = "%"
@@ -557,8 +587,7 @@ class ChartEngine:
 
                 for s in series_list:
                     scaled_values = [
-                        round(pt.value * scale_factor, 2) if pt.value is not None else None
-                        for pt in s.points
+                        round(pt.value * scale_factor, 2) if pt.value is not None else None for pt in s.points
                     ]
                     lbl = f"{s.ticker} {display_name}" if len(series_list) > 1 else display_name
                     datasets.append({"label": f"{lbl} (%)", "values": scaled_values})
@@ -566,29 +595,35 @@ class ChartEngine:
             elif series_list[0].unit == "ratio":
                 unit_label = "Ratio"
                 for s in series_list:
-                    scaled_values = [
-                        round(pt.value, 2) if pt.value is not None else None
-                        for pt in s.points
-                    ]
+                    scaled_values = [round(pt.value, 2) if pt.value is not None else None for pt in s.points]
                     lbl = f"{s.ticker} {display_name}" if len(series_list) > 1 else display_name
                     datasets.append({"label": lbl, "values": scaled_values})
 
             else:
+                currencies = {s.unit for s in series_list if s.unit}
+                if len(currencies) > 1:
+                    logger.info(
+                        "Skipping combined chart for '%s' due to incompatible currencies: %s",
+                        m_name,
+                        sorted(currencies),
+                    )
+                    continue
+
+                currency_code = next(iter(currencies), "USD")
                 max_abs = max(abs(v) for v in flat_non_nulls)
                 is_billion = max_abs >= 1_000_000_000
-                unit_label = "USD (Billions)" if is_billion else "USD"
+                unit_label = f"{currency_code} (Billions)" if is_billion else currency_code
                 div = 1_000_000_000.0 if is_billion else 1.0
 
                 for s in series_list:
-                    scaled_values = [
-                        round(pt.value / div, 2) if pt.value is not None else None
-                        for pt in s.points
-                    ]
+                    scaled_values = [round(pt.value / div, 2) if pt.value is not None else None for pt in s.points]
                     lbl = f"{s.ticker} {display_name}" if len(series_list) > 1 else display_name
                     datasets.append({"label": lbl, "values": scaled_values})
 
             # 4. Construct Descriptive Title
-            company_header = " vs ".join(s.ticker for s in series_list) if len(series_list) > 1 else series_list[0].ticker
+            company_header = (
+                " vs ".join(s.ticker for s in series_list) if len(series_list) > 1 else series_list[0].ticker
+            )
             chart_title = f"{company_header} {display_name} ({unit_label})"
 
             # 5. Build Plotly Figure JSON
@@ -631,11 +666,11 @@ class ChartEngine:
     def _build_plotly_figure(
         self,
         title: str,
-        x_labels: List[str],
-        datasets: List[Dict[str, Any]],
+        x_labels: list[str],
+        datasets: list[dict[str, Any]],
         unit_label: str,
         chart_type: ChartType,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Construct Plotly Figure specification matching modern workstation schema."""
         palette = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"]
         data_traces = []
@@ -690,8 +725,8 @@ class ChartEngine:
     def _build_mermaid_code(
         self,
         title: str,
-        x_labels: List[str],
-        datasets: List[Dict[str, Any]],
+        x_labels: list[str],
+        datasets: list[dict[str, Any]],
         unit_label: str,
         chart_type: ChartType,
     ) -> str:
@@ -721,8 +756,8 @@ class ChartEngine:
     def _build_ascii_chart(
         self,
         title: str,
-        x_labels: List[str],
-        datasets: List[Dict[str, Any]],
+        x_labels: list[str],
+        datasets: list[dict[str, Any]],
     ) -> str:
         """Construct terminal-friendly ASCII representation."""
         all_vals = [v for ds in datasets for v in ds["values"] if v is not None and v > 0]
@@ -732,7 +767,7 @@ class ChartEngine:
         for ds in datasets:
             if len(datasets) > 1:
                 ascii_lines.append(f"[{ds['label']}]")
-            for lbl, val in zip(x_labels, ds["values"]):
+            for lbl, val in zip(x_labels, ds["values"], strict=False):
                 if val is not None:
                     bar_len = max(1, int((val / v_max) * 20)) if v_max > 0 and val > 0 else 0
                     bars = "=" * bar_len

@@ -1,8 +1,8 @@
 import httpx
 import pytest
-from unittest.mock import MagicMock
-from src.data.ingestion.sec_client import SECClient
+
 from src.data.ingestion.rate_limiter import RateLimiter
+from src.data.ingestion.sec_client import SECClient
 
 
 def test_invalid_user_agent():

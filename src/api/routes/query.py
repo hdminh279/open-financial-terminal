@@ -6,6 +6,7 @@ and dual-layer persistence of conversation history to MinIO S3 Lakehouse.
 
 import logging
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.ai.agent.research_agent import ResearchAgent
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/query", tags=["Query"])
     summary="Execute multi-tool SEC research query",
     description="Processes user question through LangGraph agent (SQL, RAG, Citations, Charts) and logs to chat history.",
 )
-async def execute_query(
+def execute_query(
     request: QueryRequest,
     agent: ResearchAgent = Depends(get_research_agent),
     history: ChatHistoryManager = Depends(get_chat_history),
@@ -45,10 +46,7 @@ async def execute_query(
     session_id = session.session_id
 
     # Extract previous conversation history for contextual follow-up queries
-    previous_history = [
-        {"role": m.role, "content": m.content, "metadata": m.metadata}
-        for m in session.messages[-6:]
-    ]
+    previous_history = [{"role": m.role, "content": m.content, "metadata": m.metadata} for m in session.messages[-6:]]
 
     # 2. Append user turn to chat history
     history.add_user_message(session_id=session_id, content=cleaned_query)
@@ -66,6 +64,7 @@ async def execute_query(
             "charts_count": len(agent_resp.charts),
             "citations": [c.model_dump() for c in agent_resp.citations],
             "charts": [ch.model_dump() for ch in agent_resp.charts],
+            "activity_timeline": [s.model_dump() for s in agent_resp.activity_timeline],
         }
 
         # 5. Append assistant turn to chat history (persisted to MinIO)
@@ -85,11 +84,7 @@ async def execute_query(
 
         error_code = None
         if agent_resp.abstention and agent_resp.abstention.is_abstaining:
-            error_code = (
-                agent_resp.abstention.reason.value
-                if agent_resp.abstention.reason
-                else "ABSTENTION"
-            )
+            error_code = agent_resp.abstention.reason.value if agent_resp.abstention.reason else "ABSTENTION"
 
         log_run_telemetry(
             request_id=request_id,
@@ -143,4 +138,4 @@ async def execute_query(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Query execution failed for request {request_id}. Please try again later.",
-        )
+        ) from exc

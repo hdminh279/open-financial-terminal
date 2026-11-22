@@ -8,18 +8,15 @@ Verifies:
 """
 
 from datetime import date
-from decimal import Decimal
-import pytest
 
-from src.core.financial.availability_validator import (
-    AvailabilityCode,
-    FinancialAvailabilityValidator,
-    PeriodAvailability,
-)
 from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
 from src.ai.agent.tools.financial_sql_tool import (
     FinancialQueryInput,
     FinancialSQLTool,
+)
+from src.core.financial.availability_validator import (
+    AvailabilityCode,
+    FinancialAvailabilityValidator,
 )
 
 

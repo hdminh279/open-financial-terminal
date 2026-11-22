@@ -5,7 +5,7 @@ to elevate exact factual and regulatory answers to Rank 1.
 """
 
 import logging
-from typing import List, Optional
+
 from flashrank import Ranker, RerankRequest
 
 from src.ai.retrieval.retriever import RetrievedChunk
@@ -19,7 +19,7 @@ class FlashRankReranker:
     def __init__(
         self,
         model_name: str = "ms-marco-MiniLM-L-12-v2",
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
         max_length: int = 512,
     ) -> None:
         """Initialize FlashRank Ranker with an ONNX cross-encoder model."""
@@ -33,9 +33,9 @@ class FlashRankReranker:
     def rerank(
         self,
         query: str,
-        chunks: List[RetrievedChunk],
+        chunks: list[RetrievedChunk],
         top_k: int = 10,
-    ) -> List[RetrievedChunk]:
+    ) -> list[RetrievedChunk]:
         """Rerank a list of candidate RetrievedChunk objects.
 
         Args:
@@ -53,7 +53,7 @@ class FlashRankReranker:
         req = RerankRequest(query=query, passages=passages)
         results = self.ranker.rerank(req)
 
-        reranked_chunks: List[RetrievedChunk] = []
+        reranked_chunks: list[RetrievedChunk] = []
         for rank_idx, item in enumerate(results[:top_k], start=1):
             original_chunk: RetrievedChunk = item["meta"]
             updated_chunk = original_chunk.model_copy(

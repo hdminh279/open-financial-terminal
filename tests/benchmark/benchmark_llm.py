@@ -23,9 +23,7 @@ from src.ai.llm.contracts import ChatMessage, TokenUsage
 from src.ai.llm.factory import LLMFactory
 
 logger = logging.getLogger("benchmark_llm")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Pricing per 1,000,000 tokens (DeepSeek-V4.1-Flash as of 2026-11)
 PRICE_INPUT_CACHE_MISS = 0.15  # USD per 1M tokens
@@ -65,9 +63,7 @@ def evaluate_response(text: str, item: dict[str, Any]) -> bool:
                 if abs(val - target) <= tolerance:
                     return True
                 # Handle decimal ratio vs percentage representations (e.g. 0.4177 vs 41.77%)
-                if abs(val * 100 - target) <= tolerance or abs(val - target / 100) <= (
-                    tolerance / 100
-                ):
+                if abs(val * 100 - target) <= tolerance or abs(val - target / 100) <= (tolerance / 100):
                     return True
             except ValueError:
                 continue
@@ -143,15 +139,11 @@ def run_benchmark() -> dict[str, Any]:
                     "total_latency_ms": round(total_latency_ms, 1),
                     "ttft_ms": round(ttft_ms, 1) if ttft_ms is not None else 0.0,
                     "prompt_tokens": final_usage.prompt_tokens if final_usage else 0,
-                    "completion_tokens": final_usage.completion_tokens
-                    if final_usage
-                    else 0,
+                    "completion_tokens": final_usage.completion_tokens if final_usage else 0,
                     "reasoning_tokens": final_usage.reasoning_tokens
                     if final_usage
                     else (len(full_reasoning.split()) if full_reasoning else 0),
-                    "cache_hit_tokens": final_usage.cache_hit_tokens
-                    if final_usage
-                    else 0,
+                    "cache_hit_tokens": final_usage.cache_hit_tokens if final_usage else 0,
                     "cost_usd": cost,
                     "content_preview": full_content.replace("\n", " ")[:120],
                     "reasoning_length": len(full_reasoning),
@@ -301,15 +293,11 @@ def generate_markdown_report(results: dict[str, list[dict[str, Any]]]) -> str:
         if chat_failed:
             lines.append("#### Failed Cases in `chat` Profile:")
             for cf in chat_failed:
-                lines.append(
-                    f"- **{cf['id']}** ({cf['category']}): Output: `{cf['content_preview']}`"
-                )
+                lines.append(f"- **{cf['id']}** ({cf['category']}): Output: `{cf['content_preview']}`")
         if reasoner_failed:
             lines.append("#### Failed Cases in `reasoner` Profile:")
             for rf in reasoner_failed:
-                lines.append(
-                    f"- **{rf['id']}** ({rf['category']}): Output: `{rf['content_preview']}`"
-                )
+                lines.append(f"- **{rf['id']}** ({rf['category']}): Output: `{rf['content_preview']}`")
 
     lines.extend(
         [

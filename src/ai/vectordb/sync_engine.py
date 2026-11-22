@@ -10,7 +10,7 @@ import logging
 import os
 import random
 import uuid
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import pyarrow.parquet as pq
 from dotenv import load_dotenv
@@ -31,10 +31,10 @@ class CorpusSyncEngine:
 
     def __init__(
         self,
-        qdrant_storage: Optional[QdrantStorage] = None,
-        dense_engine: Optional[EmbeddingStrategy] = None,
-        sparse_engine: Optional[SparseTextEmbedding] = None,
-        s3_storage: Optional[S3Storage] = None,
+        qdrant_storage: QdrantStorage | None = None,
+        dense_engine: EmbeddingStrategy | None = None,
+        sparse_engine: SparseTextEmbedding | None = None,
+        s3_storage: S3Storage | None = None,
     ) -> None:
         """Initialize sync engine with storage and embedding adapters."""
         self.qdrant = qdrant_storage or QdrantStorage()
@@ -51,9 +51,9 @@ class CorpusSyncEngine:
         self,
         bucket: str = "sec-gold",
         key: str = "chunks/text_chunks.parquet",
-        local_path: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        local_path: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Load text chunks from local Parquet file or MinIO S3 object."""
         resolved_local = local_path or os.getenv("CHUNKS_PARQUET_LOCAL_PATH")
 
@@ -70,7 +70,7 @@ class CorpusSyncEngine:
 
         pydict = table.to_pydict()
         num_rows = table.num_rows
-        chunks: List[Dict[str, Any]] = []
+        chunks: list[dict[str, Any]] = []
 
         keys = list(pydict.keys())
         for i in range(num_rows):
@@ -84,16 +84,14 @@ class CorpusSyncEngine:
         self,
         bucket: str = "sec-gold",
         key: str = "chunks/text_chunks.parquet",
-        local_path: Optional[str] = None,
+        local_path: str | None = None,
         recreate: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         batch_size: int = 64,
         create_snapshot_after: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform end-to-end synchronization: stale cleanup, embedding, and upsert."""
-        chunks = self.load_chunks_from_parquet(
-            bucket=bucket, key=key, local_path=local_path, limit=limit
-        )
+        chunks = self.load_chunks_from_parquet(bucket=bucket, key=key, local_path=local_path, limit=limit)
 
         if not chunks:
             logger.warning("No chunks found to synchronize.")
@@ -104,9 +102,7 @@ class CorpusSyncEngine:
         self.qdrant.create_collection(recreate=recreate, dense_dim=dense_dim)
 
         # 2. Build mapping of valid Point IDs
-        parquet_point_ids: Dict[str, Dict[str, Any]] = {
-            self.chunk_id_to_uuid(c["chunk_id"]): c for c in chunks
-        }
+        parquet_point_ids: dict[str, dict[str, Any]] = {self.chunk_id_to_uuid(c["chunk_id"]): c for c in chunks}
         valid_id_set = set(parquet_point_ids.keys())
 
         # 3. Detect and purge stale points from Qdrant
@@ -122,10 +118,7 @@ class CorpusSyncEngine:
             logger.info("Zero stale points detected in Qdrant.")
 
         # Incremental Resume: Filter out chunks that are already indexed in Qdrant
-        chunks_to_embed = [
-            c for c in chunks
-            if self.chunk_id_to_uuid(c["chunk_id"]) not in existing_ids
-        ]
+        chunks_to_embed = [c for c in chunks if self.chunk_id_to_uuid(c["chunk_id"]) not in existing_ids]
         already_indexed_count = len(chunks) - len(chunks_to_embed)
         logger.info(
             "%d chunks already indexed in Qdrant (skipped). %d remaining chunks to embed.",
@@ -166,8 +159,8 @@ class CorpusSyncEngine:
             sparse_vectors = list(self.sparse_engine.embed(batch_texts, batch_size=batch_size))
 
             # Assemble Qdrant points with full 17 metadata fields in payload
-            points: List[models.PointStruct] = []
-            for chunk_data, d_vec, s_vec in zip(batch_chunks, dense_vectors, sparse_vectors):
+            points: list[models.PointStruct] = []
+            for chunk_data, d_vec, s_vec in zip(batch_chunks, dense_vectors, sparse_vectors, strict=True):
                 p_id = self.chunk_id_to_uuid(chunk_data["chunk_id"])
 
                 payload = {
@@ -204,7 +197,7 @@ class CorpusSyncEngine:
                     )
                 )
 
-            is_last_batch = (end_idx >= total_chunks)
+            is_last_batch = end_idx >= total_chunks
             self.qdrant.upsert_points(points=points, wait=is_last_batch)
             upserted_count += len(points)
             logger.info(
@@ -216,7 +209,7 @@ class CorpusSyncEngine:
             )
 
         # 5. Optional snapshot creation
-        snapshot_name: Optional[str] = None
+        snapshot_name: str | None = None
         if create_snapshot_after:
             snapshot_name = self.qdrant.create_snapshot()
 
@@ -235,9 +228,9 @@ class CorpusSyncEngine:
         self,
         bucket: str = "sec-gold",
         key: str = "chunks/text_chunks.parquet",
-        local_path: Optional[str] = None,
+        local_path: str | None = None,
         sample_size: int = 50,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform comprehensive integrity checks between Parquet and Qdrant."""
         chunks = self.load_chunks_from_parquet(bucket=bucket, key=key, local_path=local_path)
         parquet_count = len(chunks)
@@ -249,7 +242,7 @@ class CorpusSyncEngine:
         valid_id_set = set(parquet_point_ids.keys())
 
         # Check 1: Count match
-        counts_match = (parquet_count == qdrant_count)
+        counts_match = parquet_count == qdrant_count
 
         # Check 2: Stale check
         stale_count = len(qdrant_ids - valid_id_set)
@@ -268,7 +261,7 @@ class CorpusSyncEngine:
         )
 
         hashes_matched = 0
-        discrepancies: List[str] = []
+        discrepancies: list[str] = []
 
         for pt in fetched_points:
             pt_id = str(pt.id)
@@ -283,9 +276,7 @@ class CorpusSyncEngine:
             if qdrant_hash == expected_hash:
                 hashes_matched += 1
             else:
-                discrepancies.append(
-                    f"Hash mismatch for {pt_id}: Qdrant='{qdrant_hash}' vs Parquet='{expected_hash}'"
-                )
+                discrepancies.append(f"Hash mismatch for {pt_id}: Qdrant='{qdrant_hash}' vs Parquet='{expected_hash}'")
 
         is_passed = counts_match and (stale_count == 0) and (missing_count == 0) and (len(discrepancies) == 0)
 

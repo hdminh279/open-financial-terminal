@@ -1,9 +1,10 @@
 """Unit tests verifying LangGraph concurrency, database error safety, and telemetry."""
 
-from concurrent.futures import ThreadPoolExecutor
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import MagicMock
+
 import duckdb
 import pytest
 
@@ -20,7 +21,6 @@ from src.ai.agent.tools.financial_sql_tool import (
     FinancialSQLTool,
 )
 from src.core.observability.telemetry import (
-    RunTelemetryRecord,
     TelemetryLogger,
     sanitize_query,
 )
@@ -32,12 +32,8 @@ def test_timeline_reducer_parallel_accumulation() -> None:
         {"step": "Understanding question", "status": "completed", "duration_ms": 45.2},
         {"step": "Resolving metrics", "status": "completed", "duration_ms": 12.0},
     ]
-    sql_branch = [
-        {"step": "Querying DuckDB", "status": "completed", "duration_ms": 18.5}
-    ]
-    rag_branch = [
-        {"step": "Searching SEC filings", "status": "completed", "duration_ms": 32.1}
-    ]
+    sql_branch = [{"step": "Querying DuckDB", "status": "completed", "duration_ms": 18.5}]
+    rag_branch = [{"step": "Searching SEC filings", "status": "completed", "duration_ms": 32.1}]
 
     # Simulate fan-out resolution where both branches return concurrently
     step1 = timeline_reducer(existing, sql_branch)
@@ -52,9 +48,7 @@ def test_timeline_reducer_parallel_accumulation() -> None:
 def test_mixed_research_parallel_fanout_timeline() -> None:
     """Validate that Mixed Research parallel execution records both tools without event loss."""
     agent = ResearchAgent()
-    request = AgentRequest(
-        query="What was Apple's revenue in 2023 and what risks did they disclose regarding China?"
-    )
+    request = AgentRequest(query="What was Apple's revenue in 2023 and what risks did they disclose regarding China?")
 
     response = agent.query(request)
 
@@ -159,7 +153,7 @@ def test_telemetry_logger_jsonl_output(tmp_path: Path) -> None:
     assert success is True
     assert log_file.exists()
 
-    with open(log_file, "r", encoding="utf-8") as f:
+    with open(log_file, encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
     assert len(lines) == 1
@@ -207,7 +201,7 @@ def test_telemetry_concurrent_multithread_writes(tmp_path: Path) -> None:
 
     assert all(results)
 
-    with open(log_file, "r", encoding="utf-8") as f:
+    with open(log_file, encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
     assert len(lines) == thread_count

@@ -1,7 +1,7 @@
 [project]
 name = "corporate-filing-intelligence"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local-first verifiable financial research assistant over SEC EDGAR and VN30 corporate filings."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,7 +10,6 @@ dependencies = [
     "dbt-duckdb>=1.11.1",
     "ddgs>=9.16.1",
     "duckdb>=2.0.0",
-    "duckduckgo-search>=8.1.1",
     "fastapi>=0.162.5",
     "fastembed>=0.4.0",
     "flashrank>=0.2.10",
@@ -20,9 +19,9 @@ dependencies = [
     "openai>=3.49.0",
     "pyarrow>=26.0.1",
     "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.1",
     "pytest>=9.2.0",
     "pytest-mock>=3.17.0",
+    "python-dotenv>=1.0.0",
     "pyyaml>=6.0.3",
     "qdrant-client>=1.12.0",
     "ruff>=0.17.3",
@@ -30,6 +29,20 @@ dependencies = [
     "tiktoken>=0.14.0",
     "uvicorn>=0.54.0",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501", "B008", "UP042", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/api/main.py" = ["E402"]
+"tests/benchmark/benchmark_llm.py" = ["E402"]
+"tests/integration/test_market_live.py" = ["E402"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

@@ -1,6 +1,7 @@
 """Unit tests for the unified Command-Line Interface."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pytest
 
 from src.cli import build_parser, main

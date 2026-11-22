@@ -5,6 +5,7 @@ sub-second execution and robust error handling.
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from src.ai.agent.tools.web_search_tool import (
@@ -29,7 +30,7 @@ def test_clean_snippet(web_tool: WebSearchTool) -> None:
     assert "<b>" not in cleaned
     assert "&amp;" not in cleaned
     assert "&quot;" not in cleaned
-    assert "Apple Inc. announced & released new AI features \"Apple Intelligence\"." in cleaned
+    assert 'Apple Inc. announced & released new AI features "Apple Intelligence".' in cleaned
 
 
 def test_clean_snippet_truncation(web_tool: WebSearchTool) -> None:
@@ -111,6 +112,7 @@ def test_search_exception_handled_gracefully(mock_ddgs_cls: MagicMock, web_tool:
 def test_search_when_ddgs_uninstalled(monkeypatch: pytest.MonkeyPatch, web_tool: WebSearchTool) -> None:
     """Verify graceful failure when DDGS library is absent."""
     import src.ai.agent.tools.web_search_tool as wst
+
     monkeypatch.setattr(wst, "DDGS", None)
 
     response = web_tool.search("Apple stock")

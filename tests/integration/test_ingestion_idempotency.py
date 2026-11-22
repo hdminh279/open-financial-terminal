@@ -4,9 +4,8 @@ Verifies end-to-end data completeness, SHA-256 cryptographic integrity,
 and pipeline idempotency across MinIO Bronze storage.
 """
 
-from typing import List, Set
-from dotenv import load_dotenv
 import pytest
+from dotenv import load_dotenv
 
 from src.cli import main
 from src.data.storage.s3_storage import S3Storage
@@ -31,27 +30,36 @@ def s3_storage() -> S3Storage:
 
 def test_bronze_lakehouse_data_completeness(s3_storage: S3Storage):
     """Quality Gate 1 - Check 1: Verify all required Bronze objects exist for target companies."""
-    bronze_keys: List[str] = s3_storage.list_objects(bucket="sec-bronze")
-    key_set: Set[str] = set(bronze_keys)
+    bronze_keys: list[str] = s3_storage.list_objects(bucket="sec-bronze")
+    key_set: set[str] = set(bronze_keys)
 
     # 1. Verify Submissions & Facts exist for all companies
     for ticker in TARGET_TICKERS:
-        matching_subs = [k for k in key_set if f"raw/submissions/{ticker}_" in k and k.endswith(".json") and not k.endswith("_metadata.json")]
-        matching_facts = [k for k in key_set if f"raw/company_facts/{ticker}_" in k and k.endswith(".json") and not k.endswith("_metadata.json")]
+        matching_subs = [
+            k
+            for k in key_set
+            if f"raw/submissions/{ticker}_" in k and k.endswith(".json") and not k.endswith("_metadata.json")
+        ]
+        matching_facts = [
+            k
+            for k in key_set
+            if f"raw/company_facts/{ticker}_" in k and k.endswith(".json") and not k.endswith("_metadata.json")
+        ]
 
         assert len(matching_subs) >= 1, f"Missing submissions JSON for {ticker}"
         assert len(matching_facts) >= 1, f"Missing company facts JSON for {ticker}"
 
         # Verify companion audit metadata files exist
-        assert f"{matching_subs[0].rsplit('.', 1)[0]}_metadata.json" in key_set, f"Missing companion metadata for submissions {ticker}"
-        assert f"{matching_facts[0].rsplit('.', 1)[0]}_metadata.json" in key_set, f"Missing companion metadata for facts {ticker}"
+        assert f"{matching_subs[0].rsplit('.', 1)[0]}_metadata.json" in key_set, (
+            f"Missing companion metadata for submissions {ticker}"
+        )
+        assert f"{matching_facts[0].rsplit('.', 1)[0]}_metadata.json" in key_set, (
+            f"Missing companion metadata for facts {ticker}"
+        )
 
     # 2. Verify 10-K & 10-Q HTML Filings count per company
     for ticker, expected_count in EXPECTED_FILING_COUNTS.items():
-        filing_keys = [
-            k for k in key_set
-            if k.startswith(f"raw/filings/{ticker}/") and k.endswith(".htm")
-        ]
+        filing_keys = [k for k in key_set if k.startswith(f"raw/filings/{ticker}/") and k.endswith(".htm")]
         assert len(filing_keys) >= expected_count, (
             f"Expected at least {expected_count} filings for {ticker}, but found {len(filing_keys)}: {filing_keys}"
         )
@@ -88,6 +96,4 @@ def test_ingestion_pipeline_idempotency(s3_storage: S3Storage):
 
     # Assert object state is completely preserved without duplicates
     post_run_keys = set(s3_storage.list_objects(bucket="sec-bronze"))
-    assert post_run_keys == initial_keys, (
-        f"Idempotency violated! New objects created: {post_run_keys - initial_keys}"
-    )
+    assert post_run_keys == initial_keys, f"Idempotency violated! New objects created: {post_run_keys - initial_keys}"

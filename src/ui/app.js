@@ -47,8 +47,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvasChartEl = document.getElementById("financial-canvas-chart");
   const chartTypeToggleBtn = document.getElementById("chart-type-toggle-btn");
   const exportChartBtn = document.getElementById("export-chart-btn");
+  const exportCanvasCsvBtn = document.getElementById("export-canvas-csv-btn");
+  const exportCanvasJsonBtn = document.getElementById("export-canvas-json-btn");
   const financialTableBody = document.getElementById("financial-table-body");
   const activeAccessionNum = document.getElementById("active-accession-num");
+
+  // Citation Preview Drawer Elements
+  const citationDrawer = document.getElementById("citation-drawer");
+  const citationDrawerBackdrop = document.getElementById("citation-drawer-backdrop");
+  const citationDrawerClose = document.getElementById("citation-drawer-close");
 
   // Application State
   let currentSessionId = generateUUID();
@@ -57,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isRecording = false;
   let recognition = null;
   let isDraggingResizer = false;
+  const turnCitationStore = [];
 
   // Initial Multi-Year Comparison Dataset
   const defaultChartData = {
@@ -259,6 +267,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const listContent = sourcesCard.querySelector(".sources-list-content");
         if (listContent) {
           listContent.style.display = sourcesCard.classList.contains("collapsed") ? "none" : "flex";
+        }
+        return;
+      }
+
+      // 4. Open Citation Preview Drawer from inline [1] pill or source preview button
+      const citTrigger = e.target.closest(".citation-tag[data-turn-idx], .btn-preview-citation[data-turn-idx]");
+      if (citTrigger) {
+        const turnIdx = parseInt(citTrigger.getAttribute("data-turn-idx"), 10);
+        const citId = parseInt(citTrigger.getAttribute("data-cit-id"), 10);
+        const turnCitations = turnCitationStore[turnIdx] || [];
+        const matched = turnCitations.find(c => Number(c.citation_id) === citId) || turnCitations[citId - 1];
+        if (matched) {
+          e.preventDefault();
+          openCitationDrawer(matched);
+        }
+        return;
+      }
+
+      // 5. Export In-Chat Table to CSV / JSON
+      const exportBtn = e.target.closest(".btn-table-export");
+      if (exportBtn) {
+        const wrapper = exportBtn.closest(".table-card-container");
+        const tableEl = wrapper ? wrapper.querySelector("table") : null;
+        const format = exportBtn.getAttribute("data-format") || "csv";
+        if (tableEl) {
+          exportTableData(tableEl, format, "financial_table");
         }
         return;
       }
@@ -549,6 +583,173 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Export Canvas Financial Table to CSV / JSON
+  if (exportCanvasCsvBtn) {
+    exportCanvasCsvBtn.addEventListener("click", () => {
+      const tableEl = document.getElementById("financial-data-table");
+      if (tableEl) exportTableData(tableEl, "csv", "canvas_financial_metrics");
+    });
+  }
+  if (exportCanvasJsonBtn) {
+    exportCanvasJsonBtn.addEventListener("click", () => {
+      const tableEl = document.getElementById("financial-data-table");
+      if (tableEl) exportTableData(tableEl, "json", "canvas_financial_metrics");
+    });
+  }
+
+  function exportTableData(tableEl, format, filenamePrefix) {
+    const headers = Array.from(tableEl.querySelectorAll("thead th")).map(th =>
+      th.textContent.replace(/[↑↓]/g, "").trim()
+    );
+    const rows = Array.from(tableEl.querySelectorAll("tbody tr")).map(tr =>
+      Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim())
+    );
+    if (headers.length === 0 && rows.length === 0) return;
+
+    let content = "";
+    let mime = "text/plain;charset=utf-8;";
+    let ext = "txt";
+
+    if (format === "json") {
+      const jsonRecords = rows.map(cells => {
+        const obj = {};
+        cells.forEach((val, idx) => {
+          const key = headers[idx] || `col_${idx + 1}`;
+          obj[key] = val;
+        });
+        return obj;
+      });
+      content = JSON.stringify(jsonRecords, null, 2);
+      mime = "application/json;charset=utf-8;";
+      ext = "json";
+    } else {
+      const escapeCsv = (val) => {
+        const str = String(val ?? "");
+        return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+      };
+      const csvLines = [];
+      if (headers.length > 0) csvLines.push(headers.map(escapeCsv).join(","));
+      rows.forEach(r => csvLines.push(r.map(escapeCsv).join(",")));
+      content = "\uFEFF" + csvLines.join("\r\n");
+      mime = "text/csv;charset=utf-8;";
+      ext = "csv";
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filenamePrefix}_${Date.now()}.${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function formatCitationDisplay(c) {
+    const isWeb = c.source_type === "web" || c.form === "WEB_NEWS";
+    const isVn = c.form === "BCTC" || (c.source_url && (c.source_url.includes("vndirect") || c.source_url.includes("vietstock")));
+
+    let domain = "";
+    if (c.source_url) {
+      try {
+        const u = new URL(c.source_url);
+        domain = u.hostname.replace(/^www\./i, "");
+      } catch (e) {
+        domain = "";
+      }
+    }
+
+    let company = "";
+    if (isWeb) {
+      company = domain || "Tin tức Web";
+    } else {
+      const rawTicker = c.ticker && c.ticker !== "WEB" ? c.ticker : "";
+      company = c.company_name || rawTicker || (isVn ? "BCTC Việt Nam" : "Nguồn kiểm chứng");
+    }
+
+    const form = isWeb ? "Live Web" : (c.form || "Filing");
+
+    let periodLabel = "";
+    if (!isWeb) {
+      if (c.fiscal_period && c.fiscal_year) {
+        periodLabel = c.fiscal_period === "FY" ? `FY${c.fiscal_year}` : `${c.fiscal_period} FY${c.fiscal_year}`;
+      } else if (c.fiscal_year) {
+        periodLabel = `FY${c.fiscal_year}`;
+      } else if (c.fiscal_period) {
+        periodLabel = c.fiscal_period;
+      }
+    }
+
+    const url = c.source_url || (c.cik && !String(c.cik).startsWith("VN:") ? `https://www.sec.gov/edgar/browse/?CIK=${c.cik}` : "#");
+    return { company, form, periodLabel, url };
+  }
+
+  function openCitationDrawer(citation) {
+    if (!citationDrawer || !citationDrawerBackdrop || !citation) return;
+    const citIdEl = document.getElementById("drawer-cit-id");
+    const companyEl = document.getElementById("drawer-cit-company");
+    const metaEl = document.getElementById("drawer-cit-meta");
+    const itemEl = document.getElementById("drawer-cit-item");
+    const accRow = document.getElementById("drawer-accession-row");
+    const accEl = document.getElementById("drawer-cit-accession");
+    const excerptEl = document.getElementById("drawer-cit-excerpt");
+    const refEl = document.getElementById("drawer-cit-ref");
+    const linkEl = document.getElementById("citation-drawer-link");
+
+    const citNum = citation.citation_id || 1;
+    const display = formatCitationDisplay(citation);
+    const metaStr = [display.form, display.periodLabel].filter(Boolean).join(" · ");
+
+    if (citIdEl) citIdEl.textContent = `[${citNum}]`;
+    if (companyEl) companyEl.textContent = display.company;
+    if (metaEl) metaEl.textContent = metaStr || "Official Source";
+    if (itemEl) itemEl.textContent = citation.item_or_metric || "Tài liệu đối soát";
+
+    if (accRow && accEl) {
+      if (citation.accession_number) {
+        accRow.style.display = "flex";
+        accEl.textContent = citation.accession_number;
+      } else {
+        accRow.style.display = "none";
+      }
+    }
+
+    if (excerptEl) {
+      excerptEl.textContent =
+        citation.excerpt ||
+        citation.text ||
+        citation.snippet ||
+        citation.formatted_reference ||
+        "Trích dẫn đã được kiểm chứng từ hệ thống.";
+    }
+    if (refEl) {
+      refEl.textContent = citation.formatted_reference || citation.source_url || "";
+    }
+    if (linkEl) {
+      linkEl.href = sanitizeUrl(display.url);
+    }
+
+    citationDrawerBackdrop.style.display = "block";
+    citationDrawer.classList.add("open");
+    citationDrawer.setAttribute("aria-hidden", "false");
+  }
+
+  function closeCitationDrawer() {
+    if (!citationDrawer || !citationDrawerBackdrop) return;
+    citationDrawer.classList.remove("open");
+    citationDrawer.setAttribute("aria-hidden", "true");
+    citationDrawerBackdrop.style.display = "none";
+  }
+
+  if (citationDrawerClose) citationDrawerClose.addEventListener("click", closeCitationDrawer);
+  if (citationDrawerBackdrop) citationDrawerBackdrop.addEventListener("click", closeCitationDrawer);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && citationDrawer && citationDrawer.classList.contains("open")) {
+      closeCitationDrawer();
+    }
+  });
+
   /* ========================================================================= */
   /* Watchlist & Action Chips Prompt Binding                                   */
   /* ========================================================================= */
@@ -563,8 +764,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("action-chip")) {
-      const promptQuery = e.target.getAttribute("data-query");
+    const chip = e.target.closest(".action-chip");
+    if (chip) {
+      const promptQuery = chip.getAttribute("data-query");
       if (promptQuery) {
         submitQuery(promptQuery);
       }
@@ -623,12 +825,23 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="welcome-sparkle">✦</span>
           <span>AI Financial Terminal</span>
         </div>
+        <p class="welcome-subtitle">Tra cứu số liệu BCTC chuẩn hóa, phân tích thuyết minh 10-K/10-Q và đối soát trích dẫn gốc.</p>
+        <div class="quick-suggestions-row">
+          <button type="button" class="action-chip" data-query="So sánh doanh thu AAPL, MSFT và NVDA 3 năm gần nhất">So sánh AAPL, MSFT &amp; NVDA</button>
+          <button type="button" class="action-chip" data-query="Phân tích rủi ro chuỗi cung ứng của Apple trong báo cáo 10-K">Rủi ro chuỗi cung ứng Apple</button>
+          <button type="button" class="action-chip" data-query="So sánh doanh thu và biên lợi nhuận FPT và Vinamilk">FPT vs Vinamilk</button>
+          <button type="button" class="action-chip" data-query="Biên lợi nhuận hoạt động của Microsoft từ FY2022 đến FY2025">Biên hoạt động Microsoft</button>
+          <button type="button" class="action-chip" data-query="Tin tức tài chính mới nhất về NVIDIA hôm nay">Tin tức NVIDIA hôm nay</button>
+        </div>
       </div>
     `;
   }
 
   function startNewSession() {
     currentSessionId = generateUUID();
+    window.sessionCharts = [];
+    turnCitationStore.length = 0;
+    closeCitationDrawer();
     localStorage.removeItem("current_active_session_id");
     localStorage.setItem("current_session_id", currentSessionId);
     renderWelcomeHero();
@@ -768,11 +981,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const group = document.createElement("div");
     group.className = "message-group assistant-turn";
 
+    const turnIdx = turnCitationStore.length;
+    turnCitationStore.push(data.citations || []);
+
     const citationMap = {};
     if (data.citations && data.citations.length > 0) {
       data.citations.forEach((c) => {
-        if (c.citation_id && c.source_url) {
-          citationMap[c.citation_id] = c.source_url;
+        if (c.citation_id) {
+          citationMap[c.citation_id] = c;
         }
       });
     }
@@ -781,6 +997,9 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/^\*\*Abstention Notice\*\*:\s*/i, "")
       .replace(/```(?:mermaid)?\s*xychart-beta[\s\S]*?```/gi, "")
       .replace(/\n+(?:#{1,3}\s+)?(?:Financial Visualizations|Visualizations|Biểu đồ|Sources & References)[\s\S]*$/gi, "")
+      .replace(/^\s*(?:---+|\*\*\*+|___+)\s*$/gm, "")
+      .replace(/^(#{1,4}\s+)\[([^\]]+)\]\s*$/gm, "$1$2")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
 
     if (!cleanAnswer && data.abstention && data.abstention.explanation) {
@@ -790,65 +1009,97 @@ document.addEventListener("DOMContentLoaded", () => {
     // Escape tildes so marked doesn't misinterpret Vietnamese financial approximations (~383 tỷ) as strikethrough <del>
     cleanAnswer = cleanAnswer.replace(/~/g, "\\~");
 
-    let formattedAnswer = marked.parse(cleanAnswer);
+    const rawHtml = marked.parse(cleanAnswer);
+    let formattedAnswer = (typeof DOMPurify !== "undefined")
+      ? DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true } })
+      : rawHtml;
 
-    // Wrap all <table> elements in <div class="table-scroll-wrapper"> to guarantee responsive horizontal scrolling
+    // Wrap all <table> elements with an exportable card container (CSV / JSON)
     formattedAnswer = formattedAnswer.replace(/<table>([\s\S]*?)<\/table>/gi, (match) => {
-      return `<div class="table-scroll-wrapper">${match}</div>`;
+      return `
+        <div class="table-card-container">
+          <div class="table-export-toolbar">
+            <span class="table-toolbar-label">Bảng số liệu</span>
+            <div class="table-export-actions">
+              <button type="button" class="btn-mini-export btn-table-export" data-format="csv" title="Xuất bảng ra CSV">CSV</button>
+              <button type="button" class="btn-mini-export btn-table-export" data-format="json" title="Xuất bảng ra JSON">JSON</button>
+            </div>
+          </div>
+          <div class="table-scroll-wrapper">${match}</div>
+        </div>
+      `;
     });
 
-    // Replace [1], [2] with seamless citation pills
+    // Replace [1], [2] with interactive citation pills that open the Citation Preview Drawer
     formattedAnswer = formattedAnswer.replace(/\[(\d+)\]/g, (match, p1) => {
-      const url = citationMap[p1];
-      if (url) {
-        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="citation-tag">[${p1}]</a>`;
+      const cit = citationMap[p1];
+      if (cit) {
+        return `<button type="button" class="citation-tag" data-turn-idx="${turnIdx}" data-cit-id="${p1}" title="Xem trước trích dẫn [${p1}]">[${p1}]</button>`;
       }
       return `<span class="citation-tag">[${p1}]</span>`;
     });
 
-    // Activity Steps in Vietnamese
+    // Agent Thought / Execution Trace Accordion
     let activityStepsHtml = "";
     if (data.activity_timeline && data.activity_timeline.length > 0) {
-      activityStepsHtml = data.activity_timeline.map(step => `
-        <div class="activity-step-row ${step.status}">
-          <span class="step-check-badge">${step.status === 'completed' ? '✔' : '○'}</span>
-          <span class="step-label">${escapeHtml(translateStepName(step.step))}</span>
-        </div>
-      `).join("");
+      activityStepsHtml = data.activity_timeline.map(step => {
+        const icon = step.status === "completed" ? "✔" : (step.status === "failed" ? "✕" : "○");
+        const descHtml = step.description ? `<span class="step-desc">${escapeHtml(step.description)}</span>` : "";
+        const durHtml = (step.duration_ms !== null && step.duration_ms !== undefined && step.duration_ms > 0)
+          ? `<span class="step-duration">${Math.round(step.duration_ms)} ms</span>`
+          : "";
+        return `
+          <div class="activity-step-row ${escapeHtml(step.status || 'completed')}">
+            <span class="step-check-badge">${icon}</span>
+            <div class="step-main-info">
+              <span class="step-label">${escapeHtml(translateStepName(step.step))}</span>
+              ${descHtml}
+            </div>
+            ${durHtml}
+          </div>
+        `;
+      }).join("");
     } else {
       activityStepsHtml = `
-        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><span class="step-label">Bước 1: Phân loại ý định</span></div>
-        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><span class="step-label">Bước 2: Truy vấn DuckDB SQL</span></div>
-        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><span class="step-label">Bước 3: Tìm kiếm ngữ nghĩa Hybrid RAG</span></div>
-        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><span class="step-label">Bước 4: Đối soát & Kiểm chứng</span></div>
+        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><div class="step-main-info"><span class="step-label">Hiểu câu hỏi &amp; Lập kế hoạch</span></div></div>
+        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><div class="step-main-info"><span class="step-label">Truy vấn DuckDB Lakehouse</span></div></div>
+        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><div class="step-main-info"><span class="step-label">Tìm kiếm tài liệu SEC EDGAR</span></div></div>
+        <div class="activity-step-row completed"><span class="step-check-badge">✔</span><div class="step-main-info"><span class="step-label">Xác thực bằng chứng</span></div></div>
       `;
     }
 
-    // Interactive In-Chat Chart Preview Card
+    const intentBadge = data.intent ? `<span class="activity-intent-badge">${escapeHtml(translateIntentName(data.intent))}</span>` : "";
+    const latencyBadge = (data.execution_time_ms && data.execution_time_ms > 0)
+      ? `<span class="activity-latency-badge">${(data.execution_time_ms / 1000).toFixed(2)}s</span>`
+      : "";
+
+    // Interactive In-Chat Chart Preview Cards (supports multiple charts per response)
     let chartPreviewHtml = "";
     if (data.charts && data.charts.length > 0) {
       if (!window.sessionCharts) window.sessionCharts = [];
-      const chartIdx = window.sessionCharts.length;
-      window.sessionCharts.push(data.charts[0]);
-      const chartTitle = data.charts[0].title || "Biểu đồ phân tích tài chính";
-      chartPreviewHtml = `
-        <div class="chart-preview-card" data-chart-idx="${chartIdx}">
-          <div class="chart-preview-title">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="3" y1="9" x2="21" y2="9"></line>
-              <line x1="9" y1="21" x2="9" y2="9"></line>
-            </svg>
-            <span>${escapeHtml(chartTitle)}</span>
+      chartPreviewHtml = data.charts.map((chartSpec) => {
+        const chartIdx = window.sessionCharts.length;
+        window.sessionCharts.push(chartSpec);
+        const chartTitle = chartSpec.title || "Biểu đồ phân tích tài chính";
+        return `
+          <div class="chart-preview-card" data-chart-idx="${chartIdx}">
+            <div class="chart-preview-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+              <span>${escapeHtml(chartTitle)}</span>
+            </div>
+            <button type="button" class="btn-view-canvas">
+              <span>Xem biểu đồ</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
           </div>
-          <button type="button" class="btn-view-canvas">
-            <span>Xem biểu đồ</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
-        </div>
-      `;
+        `;
+      }).join("");
     }
 
     // Collapsible Sources & References Card
@@ -856,22 +1107,26 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.citations && data.citations.length > 0) {
       const citationItems = data.citations.map((c, idx) => {
         const citNum = c.citation_id || (idx + 1);
-        const ticker = c.ticker || "";
-        const form = c.form || "10-K";
-        const excerpt = c.text || c.snippet || "Trích dẫn hồ sơ SEC EDGAR hợp lệ.";
-        const url = c.source_url || `https://www.sec.gov/edgar/browse/?CIK=${c.cik || ''}`;
+        const display = formatCitationDisplay(c);
+        const excerpt = c.excerpt || c.text || c.snippet || c.formatted_reference || "Trích dẫn tài liệu kiểm chứng.";
         return `
           <div class="source-item-card">
             <div class="source-item-header">
               <span class="citation-badge">[${citNum}]</span>
-              <span class="source-company">${escapeHtml(c.company_name || ticker || "SEC EDGAR")}</span>
-              <span class="source-badge">${escapeHtml(form)}</span>
+              <span class="source-company">${escapeHtml(display.company)}</span>
+              <span class="source-badge">${escapeHtml(display.form)}</span>
+              ${display.periodLabel ? `<span class="source-badge">${escapeHtml(display.periodLabel)}</span>` : ""}
             </div>
             <div class="source-excerpt">${escapeHtml(excerpt.length > 220 ? excerpt.substring(0, 220) + "..." : excerpt)}</div>
-            <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="source-link">
-              <span>Xem hồ sơ gốc trên SEC EDGAR</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-            </a>
+            <div class="source-item-actions">
+              <button type="button" class="btn-preview-citation" data-turn-idx="${turnIdx}" data-cit-id="${citNum}">
+                Xem trước trích dẫn
+              </button>
+              <a href="${escapeHtml(sanitizeUrl(display.url))}" target="_blank" rel="noopener noreferrer" class="source-link">
+                <span>Mở nguồn gốc</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              </a>
+            </div>
           </div>
         `;
       }).join("");
@@ -886,7 +1141,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <line x1="16" y1="13" x2="8" y2="13"></line>
                 <line x1="16" y1="17" x2="8" y2="17"></line>
               </svg>
-              <span class="sources-title">Nguồn & Trích dẫn hồ sơ SEC EDGAR (${data.citations.length} nguồn)</span>
+              <span class="sources-title">Nguồn &amp; Trích dẫn kiểm chứng: ${data.citations.length} nguồn</span>
             </div>
             <span class="sources-chevron-icon" aria-label="Thu phóng nguồn">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -915,7 +1170,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="activity-card-header">
             <div class="activity-header-left">
               <span class="activity-spark-icon">✦</span>
-              <span class="activity-title">Tiến trình Agent</span>
+              <span class="activity-title">Tiến trình suy luận Agent</span>
+              ${intentBadge}
+              ${latencyBadge}
             </div>
             <span class="activity-chevron-icon" aria-label="Thu gọn / Mở rộng">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -941,6 +1198,17 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesContainer.appendChild(group);
   }
 
+  function translateIntentName(intent) {
+    const map = {
+      "FINANCIAL_METRIC": "Số liệu BCTC",
+      "TEXTUAL_RESEARCH": "Phân tích hồ sơ",
+      "MIXED_RESEARCH": "Nghiên cứu tổng hợp",
+      "DEEP_RESEARCH_REPORT": "Báo cáo chuyên sâu",
+      "OUT_OF_SCOPE": "Ngoài phạm vi",
+    };
+    return map[intent] || intent;
+  }
+
   function translateStepName(stepName) {
     if (!stepName) return "";
     const map = {
@@ -952,6 +1220,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "Resolving metrics": "Xác định chỉ tiêu tài chính",
       "Querying DuckDB": "Truy vấn DuckDB Lakehouse",
       "Searching SEC filings": "Tìm kiếm tài liệu SEC EDGAR",
+      "Searching live web": "Tìm kiếm Web thời sự",
       "Validating evidence": "Xác thực bằng chứng",
       "Preparing visualization": "Khởi tạo biểu đồ trực quan",
     };
@@ -1017,8 +1286,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (context.dataset.yAxisID === "y1" || isChartPercent) {
           return `${context.dataset.label}: ${val}%`;
         }
-        const unitSuffix = (chartSpec.unit && chartSpec.unit.includes("Billion")) ? "B" : "M";
-        return `${context.dataset.label}: $${val.toLocaleString()}${unitSuffix}`;
+        const unitStr = chartSpec.unit || "USD";
+        const unitSuffix = unitStr.includes("Billion") ? "B" : "";
+        const currencyPrefix = unitStr.startsWith("USD") ? "$" : "";
+        const currencyTail = unitStr.startsWith("USD") ? "" : ` ${unitStr.replace(/\s*\(Billions\)/i, "")}`;
+        return `${context.dataset.label}: ${currencyPrefix}${val.toLocaleString()}${unitSuffix}${currencyTail}`;
       };
     }
 
@@ -1240,21 +1512,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (sessionData.messages && sessionData.messages.length > 0) {
         messagesContainer.innerHTML = "";
+        window.sessionCharts = [];
+        turnCitationStore.length = 0;
 
         let hasAnyChart = false;
         sessionData.messages.forEach(msg => {
           if (msg.role === "user") {
             appendUserTurn(msg.content);
           } else {
+            const meta = msg.metadata || {};
+            const charts = msg.charts || meta.charts || [];
             renderAssistantTurn({
               answer: msg.content,
-              citations: msg.citations || [],
-              charts: msg.charts || [],
-              activity_timeline: msg.activity_timeline || []
+              citations: msg.citations || meta.citations || [],
+              charts: charts,
+              activity_timeline: msg.activity_timeline || meta.activity_timeline || [],
+              intent: msg.intent || meta.intent || null,
+              execution_time_ms: msg.execution_time_ms ?? meta.execution_time_ms ?? null,
             });
-            if (msg.charts && msg.charts.length > 0) {
+            if (charts.length > 0) {
               hasAnyChart = true;
-              updateCanvasWithAgentChart(msg.charts[0]);
+              updateCanvasWithAgentChart(charts[0]);
             }
           }
         });
@@ -1736,6 +2014,13 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function sanitizeUrl(url) {
+    if (!url || typeof url !== "string") return "#";
+    const trimmed = url.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return "#";
   }
 
   function generateUUID() {

@@ -4,19 +4,20 @@ Extracts data from SEC EDGAR API for target companies defined in configs/compani
 hashes the payload with SHA-256 for data provenance, and stores it in MinIO `sec-bronze`.
 """
 
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List
-from dotenv import load_dotenv
+from typing import Any
+
 import yaml
+from dotenv import load_dotenv
 
 from src.data.ingestion.rate_limiter import RateLimiter
-from src.data.storage.s3_storage import S3Storage
 from src.data.ingestion.sec_client import SECClient
+from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class FactsIngestionPipeline:
 
         # Compute audit provenance
         sha256_hash = self._compute_sha256(payload_bytes)
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
 
         # Idempotency check: if not forced and object exists, verify if content actually changed
         if not force and self.s3_storage.object_exists(self.bronze_bucket, s3_raw_key):
@@ -79,9 +80,11 @@ class FactsIngestionPipeline:
                     )
                     return False
             except Exception as exc:
-                logger.warning("Could not read metadata for s3://%s/%s: %s. Overwriting.", self.bronze_bucket, s3_raw_key, exc)
+                logger.warning(
+                    "Could not read metadata for s3://%s/%s: %s. Overwriting.", self.bronze_bucket, s3_raw_key, exc
+                )
 
-        metadata_dict: Dict[str, Any] = {
+        metadata_dict: dict[str, Any] = {
             "ticker": ticker,
             "cik": cik_10,
             "source_url": url,
@@ -116,7 +119,7 @@ class FactsIngestionPipeline:
         logger.info("Successfully ingested s3://%s/%s (SHA256: %s)", self.bronze_bucket, s3_raw_key, sha256_hash[:8])
         return True
 
-    def ingest_company(self, ticker: str, cik: str, force: bool = False) -> Dict[str, bool]:
+    def ingest_company(self, ticker: str, cik: str, force: bool = False) -> dict[str, bool]:
         """Fetch and store submissions and XBRL facts for a given company."""
         cik_10 = str(cik).strip().zfill(10)
         ticker_clean = ticker.strip().upper()
@@ -157,10 +160,10 @@ class FactsIngestionPipeline:
         if not config_file.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
 
-        companies: List[Dict[str, Any]] = cfg.get("companies", [])
+        companies: list[dict[str, Any]] = cfg.get("companies", [])
         if not companies:
             logger.warning("No companies configured in %s", config_path)
             return

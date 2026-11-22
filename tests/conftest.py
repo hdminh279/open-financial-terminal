@@ -6,7 +6,6 @@ runs connect strictly to the MinIO Lakehouse.
 """
 
 import os
-import pytest
 
 # Force test fixtures for pytest runs
 os.environ["USE_TEST_FIXTURES"] = "true"

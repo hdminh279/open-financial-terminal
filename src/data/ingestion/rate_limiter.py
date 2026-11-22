@@ -1,12 +1,14 @@
 import threading
 import time
 
+
 class RateLimiter:
     """Thread-safe Token Bucket rate limiter to respect SEC request limits (default <= 10  req/s)"""
+
     def __init__(self, requests_per_second: float = 10.0):
         if requests_per_second <= 0:
             raise ValueError("requests_per_second must be strictly positive")
-        
+
         self.rate = float(requests_per_second)
         self.capacity = float(requests_per_second)
         self.tokens = float(requests_per_second)

@@ -1,6 +1,7 @@
 """Unit tests for FilingsIngestionPipeline."""
 
 from unittest.mock import MagicMock
+
 import pytest
 
 from src.data.ingestion.fetch_filings import FilingsIngestionPipeline

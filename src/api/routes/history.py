@@ -20,7 +20,7 @@ router = APIRouter(prefix="/history", tags=["Chat History"])
     summary="List saved chat sessions",
     description="Returns chronological summary list of all active and archived research sessions.",
 )
-async def list_chat_sessions(
+def list_chat_sessions(
     history: ChatHistoryManager = Depends(get_chat_history),
 ) -> ChatSessionListResponse:
     """Return all conversation sessions."""
@@ -35,12 +35,18 @@ async def list_chat_sessions(
     summary="Get conversation session detail",
     description="Retrieves full conversation history with message payloads, telemetry, and citations.",
 )
-async def get_chat_session(
+def get_chat_session(
     session_id: str,
     history: ChatHistoryManager = Depends(get_chat_history),
 ) -> ChatSession:
     """Return specific session or 404 if not found."""
-    session = history.get_session(session_id)
+    try:
+        session = history.get_session(session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -55,12 +61,18 @@ async def get_chat_session(
     summary="Delete conversation session",
     description="Removes session from memory and deletes backing JSON object from MinIO S3 bucket sec-silver.",
 )
-async def delete_chat_session(
+def delete_chat_session(
     session_id: str,
     history: ChatHistoryManager = Depends(get_chat_history),
 ) -> dict:
     """Remove conversation session."""
-    deleted = history.delete_session(session_id)
+    try:
+        deleted = history.delete_session(session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

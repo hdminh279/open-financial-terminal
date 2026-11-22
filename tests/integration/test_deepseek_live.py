@@ -9,8 +9,8 @@ Validates:
 
 import os
 
-from dotenv import load_dotenv
 import pytest
+from dotenv import load_dotenv
 
 from src.ai.llm.contracts import ChatMessage
 from src.ai.llm.factory import LLMFactory
@@ -91,7 +91,4 @@ def test_live_reasoner_generate() -> None:
     assert "30%" in response.content or "0.3" in response.content
     assert response.latency_ms > 0
     assert response.usage is not None
-    assert (
-        response.usage.reasoning_tokens is not None
-        or response.usage.completion_tokens > 0
-    )
+    assert response.usage.reasoning_tokens is not None or response.usage.completion_tokens > 0

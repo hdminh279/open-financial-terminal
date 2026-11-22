@@ -9,9 +9,12 @@ reproducible data lakehouse audit trails.
 import json
 import logging
 import os
+import re
+import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from collections import OrderedDict
+from datetime import UTC, datetime
+from typing import Any
 
 from src.api.contracts import (
     ChatMessage,
@@ -22,27 +25,50 @@ from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def validate_session_id(session_id: str) -> str:
+    """Ensure session_id is safe for S3 object keys and free of path traversal."""
+    if not session_id or not SESSION_ID_RE.match(session_id):
+        raise ValueError("Invalid session_id: must be 1-64 alphanumeric, hyphen, or underscore characters.")
+    return session_id
+
 
 class ChatHistoryManager:
-    """Manages chat sessions with local memory caching and MinIO S3 synchronization."""
+    """Manages chat sessions with bounded local memory caching and MinIO S3 synchronization."""
 
     BUCKET_NAME = "sec-silver"
     KEY_PREFIX = "chat_history"
+    MAX_CACHED_SESSIONS = 500
 
-    def __init__(self, s3_storage: Optional[S3Storage] = None) -> None:
+    def __init__(self, s3_storage: S3Storage | None = None, max_sessions: int = MAX_CACHED_SESSIONS) -> None:
         """Initialize chat history manager with optional injected S3Storage adapter.
 
         Args:
             s3_storage: Optional S3Storage instance. If None, instantiates default.
+            max_sessions: Maximum number of sessions kept in local memory cache.
         """
-        self._sessions: Dict[str, ChatSession] = {}
-        self._s3: Optional[S3Storage] = s3_storage
-        self._s3_enabled: bool = os.getenv("ENABLE_S3_CHAT_HISTORY", "true").lower() == "true"
+        self._sessions: OrderedDict[str, ChatSession] = OrderedDict()
+        self._max_sessions = max(1, int(max_sessions))
+        self._lock = threading.RLock()
+        self._s3: S3Storage | None = s3_storage
+        self._s3_enabled: bool = (
+            True if s3_storage is not None else os.getenv("ENABLE_S3_CHAT_HISTORY", "true").lower() == "true"
+        )
 
         if self._s3 is None and self._s3_enabled:
             self._init_s3()
 
-    def _init_s3(self) -> Optional[S3Storage]:
+    def _put_cached_session(self, session_id: str, session: ChatSession) -> None:
+        """Store session in bounded LRU OrderedDict under lock."""
+        with self._lock:
+            self._sessions[session_id] = session
+            self._sessions.move_to_end(session_id)
+            while len(self._sessions) > self._max_sessions:
+                self._sessions.popitem(last=False)
+
+    def _init_s3(self) -> S3Storage | None:
         """Lazy-initialize or retrieve the S3Storage adapter."""
         if self._s3 is not None:
             return self._s3
@@ -56,7 +82,7 @@ class ChatHistoryManager:
             self._s3 = None
             return None
 
-    def get_or_create_session(self, session_id: Optional[str] = None) -> ChatSession:
+    def get_or_create_session(self, session_id: str | None = None) -> ChatSession:
         """Retrieve an existing session or initialize a new one.
 
         Args:
@@ -65,20 +91,25 @@ class ChatHistoryManager:
         Returns:
             Active ChatSession instance.
         """
-        if session_id and session_id in self._sessions:
-            return self._sessions[session_id]
+        if session_id is not None:
+            validate_session_id(session_id)
+
+        with self._lock:
+            if session_id and session_id in self._sessions:
+                self._sessions.move_to_end(session_id)
+                return self._sessions[session_id]
 
         # Try loading from S3 if session_id is provided but not in memory
         s3 = self._init_s3()
         if session_id and s3 is not None:
             persisted = self._load_from_s3(session_id)
             if persisted:
-                self._sessions[session_id] = persisted
+                self._put_cached_session(session_id, persisted)
                 return persisted
 
         # Create brand-new session (lazy persistence: only saved to S3 when first message is added)
         new_id = session_id or str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         session = ChatSession(
             session_id=new_id,
             title="New Research Session",
@@ -86,7 +117,7 @@ class ChatHistoryManager:
             updated_at=now,
             messages=[],
         )
-        self._sessions[new_id] = session
+        self._put_cached_session(new_id, session)
         return session
 
     def add_user_message(self, session_id: str, content: str) -> ChatMessage:
@@ -101,7 +132,7 @@ class ChatHistoryManager:
         """
         session = self.get_or_create_session(session_id)
         msg_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Update title from first user query if still default
         if session.title == "New Research Session" and content.strip():
@@ -124,7 +155,7 @@ class ChatHistoryManager:
         self,
         session_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ChatMessage:
         """Append an assistant response to the session.
 
@@ -138,7 +169,7 @@ class ChatHistoryManager:
         """
         session = self.get_or_create_session(session_id)
         msg_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         msg = ChatMessage(
             message_id=msg_id,
@@ -152,21 +183,24 @@ class ChatHistoryManager:
         self._persist_to_s3(session)
         return msg
 
-    def get_session(self, session_id: str) -> Optional[ChatSession]:
+    def get_session(self, session_id: str) -> ChatSession | None:
         """Fetch session by ID with lazy loading from S3."""
-        if session_id in self._sessions:
-            return self._sessions[session_id]
+        validate_session_id(session_id)
+        with self._lock:
+            if session_id in self._sessions:
+                self._sessions.move_to_end(session_id)
+                return self._sessions[session_id]
 
         s3 = self._init_s3()
         if s3 is not None:
             persisted = self._load_from_s3(session_id)
             if persisted:
-                self._sessions[session_id] = persisted
+                self._put_cached_session(session_id, persisted)
                 return persisted
 
         return None
 
-    def list_sessions(self) -> List[ChatSessionSummary]:
+    def list_sessions(self) -> list[ChatSessionSummary]:
         """Return summaries of all available sessions ordered by recency.
 
         Reconciles memory cache with authoritative MinIO S3 Lakehouse state,
@@ -194,7 +228,7 @@ class ChatHistoryManager:
             except Exception as exc:
                 logger.warning("Failed to sync chat sessions from MinIO S3: %s", exc)
 
-        summaries: List[ChatSessionSummary] = []
+        summaries: list[ChatSessionSummary] = []
         for session in list(self._sessions.values()):
             # Prune empty sessions from both storage and summaries
             if len(session.messages) == 0:
@@ -218,10 +252,12 @@ class ChatHistoryManager:
 
     def delete_session(self, session_id: str) -> bool:
         """Remove a session from memory and MinIO storage."""
+        validate_session_id(session_id)
         existed = False
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            existed = True
+        with self._lock:
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                existed = True
 
         s3 = self._init_s3()
         if s3 is not None:
@@ -268,7 +304,7 @@ class ChatHistoryManager:
         except Exception as exc:
             logger.warning("Could not persist chat session %s to MinIO S3: %s", session.session_id, exc)
 
-    def _load_from_s3(self, session_id: str) -> Optional[ChatSession]:
+    def _load_from_s3(self, session_id: str) -> ChatSession | None:
         """Download and deserialize session JSON from MinIO S3 bucket sec-silver."""
         s3 = self._init_s3()
         if s3 is None:

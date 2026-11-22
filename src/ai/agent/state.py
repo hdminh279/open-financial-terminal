@@ -5,14 +5,15 @@ for accumulating tool execution logs, evidence records, charts, and report secti
 """
 
 import operator
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any
+
 from typing_extensions import TypedDict
 
 
 def timeline_reducer(
-    existing: Optional[List[Dict[str, Any]]],
-    incoming: Optional[List[Dict[str, Any]]],
-) -> List[Dict[str, Any]]:
+    existing: list[dict[str, Any]] | None,
+    incoming: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
     """Thread-safe event accumulator for LangGraph parallel fan-out/fan-in branches.
 
     Safely combines timeline events from concurrent nodes (e.g., sql_node and rag_node)
@@ -30,36 +31,36 @@ class AgentState(TypedDict, total=False):
     # 1. Inputs & Intent Planning
     query: str
     intent: str
-    conversation_history: Optional[List[Dict[str, Any]]]
-    routing_decision: Optional[Dict[str, Any]]
-    query_plan: Optional[Dict[str, Any]]
-    sql_params: Optional[Dict[str, Any]]
-    rag_params: Optional[Dict[str, Any]]
-    web_params: Optional[Dict[str, Any]]
+    conversation_history: list[dict[str, Any]] | None
+    routing_decision: dict[str, Any] | None
+    query_plan: dict[str, Any] | None
+    sql_params: dict[str, Any] | None
+    rag_params: dict[str, Any] | None
+    web_params: dict[str, Any] | None
     execution_strategy: str
 
     # 2. Tool Data Stores
-    sql_data: Optional[Dict[str, Any]]
-    rag_data: Optional[Dict[str, Any]]
-    web_data: Optional[Dict[str, Any]]
-    
+    sql_data: dict[str, Any] | None
+    rag_data: dict[str, Any] | None
+    web_data: dict[str, Any] | None
+
     # 3. Accumulated Logs & Evidences (Reducers for parallel Fan-Out/Fan-In)
-    tool_results: Annotated[List[Dict[str, Any]], operator.add]
-    evidence_items: Annotated[List[Dict[str, Any]], operator.add]
-    activity_timeline: Annotated[List[Dict[str, Any]], timeline_reducer]
+    tool_results: Annotated[list[dict[str, Any]], operator.add]
+    evidence_items: Annotated[list[dict[str, Any]], operator.add]
+    activity_timeline: Annotated[list[dict[str, Any]], timeline_reducer]
 
     # 4. Abstention & Quality Gate Telemetry
-    abstention_info: Optional[Dict[str, Any]]
+    abstention_info: dict[str, Any] | None
     is_abstaining: bool
     is_partial: bool
 
     # 5. Synthesis & Visual Artifacts
-    draft_answer: Optional[str]
+    draft_answer: str | None
     final_answer: str
-    citations: List[Dict[str, Any]]
-    charts: List[Dict[str, Any]]
-    report_sections: List[Dict[str, Any]]
+    citations: list[dict[str, Any]]
+    charts: list[dict[str, Any]]
+    report_sections: list[dict[str, Any]]
 
     # 6. Pipeline Execution Metrics
     execution_time_ms: float
-    error: Optional[str]
+    error: str | None

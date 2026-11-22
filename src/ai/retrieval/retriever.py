@@ -6,12 +6,12 @@ FlashRank Cross-Encoder Reranker.
 """
 
 import logging
-import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+from fastembed import SparseTextEmbedding
 from pydantic import BaseModel, Field
 from qdrant_client.http import models
-from fastembed import SparseTextEmbedding
 
 from src.ai.embeddings.base import EmbeddingStrategy
 from src.ai.embeddings.factory import EmbeddingFactory
@@ -22,15 +22,18 @@ logger = logging.getLogger(__name__)
 
 class RetrievalFilter(BaseModel):
     """Normalized metadata filter contract applied across all retrieval streams."""
-    ticker: Optional[str] = None
-    form: Optional[str] = None
-    fiscal_year: Optional[int] = None
-    item: Optional[str] = None
-    accession_number: Optional[str] = None
+
+    ticker: str | None = None
+    form: str | None = None
+    fiscal_year: int | None = None
+    min_fiscal_year: int | None = None
+    item: str | None = None
+    accession_number: str | None = None
 
 
 class RetrievedChunk(BaseModel):
     """Standardized retrieval output unit with full provenance citations."""
+
     chunk_id: str
     score: float
     rank: int
@@ -41,8 +44,8 @@ class RetrievedChunk(BaseModel):
     filed_date: str
     period_end: str
     item: str
-    part: Optional[str] = None
-    subsection: Optional[str] = None
+    part: str | None = None
+    subsection: str | None = None
     content_type: str
     text: str
     source_url: str
@@ -51,11 +54,12 @@ class RetrievedChunk(BaseModel):
 
 class RetrievalResponse(BaseModel):
     """Container holding query results and execution metadata."""
+
     query: str
     mode: str
     total_found: int
     latency_ms: float
-    chunks: List[RetrievedChunk] = Field(default_factory=list)
+    chunks: list[RetrievedChunk] = Field(default_factory=list)
 
 
 class HybridRetriever:
@@ -63,10 +67,10 @@ class HybridRetriever:
 
     def __init__(
         self,
-        qdrant_storage: Optional[QdrantStorage] = None,
-        dense_engine: Optional[EmbeddingStrategy] = None,
-        sparse_engine: Optional[SparseTextEmbedding] = None,
-        reranker: Optional[Any] = None,
+        qdrant_storage: QdrantStorage | None = None,
+        dense_engine: EmbeddingStrategy | None = None,
+        sparse_engine: SparseTextEmbedding | None = None,
+        reranker: Any | None = None,
     ) -> None:
         """Initialize retriever with storage, embedding engines, and optional reranker."""
         self.qdrant = qdrant_storage or QdrantStorage()
@@ -79,10 +83,11 @@ class HybridRetriever:
         """Lazy initialization of FlashRank Cross-Encoder on CPU."""
         if self._reranker is None:
             from src.ai.retrieval.reranker import FlashRankReranker
+
             self._reranker = FlashRankReranker()
         return self._reranker
 
-    def _build_qdrant_filter(self, filter_params: Optional[RetrievalFilter]) -> Optional[models.Filter]:
+    def _build_qdrant_filter(self, filter_params: RetrievalFilter | None) -> models.Filter | None:
         """Convert RetrievalFilter to Qdrant models.Filter."""
         if not filter_params:
             return None
@@ -93,21 +98,23 @@ class HybridRetriever:
                 models.FieldCondition(key="ticker", match=models.MatchValue(value=filter_params.ticker))
             )
         if filter_params.form:
-            must_conditions.append(
-                models.FieldCondition(key="form", match=models.MatchValue(value=filter_params.form))
-            )
+            must_conditions.append(models.FieldCondition(key="form", match=models.MatchValue(value=filter_params.form)))
         if filter_params.fiscal_year:
             must_conditions.append(
                 models.FieldCondition(key="fiscal_year", match=models.MatchValue(value=filter_params.fiscal_year))
             )
+        if filter_params.min_fiscal_year is not None:
+            must_conditions.append(
+                models.FieldCondition(key="fiscal_year", range=models.Range(gte=filter_params.min_fiscal_year))
+            )
         if filter_params.item:
             normalized_item = filter_params.item.upper() if isinstance(filter_params.item, str) else filter_params.item
-            must_conditions.append(
-                models.FieldCondition(key="item", match=models.MatchValue(value=normalized_item))
-            )
+            must_conditions.append(models.FieldCondition(key="item", match=models.MatchValue(value=normalized_item)))
         if filter_params.accession_number:
             must_conditions.append(
-                models.FieldCondition(key="accession_number", match=models.MatchValue(value=filter_params.accession_number))
+                models.FieldCondition(
+                    key="accession_number", match=models.MatchValue(value=filter_params.accession_number)
+                )
             )
 
         return models.Filter(must=must_conditions) if must_conditions else None
@@ -137,7 +144,7 @@ class HybridRetriever:
     def retrieve_dense(
         self,
         query: str,
-        filter_params: Optional[RetrievalFilter] = None,
+        filter_params: RetrievalFilter | None = None,
         limit: int = 10,
     ) -> RetrievalResponse:
         """Execute semantic dense vector search."""
@@ -166,7 +173,7 @@ class HybridRetriever:
     def retrieve_bm25(
         self,
         query: str,
-        filter_params: Optional[RetrievalFilter] = None,
+        filter_params: RetrievalFilter | None = None,
         limit: int = 10,
     ) -> RetrievalResponse:
         """Execute lexical sparse BM25 search."""
@@ -199,7 +206,7 @@ class HybridRetriever:
     def retrieve_hybrid(
         self,
         query: str,
-        filter_params: Optional[RetrievalFilter] = None,
+        filter_params: RetrievalFilter | None = None,
         limit: int = 10,
         prefetch_limit: int = 25,
     ) -> RetrievalResponse:
@@ -246,7 +253,7 @@ class HybridRetriever:
     def retrieve_hybrid_rerank(
         self,
         query: str,
-        filter_params: Optional[RetrievalFilter] = None,
+        filter_params: RetrievalFilter | None = None,
         limit: int = 5,
         candidate_limit: int = 20,
     ) -> RetrievalResponse:
@@ -278,8 +285,8 @@ class HybridRetriever:
     def retrieve_multi_entity(
         self,
         query: str,
-        tickers: List[str],
-        filter_params: Optional[RetrievalFilter] = None,
+        tickers: list[str],
+        filter_params: RetrievalFilter | None = None,
         per_ticker_limit: int = 4,
         candidate_limit_per_ticker: int = 15,
         mode: str = "hybrid_rerank",
@@ -311,14 +318,15 @@ class HybridRetriever:
                 candidate_limit=candidate_limit_per_ticker * 2,
             )
 
-        combined_chunks: List[RetrievedChunk] = []
-        chunks_by_ticker: Dict[str, List[RetrievedChunk]] = {}
+        combined_chunks: list[RetrievedChunk] = []
+        chunks_by_ticker: dict[str, list[RetrievedChunk]] = {}
 
         for ticker in clean_tickers:
             ticker_filter = RetrievalFilter(
                 ticker=ticker,
                 form=filter_params.form if filter_params else None,
                 fiscal_year=filter_params.fiscal_year if filter_params else None,
+                min_fiscal_year=filter_params.min_fiscal_year if filter_params else None,
                 item=filter_params.item if filter_params else None,
                 accession_number=filter_params.accession_number if filter_params else None,
             )
@@ -344,7 +352,7 @@ class HybridRetriever:
                     combined_chunks.append(ticker_chunks[i])
 
         # Reassign sequential ranks
-        final_chunks: List[RetrievedChunk] = []
+        final_chunks: list[RetrievedChunk] = []
         for idx, chunk in enumerate(combined_chunks, start=1):
             final_chunks.append(chunk.model_copy(update={"rank": idx}))
 
@@ -361,7 +369,7 @@ class HybridRetriever:
         self,
         query: str,
         mode: str = "hybrid_rerank",
-        filter_params: Optional[RetrievalFilter] = None,
+        filter_params: RetrievalFilter | None = None,
         limit: int = 5,
         candidate_limit: int = 20,
     ) -> RetrievalResponse:
@@ -382,6 +390,5 @@ class HybridRetriever:
             )
         else:
             raise ValueError(
-                f"Unsupported retrieval mode: '{mode}'. "
-                f"Supported: ['dense', 'bm25', 'hybrid', 'hybrid_rerank']"
+                f"Unsupported retrieval mode: '{mode}'. Supported: ['dense', 'bm25', 'hybrid', 'hybrid_rerank']"
             )

@@ -1,6 +1,7 @@
 """Unit tests for Extraction Coverage Audit & Item 8 Note Disclosures."""
 
 from bs4 import BeautifulSoup
+
 from src.data.processing.coverage_reporter import (
     CoverageReporter,
     ItemClassification,
@@ -94,7 +95,10 @@ def test_note_disclosure_heading_vs_prose() -> None:
     assert res_h[0] == "1"
 
     # Prose sentence: long or ending with period -> must return None
-    soup_prose = BeautifulSoup("<p>Note 1 to our consolidated financial statements describes our revenue recognition policy.</p>", "html.parser")
+    soup_prose = BeautifulSoup(
+        "<p>Note 1 to our consolidated financial statements describes our revenue recognition policy.</p>",
+        "html.parser",
+    )
     tag_p = soup_prose.find("p")
     res_p = extractor._is_note_heading(tag_p, tag_p.get_text())
     assert res_p is None

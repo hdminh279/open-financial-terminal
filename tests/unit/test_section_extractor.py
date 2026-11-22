@@ -1,11 +1,9 @@
 """Unit tests for HTMLSectionExtractor supporting Form 10-K, 10-Q, and Form 20-F/A."""
 
 import pytest
+
 from src.data.processing.section_extractor import (
     HTMLSectionExtractor,
-    CANONICAL_10K_ITEMS,
-    CANONICAL_10Q_ITEMS,
-    CANONICAL_20F_ITEMS,
     SectionStatus,
 )
 

@@ -5,23 +5,32 @@ multiprocess file locking, in-memory thread synchronization, sensitive query red
 and fail-safe error isolation.
 """
 
-from datetime import datetime, timezone
+import contextlib
 import fcntl
+import hashlib
 import json
 import logging
 import os
-from pathlib import Path
 import re
+import statistics
 import threading
-from typing import Any, Dict, List, Optional
+from collections import Counter
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
 # Sensitive pattern regexes for query redaction
 _EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
-_API_KEY_PATTERN = re.compile(r"\b(?:sk-[A-Za-z0-9]{20,}|Bearer\s+[A-Za-z0-9\-._~+/]+=*|ghp_[A-Za-z0-9]{20,})\b", re.IGNORECASE)
-_AUTH_SECRET_PATTERN = re.compile(r"\b(password|passwd|secret|token|api_key|apikey)\s*[:=]\s*([^\s\[\]]+)", re.IGNORECASE)
+_API_KEY_PATTERN = re.compile(
+    r"\b(?:sk-[A-Za-z0-9]{20,}|Bearer\s+[A-Za-z0-9\-._~+/]+=*|ghp_[A-Za-z0-9]{20,})\b", re.IGNORECASE
+)
+_AUTH_SECRET_PATTERN = re.compile(
+    r"\b(password|passwd|secret|token|api_key|apikey)\s*[:=]\s*([^\s\[\]]+)", re.IGNORECASE
+)
 
 
 def sanitize_query(query: str) -> str:
@@ -53,23 +62,23 @@ class RunTelemetryRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 UTC timestamp of execution completion",
     )
     request_id: str = Field(..., description="Unique correlation identifier for the request turn")
-    session_id: Optional[str] = Field(default=None, description="Conversation session identifier")
+    session_id: str | None = Field(default=None, description="Conversation session identifier")
     query: str = Field(..., description="Sanitized natural language query text")
     intent: str = Field(..., description="Classified agent intent")
-    tickers: List[str] = Field(default_factory=list, description="Target company tickers")
-    metrics: List[str] = Field(default_factory=list, description="Target financial metrics")
-    periods: List[str] = Field(default_factory=list, description="Target fiscal periods/years")
-    tools_called: List[str] = Field(default_factory=list, description="Names of executed tools")
-    tool_status: Dict[str, str] = Field(
+    tickers: list[str] = Field(default_factory=list, description="Target company tickers")
+    metrics: list[str] = Field(default_factory=list, description="Target financial metrics")
+    periods: list[str] = Field(default_factory=list, description="Target fiscal periods/years")
+    tools_called: list[str] = Field(default_factory=list, description="Names of executed tools")
+    tool_status: dict[str, str] = Field(
         default_factory=dict,
         description="Execution status per tool (e.g. {'financial_sql_tool': 'success'})",
     )
     latency_ms: float = Field(..., description="Total end-to-end execution latency in milliseconds")
-    error_code: Optional[str] = Field(
+    error_code: str | None = Field(
         default=None,
         description="Standardized error code if query encountered failures",
     )
@@ -80,7 +89,7 @@ class TelemetryLogger:
 
     _lock = threading.Lock()
 
-    def __init__(self, log_path: Optional[str] = None) -> None:
+    def __init__(self, log_path: str | None = None) -> None:
         """Initialize logger with configured destination path.
 
         Args:
@@ -95,13 +104,13 @@ class TelemetryLogger:
         query: str,
         intent: str,
         latency_ms: float,
-        session_id: Optional[str] = None,
-        tickers: Optional[List[str]] = None,
-        metrics: Optional[List[str]] = None,
-        periods: Optional[List[str]] = None,
-        tools_called: Optional[List[str]] = None,
-        tool_status: Optional[Dict[str, str]] = None,
-        error_code: Optional[str] = None,
+        session_id: str | None = None,
+        tickers: list[str] | None = None,
+        metrics: list[str] | None = None,
+        periods: list[str] | None = None,
+        tools_called: list[str] | None = None,
+        tool_status: dict[str, str] | None = None,
+        error_code: str | None = None,
     ) -> bool:
         """Serialize telemetry record and write append-only with concurrency protection.
 
@@ -131,17 +140,14 @@ class TelemetryLogger:
 
             line = record.model_dump_json() + "\n"
 
-            with self._lock:
-                with open(self.log_path, "a", encoding="utf-8") as f:
-                    try:
-                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                        f.write(line)
-                        f.flush()
-                    finally:
-                        try:
-                            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                        except OSError:
-                            pass
+            with self._lock, open(self.log_path, "a", encoding="utf-8") as f:
+                try:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    f.write(line)
+                    f.flush()
+                finally:
+                    with contextlib.suppress(OSError):
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
             return True
 
@@ -151,7 +157,7 @@ class TelemetryLogger:
 
 
 # Shared default singleton
-_DEFAULT_LOGGER: Optional[TelemetryLogger] = None
+_DEFAULT_LOGGER: TelemetryLogger | None = None
 
 
 def get_telemetry_logger() -> TelemetryLogger:
@@ -165,3 +171,95 @@ def get_telemetry_logger() -> TelemetryLogger:
 def log_run_telemetry(**kwargs: Any) -> bool:
     """Convenience helper to record run telemetry via default logger."""
     return get_telemetry_logger().log_run(**kwargs)
+
+
+def summarize_traffic_telemetry(
+    run_log_path: str | Path | None = None,
+    traffic_log_path: str | Path | None = None,
+    persist: bool = False,
+) -> dict[str, Any]:
+    """Compute anonymized traffic metrics (DAR, unique sessions, top tickers, P50/P95) from run telemetry.
+
+    Never exposes raw queries or PII; session IDs are hashed before counting.
+    """
+    src_path = Path(run_log_path or os.getenv("RUN_TELEMETRY_LOG_PATH") or "logs/run_telemetry.jsonl")
+    dst_path = Path(traffic_log_path or os.getenv("TRAFFIC_TELEMETRY_LOG_PATH") or "logs/traffic_telemetry.jsonl")
+    today_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
+
+    total_requests = 0
+    requests_today = 0
+    error_count = 0
+    abstention_count = 0
+    sessions: set[str] = set()
+    intent_counts: Counter[str] = Counter()
+    ticker_counts: Counter[str] = Counter()
+    tool_counts: Counter[str] = Counter()
+    latencies: list[float] = []
+
+    if src_path.exists():
+        with open(src_path, encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                total_requests += 1
+                ts = str(rec.get("timestamp") or "")
+                if ts.startswith(today_prefix):
+                    requests_today += 1
+
+                sid = rec.get("session_id")
+                if isinstance(sid, str) and sid:
+                    sessions.add(hashlib.sha256(sid.encode("utf-8")).hexdigest()[:12])
+
+                intent = str(rec.get("intent") or "UNKNOWN")
+                intent_counts[intent] += 1
+
+                for t in rec.get("tickers") or []:
+                    if isinstance(t, str) and t:
+                        ticker_counts[t.upper()] += 1
+
+                for tool in rec.get("tools_called") or []:
+                    if isinstance(tool, str) and tool:
+                        tool_counts[tool] += 1
+
+                err = rec.get("error_code")
+                if err:
+                    if err == "INTERNAL_SERVER_ERROR":
+                        error_count += 1
+                    else:
+                        abstention_count += 1
+
+                lat = rec.get("latency_ms")
+                if isinstance(lat, int | float) and lat >= 0:
+                    latencies.append(float(lat))
+
+    latencies.sort()
+    p50 = round(statistics.median(latencies), 2) if latencies else 0.0
+    p95 = round(latencies[min(len(latencies) - 1, int(0.95 * len(latencies)))], 2) if latencies else 0.0
+
+    summary: dict[str, Any] = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "total_requests": total_requests,
+        "requests_today_utc": requests_today,
+        "unique_sessions": len(sessions),
+        "error_rate_pct": round((error_count / total_requests) * 100, 2) if total_requests else 0.0,
+        "abstention_rate_pct": round((abstention_count / total_requests) * 100, 2) if total_requests else 0.0,
+        "latency_p50_ms": p50,
+        "latency_p95_ms": p95,
+        "intent_breakdown": dict(intent_counts),
+        "top_tickers": [{"ticker": k, "count": v} for k, v in ticker_counts.most_common(10)],
+        "top_tools": [{"tool": k, "count": v} for k, v in tool_counts.most_common(10)],
+    }
+
+    if persist:
+        with contextlib.suppress(OSError):
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(dst_path, "a", encoding="utf-8") as out:
+                out.write(json.dumps(summary) + "\n")
+
+    return summary

@@ -5,6 +5,7 @@ and MinIO S3 chat history synchronization.
 """
 
 from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -21,8 +22,6 @@ from src.api.chat_history import ChatHistoryManager
 from src.api.deps import (
     get_chat_history,
     get_research_agent,
-    override_chat_history,
-    override_research_agent,
 )
 from src.api.main import app
 
@@ -100,7 +99,6 @@ def test_serve_static_ui(client: TestClient) -> None:
 
 
 def test_get_companies(client: TestClient) -> None:
-
     """Validate GET /api/companies returns AAPL, MSFT, GOOGL."""
     resp = client.get("/api/companies")
     assert resp.status_code == 200
@@ -203,7 +201,7 @@ def test_chat_history_lifecycle(
     memory_chat_history: ChatHistoryManager,
 ) -> None:
     """Validate GET /api/history, GET /api/history/{id}, and DELETE /api/history/{id}."""
-    session = memory_chat_history.get_or_create_session("sess-lifecycle-1")
+    memory_chat_history.get_or_create_session("sess-lifecycle-1")
     memory_chat_history.add_user_message("sess-lifecycle-1", "Hello AI")
     memory_chat_history.add_assistant_message("sess-lifecycle-1", "Hello Analyst")
 
@@ -253,7 +251,7 @@ def test_chat_history_s3_persistence() -> None:
     mock_s3.object_exists.return_value = False
 
     mgr = ChatHistoryManager(s3_storage=mock_s3)
-    session = mgr.get_or_create_session("s3-test-session")
+    mgr.get_or_create_session("s3-test-session")
     mgr.add_user_message("s3-test-session", "What is Microsoft gross profit?")
     mgr.add_assistant_message("s3-test-session", "Microsoft gross profit was $146B.")
 
@@ -271,7 +269,7 @@ def test_chat_history_s3_non_ascii_unicode_title() -> None:
     mock_s3.object_exists.return_value = False
 
     mgr = ChatHistoryManager(s3_storage=mock_s3)
-    session = mgr.get_or_create_session("s3-unicode-session")
+    mgr.get_or_create_session("s3-unicode-session")
     # Add Vietnamese user message
     mgr.add_user_message("s3-unicode-session", "so sánh 2 công ty microsoft và google")
     mgr.add_assistant_message("s3-unicode-session", "Báo cáo so sánh Microsoft và Google.")
@@ -283,7 +281,7 @@ def test_chat_history_s3_non_ascii_unicode_title() -> None:
     for k, v in meta.items():
         assert all(ord(c) < 128 for c in str(v)), f"Metadata key {k} has non-ASCII value: {v}"
     # Payload bytes must retain full UTF-8 Vietnamese content
-    assert "so sánh 2 công ty microsoft và google".encode("utf-8") in call_args["data"]
+    assert "so sánh 2 công ty microsoft và google".encode() in call_args["data"]
 
 
 def test_chat_history_lazy_persistence_ignores_empty_sessions() -> None:
@@ -308,5 +306,3 @@ def test_chat_history_s3_delete_and_reconcile() -> None:
     assert deleted is True
     assert mock_s3.delete_object.called
     assert "sess-to-delete" not in mgr._sessions
-
-

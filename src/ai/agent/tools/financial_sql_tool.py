@@ -2,12 +2,14 @@
 
 import time
 from typing import TYPE_CHECKING, Any, Literal, Optional
+
 if TYPE_CHECKING:
     from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
 
 from datetime import date
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.financial.company_registry import get_supported_tickers
 
@@ -17,6 +19,9 @@ STATEMENT_METRICS = {
     "net_income",
     "gross_profit",
     "eps_diluted",
+    "net_interest_income",
+    "total_operating_income",
+    "operating_cash_flow",
     "cash_and_cash_equivalents",
     "current_assets",
     "current_liabilities",
@@ -60,7 +65,7 @@ class FinancialQueryInput(BaseModel):
         default_factory=list,
         description="List of fiscal periods for multi-period queries.",
     )
-    period_type: Optional[Literal["quarterly", "annual"]] = Field(
+    period_type: Literal["quarterly", "annual"] | None = Field(
         default=None,
         description="Target period duration type. Automatically resolved if fiscal_period is specified.",
     )
@@ -146,13 +151,17 @@ class FinancialMetricRecord(BaseModel):
     record_key: str = Field(..., description="Surrogate primary key (statement_key or ratio_key)")
     ticker: str = Field(..., description="Company ticker symbol")
     cik: str = Field(..., description="10-digit SEC Central Index Key")
+    currency: str | None = Field(
+        default=None,
+        description="ISO-4217 reporting currency (e.g., USD, VND, TWD, EUR, INR, JPY, GBP)",
+    )
     fiscal_year: int = Field(..., description="SEC authoritative fiscal year")
     fiscal_period: str = Field(..., description="SEC authoritative fiscal period (Q1, Q2, Q3, Q4, FY)")
     period_type: str = Field(..., description="Duration scope: quarterly or annual")
-    start_date: Optional[date] = Field(default=None, description="Start date of the period (null for instant)")
-    end_date: Optional[date] = Field(default=None, description="End date of the period or balance sheet snapshot date")
+    start_date: date | None = Field(default=None, description="Start date of the period (null for instant)")
+    end_date: date | None = Field(default=None, description="End date of the period or balance sheet snapshot date")
     metric_name: str = Field(..., description="Standardized canonical metric name")
-    metric_value: Optional[Decimal] = Field(
+    metric_value: Decimal | None = Field(
         default=None,
         description="Exact numerical metric value. Null if not reported (e.g. Alphabet gross profit).",
     )
@@ -160,19 +169,19 @@ class FinancialMetricRecord(BaseModel):
         default=False,
         description="True if record was derived via financial subtraction (e.g. Q4 = FY - 9M)",
     )
-    derivation_method: Optional[str] = Field(
+    derivation_method: str | None = Field(
         default=None,
         description="Audit description of derivation formula if is_derived is true",
     )
-    source_accession_number: Optional[str] = Field(
+    source_accession_number: str | None = Field(
         default=None,
         description="SEC EDGAR accession number of the primary source filing",
     )
-    source_filed_date: Optional[date] = Field(
+    source_filed_date: date | None = Field(
         default=None,
         description="Filing date of the primary source document",
     )
-    provenance_url: Optional[str] = Field(
+    provenance_url: str | None = Field(
         default=None,
         description="Direct clickable SEC EDGAR URL to the source filing index",
     )
@@ -191,7 +200,7 @@ class FinancialQueryResponse(BaseModel):
     )
 
 
-def generate_edgar_url(cik: str, accession_number: Optional[str]) -> Optional[str]:
+def generate_edgar_url(cik: str, accession_number: str | None) -> str | None:
     """Generate canonical SEC EDGAR filing index URL for audit verification.
 
     Format:
@@ -207,10 +216,17 @@ def generate_edgar_url(cik: str, accession_number: Optional[str]) -> Optional[st
     if not accession_number or not cik:
         return None
 
+    cik_stripped = cik.strip()
+    if cik_stripped.upper().startswith("VN:"):
+        vn_ticker = cik_stripped.split(":", 1)[1].strip().upper()
+        if not vn_ticker:
+            return None
+        return f"https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{vn_ticker}"
+
     try:
-        cik_clean = str(int(cik.strip()))
+        cik_clean = str(int(cik_stripped))
     except (ValueError, TypeError):
-        cik_clean = cik.strip().lstrip("0") or "0"
+        cik_clean = cik_stripped.lstrip("0") or "0"
 
     accession_clean = accession_number.strip()
     accession_nodash = accession_clean.replace("-", "")
@@ -231,17 +247,19 @@ class FinancialSQLTool:
     def __init__(
         self,
         repository: Optional["DuckDBFinancialRepository"] = None,
-        availability_validator: Optional[Any] = None,
+        availability_validator: Any | None = None,
     ):
         """Initialize tool with repository instance or lazy-load default repository."""
         if repository is None:
             from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+
             self.repository = DuckDBFinancialRepository()
         else:
             self.repository = repository
 
         if availability_validator is None:
             from src.core.financial.availability_validator import FinancialAvailabilityValidator
+
             self.availability_validator = FinancialAvailabilityValidator(repository=self.repository)
         else:
             self.availability_validator = availability_validator
@@ -257,9 +275,7 @@ class FinancialSQLTool:
         """
         start_time = time.perf_counter()
 
-        validated_query = (
-            query if isinstance(query, FinancialQueryInput) else FinancialQueryInput(**query)
-        )
+        validated_query = query if isinstance(query, FinancialQueryInput) else FinancialQueryInput(**query)
 
         # 1. Gatekeeper: Validate requested periods dynamically against SEC metadata BEFORE SQL
         valid_years, availability_reports = self.availability_validator.validate_periods(
@@ -296,7 +312,7 @@ class FinancialSQLTool:
             )
 
             raw_val = row.get("metric_value")
-            metric_val: Optional[Decimal] = None
+            metric_val: Decimal | None = None
             if raw_val is not None:
                 metric_val = raw_val if isinstance(raw_val, Decimal) else Decimal(str(raw_val))
 
@@ -304,6 +320,7 @@ class FinancialSQLTool:
                 record_key=str(row["record_key"]),
                 ticker=row["ticker"],
                 cik=row["cik"],
+                currency=row.get("currency"),
                 fiscal_year=int(row["fiscal_year"]),
                 fiscal_period=row["fiscal_period"],
                 period_type=row["period_type"],
@@ -333,8 +350,8 @@ class FinancialSQLTool:
         self,
         ticker: str,
         metric: str,
-        fiscal_year: Optional[int] = None,
-        fiscal_period: Optional[Literal["Q1", "Q2", "Q3", "Q4", "FY"]] = None,
+        fiscal_year: int | None = None,
+        fiscal_period: Literal["Q1", "Q2", "Q3", "Q4", "FY"] | None = None,
     ) -> FinancialQueryResponse:
         """Convenience method for querying a single metric."""
         query = FinancialQueryInput(
@@ -350,7 +367,7 @@ class FinancialSQLTool:
         metric: str,
         fiscal_year: int,
         fiscal_period: Literal["Q1", "Q2", "Q3", "Q4", "FY"],
-        tickers: Optional[list[str]] = None,
+        tickers: list[str] | None = None,
     ) -> list[FinancialMetricRecord]:
         """Convenience method comparing a specific metric across multiple companies for a period."""
         target_tickers = tickers if tickers is not None else sorted(list(get_supported_tickers()))

@@ -4,10 +4,10 @@
 # Legal source: Decision of Ho Chi Minh Stock Exchange on VN30 constituent portfolio
 # ==============================================================================
 
-version: "1.0"
+version: "1.1"
 market: "VN"
 exchange: "HOSE"
-total_companies: 30
+total_companies: 50
 
 companies:
   # ----------------------------------------------------------------------------
@@ -429,3 +429,287 @@ companies:
     peer_benchmark: "DAL"
     founded_year: 2007
     listing_year: 2017
+
+
+  # ----------------------------------------------------------------------------
+  # EXPANDED VIETNAM HOSE SECTOR LEADERS (+20 Verified Companies)
+  # ----------------------------------------------------------------------------
+  - ticker: "CMG"
+    name: "Công ty Cổ phần Tập đoàn Công nghệ CMC"
+    english_name: "CMC Corporation"
+    sector: "Technology"
+    industry: "IT Services, Cloud Infrastructure & Telecom"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "INFY"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1993
+    listing_year: 2010
+
+  - ticker: "CTR"
+    name: "Tổng Công ty Cổ phần Công trình Viettel"
+    english_name: "Viettel Construction Joint Stock Corporation"
+    sector: "Industrials"
+    industry: "Telecom Infrastructure, TowerCo & Construction"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "ERIC"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1995
+    listing_year: 2022
+
+  - ticker: "PNJ"
+    name: "Công ty Cổ phần Vàng bạc Đá quý Phú Nhuận"
+    english_name: "Phu Nhuan Jewelry Joint Stock Company"
+    sector: "Consumer & Retail"
+    industry: "Jewelry Retailing & Luxury Manufacturing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "WMT"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1988
+    listing_year: 2009
+
+  - ticker: "FRT"
+    name: "Công ty Cổ phần Bán lẻ Kỹ thuật số FPT"
+    english_name: "FPT Digital Retail Joint Stock Company"
+    sector: "Retail"
+    industry: "Pharmacy Chain (Long Chau) & ICT Retailing"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "WMT"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2012
+    listing_year: 2018
+
+  - ticker: "DGW"
+    name: "Công ty Cổ phần Thế Giới Số"
+    english_name: "Digiworld Corporation"
+    sector: "Retail"
+    industry: "ICT & Consumer Goods Distribution"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "AAPL"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1997
+    listing_year: 2015
+
+  - ticker: "DGC"
+    name: "Công ty Cổ phần Tập đoàn Hóa chất Đức Giang"
+    english_name: "Duc Giang Chemicals Group Joint Stock Company"
+    sector: "Materials"
+    industry: "Yellow Phosphorus, Industrial Chemicals & Fertilizers"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "VALE"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1963
+    listing_year: 2020
+
+  - ticker: "VHC"
+    name: "Công ty Cổ phần Vĩnh Hoàn"
+    english_name: "Vinh Hoan Corporation"
+    sector: "Consumer Goods"
+    industry: "Pangasius Aquaculture & Collagen Exports"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "KO"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1997
+    listing_year: 2007
+
+  - ticker: "REE"
+    name: "Công ty Cổ phần Cơ Điện Lạnh"
+    english_name: "Refrigeration Electrical Engineering Corporation"
+    sector: "Utilities & Industrials"
+    industry: "Renewable Energy, Water Utilities & M&E Engineering"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "GE"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1977
+    listing_year: 2000
+
+  - ticker: "GMD"
+    name: "Công ty Cổ phần Gemadept"
+    english_name: "Gemadept Corporation"
+    sector: "Industrials"
+    industry: "Deep-Sea Port Operations & Maritime Logistics"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "UPS"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1990
+    listing_year: 2002
+
+  - ticker: "HAH"
+    name: "Công ty Cổ phần Vận tải và Xếp dỡ Hải An"
+    english_name: "Hai An Transport and Stevedoring Joint Stock Company"
+    sector: "Industrials"
+    industry: "Container Shipping & Port Terminal Services"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "UPS"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2009
+    listing_year: 2015
+
+  - ticker: "HSG"
+    name: "Công ty Cổ phần Tập đoàn Hoa Sen"
+    english_name: "Hoa Sen Group"
+    sector: "Materials"
+    industry: "Galvanized Steel Sheets & Building Materials"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "BHP"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2001
+    listing_year: 2008
+
+  - ticker: "KDH"
+    name: "Công ty Cổ phần Đầu tư và Kinh doanh Nhà Khang Điền"
+    english_name: "Khang Dien House Trading and Investment JSC"
+    sector: "Real Estate"
+    industry: "Residential Real Estate Development"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CAT"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2001
+    listing_year: 2010
+
+  - ticker: "KBC"
+    name: "Tổng Công ty Phát triển Đô thị Kinh Bắc - CTCP"
+    english_name: "Kinh Bac City Development Holding Corporation"
+    sector: "Real Estate"
+    industry: "FDI Industrial Parks & Urban Townships"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "CAT"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2002
+    listing_year: 2009
+
+  - ticker: "DPM"
+    name: "Tổng Công ty Phân bón và Hóa chất Dầu khí - CTCP"
+    english_name: "PetroVietnam Fertilizer and Chemicals Corporation"
+    sector: "Materials"
+    industry: "Urea Fertilizers & Industrial Chemicals"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "XOM"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2003
+    listing_year: 2007
+
+  - ticker: "PC1"
+    name: "Công ty Cổ phần Tập đoàn PC1"
+    english_name: "PC1 Group Joint Stock Company"
+    sector: "Utilities & Industrials"
+    industry: "Power Grid EPC, Wind Power & Nickel Mining"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS"
+    regulatory_circular: "Circular 200/2014/TT-BTC"
+    peer_benchmark: "GE"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1963
+    listing_year: 2016
+
+  - ticker: "EIB"
+    name: "Ngân hàng TMCP Xuất Nhập khẩu Việt Nam"
+    english_name: "Vietnam Export Import Commercial Joint Stock Bank (Eximbank)"
+    sector: "Financials"
+    industry: "Commercial & Trade Finance Banking"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "JPM"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1989
+    listing_year: 2009
+
+  - ticker: "OCB"
+    name: "Ngân hàng TMCP Phương Đông"
+    english_name: "Orient Commercial Joint Stock Bank"
+    sector: "Financials"
+    industry: "Retail & SME Commercial Banking"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-BANK"
+    regulatory_circular: "Circular 49/2014/TT-NHNN"
+    peer_benchmark: "BAC"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 1996
+    listing_year: 2021
+
+  - ticker: "VCI"
+    name: "Công ty Cổ phần Chứng khoán Vietcap"
+    english_name: "Vietcap Securities Joint Stock Company"
+    sector: "Financials"
+    industry: "Institutional Brokerage, M&A Advisory & Investment Banking"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-SECURITIES"
+    regulatory_circular: "Circular 125/2016/TT-BTC"
+    peer_benchmark: "GS"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2007
+    listing_year: 2017
+
+  - ticker: "HCM"
+    name: "Công ty Cổ phần Chứng khoán Thành phố Hồ Chí Minh"
+    english_name: "Ho Chi Minh City Securities Corporation (HSC)"
+    sector: "Financials"
+    industry: "Securities Brokerage, Margin Lending & Capital Markets"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-SECURITIES"
+    regulatory_circular: "Circular 125/2016/TT-BTC"
+    peer_benchmark: "MS"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2003
+    listing_year: 2009
+
+  - ticker: "MIG"
+    name: "Tổng Công ty Cổ phần Bảo hiểm Quân đội"
+    english_name: "Military Insurance Corporation (MIC)"
+    sector: "Financials"
+    industry: "Non-Life Insurance & Bancassurance"
+    exchange: "HOSE"
+    currency: "VND"
+    accounting_standard: "VAS-INSURANCE"
+    regulatory_circular: "Circular 199/2014/TT-BTC"
+    peer_benchmark: "BRK-B"
+    index_membership: "HOSE_EXPANDED"
+    founded_year: 2007
+    listing_year: 2021

@@ -8,7 +8,7 @@ Implements 3-tier abstention checks:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.ai.agent.contracts import (
     AbstentionInfo,
@@ -18,6 +18,7 @@ from src.ai.agent.contracts import (
 )
 from src.ai.agent.state import AgentState
 from src.core.financial.company_registry import get_supported_tickers
+from src.core.financial.response_templates import detect_query_language, render_template
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,8 @@ class AbstentionGate:
             years = [routing_decision.get("fiscal_year")]
         year_str = ", ".join(map(str, years)) if years else ""
 
+        query_lang = detect_query_language(state.get("query", ""))
+
         # -------------------------------------------------------------
         # Tier 1: Direct Scope Rejection (Dynamic Tickers from Registry)
         # -------------------------------------------------------------
@@ -60,11 +63,20 @@ class AbstentionGate:
             invalid_tickers = [t for t in tickers if t not in supported_tickers]
             if invalid_tickers:
                 t_display = ", ".join(invalid_tickers)
+                explanation = (
+                    render_template(
+                        "unsupported_company",
+                        lang=query_lang,
+                        tickers=t_display,
+                        supported=sorted(supported_tickers),
+                    )
+                    or f"Company '{t_display}' is not currently supported. Corporate Filing Intelligence supports: {sorted(supported_tickers)}."
+                )
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.UNSUPPORTED_COMPANY,
-                    explanation=f"Company '{t_display}' is not currently supported. Corporate Filing Intelligence supports: {sorted(supported_tickers)}.",
+                    explanation=explanation,
                     unsupported_aspects=[f"company:{t}" for t in invalid_tickers],
                 )
 
@@ -79,8 +91,8 @@ class AbstentionGate:
         # -------------------------------------------------------------
         # Tier 2: Tool Execution Health Check
         # -------------------------------------------------------------
-        tool_results: List[Dict[str, Any]] = state.get("tool_results", [])
-        evidence_items: List[Dict[str, Any]] = state.get("evidence_items", [])
+        tool_results: list[dict[str, Any]] = state.get("tool_results", [])
+        evidence_items: list[dict[str, Any]] = state.get("evidence_items", [])
 
         sql_results = [r for r in tool_results if r.get("tool_name") == "financial_sql_tool"]
         rag_results = [r for r in tool_results if r.get("tool_name") == "hybrid_retriever"]
@@ -97,21 +109,23 @@ class AbstentionGate:
         # -------------------------------------------------------------
         # Tier 3: Intent-Specific Granular Resolution
         # -------------------------------------------------------------
-        # Pure Live Web Search evaluation
+        # Pure Live Web Search evaluation (decisive abstention with zero unrelated tables)
         if web_results and not sql_results and not rag_results:
+            web_abstention_msg = render_template("web_news_abstention", lang=query_lang)
             if web_failed:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.TOOL_ERROR,
-                    explanation="A technical error occurred while executing live web search.",
+                    explanation=web_abstention_msg
+                    or "Live web search is temporarily unavailable and periodic filings do not contain today's breaking news.",
                 )
             if not web_success or len(evidence_items) == 0:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
-                    explanation=f"No relevant live web news or articles found for {ticker_str}.",
+                    explanation=web_abstention_msg or f"No relevant live web news or articles found for {ticker_str}.",
                 )
             return AbstentionInfo(is_abstaining=False, is_partial=False)
 
@@ -124,12 +138,25 @@ class AbstentionGate:
                     explanation="A technical database error occurred while querying financial statements.",
                 )
             if not sql_success:
-                period_str = f" for period {year_str}" if year_str else ""
+                period_str = (
+                    f" (FY {year_str})"
+                    if (year_str and query_lang == "vi")
+                    else (f" for period {year_str}" if year_str else "")
+                )
+                explanation = (
+                    render_template(
+                        "no_financial_records",
+                        lang=query_lang,
+                        tickers=ticker_str,
+                        period_str=period_str,
+                    )
+                    or f"No reported financial records found for {ticker_str}{period_str} in verified SEC filings."
+                )
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
-                    explanation=f"No reported financial records found for {ticker_str}{period_str} in verified SEC filings.",
+                    explanation=explanation,
                 )
             return AbstentionInfo(is_abstaining=False, is_partial=False)
 
@@ -144,18 +171,30 @@ class AbstentionGate:
                     explanation="A technical retrieval service error occurred while searching filing texts.",
                 )
             if (not rag_success and not web_success) or len(evidence_items) == 0:
+                explanation = (
+                    render_template(
+                        "no_textual_disclosures",
+                        lang=query_lang,
+                        tickers=ticker_str,
+                    )
+                    or f"No relevant narrative disclosures found in verified filing texts for {ticker_str}."
+                )
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
                     reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
-                    explanation=f"No relevant narrative disclosures found in SEC 10-K/10-Q filings for {ticker_str} for this inquiry.",
+                    explanation=explanation,
                 )
             return AbstentionInfo(is_abstaining=False, is_partial=False)
 
         # Mixed & Report Intents: Evaluate Partial Failure
         if intent in (IntentType.MIXED_RESEARCH, IntentType.DEEP_RESEARCH_REPORT):
             if not sql_success and not rag_success and not web_success:
-                reason = AbstentionReason.TOOL_ERROR if (sql_failed or rag_failed or web_failed) else AbstentionReason.INSUFFICIENT_EVIDENCE
+                reason = (
+                    AbstentionReason.TOOL_ERROR
+                    if (sql_failed or rag_failed or web_failed)
+                    else AbstentionReason.INSUFFICIENT_EVIDENCE
+                )
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=False,
@@ -163,8 +202,8 @@ class AbstentionGate:
                     explanation=f"Unable to retrieve verified financial figures, filing disclosures, or live news for {ticker_str}.",
                 )
 
-            # SQL succeeded, but RAG failed or found no textual context
-            if sql_success and not rag_success:
+            # Evaluate partial failures only across tools that were actually invoked
+            if sql_success and rag_results and not rag_success:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=True,
@@ -173,13 +212,22 @@ class AbstentionGate:
                     unsupported_aspects=["qualitative_explanation"],
                 )
 
-            # RAG succeeded, but SQL failed or found no numerical records
-            if rag_success and not sql_success:
+            if sql_success and web_results and not web_success:
+                return AbstentionInfo(
+                    is_abstaining=True,
+                    is_partial=True,
+                    reason=AbstentionReason.TOOL_ERROR if web_failed else AbstentionReason.INSUFFICIENT_EVIDENCE,
+                    explanation=render_template("web_news_abstention", lang=query_lang)
+                    or "Financial metrics were verified, but live web news was unavailable.",
+                    unsupported_aspects=["live_web_news"],
+                )
+
+            if (rag_success or web_success) and sql_results and not sql_success:
                 return AbstentionInfo(
                     is_abstaining=True,
                     is_partial=True,
                     reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
-                    explanation="Qualitative filing disclosures were retrieved, but exact standardized accounting metrics were not reported for this specific period.",
+                    explanation="Qualitative or live disclosures were retrieved, but exact standardized accounting metrics were not reported for this specific period.",
                     unsupported_aspects=["numerical_metrics"],
                 )
 
@@ -192,10 +240,11 @@ class AbstentionGate:
 # LangGraph Node and Conditional Edge Functions
 # ---------------------------------------------------------------------------
 
+
 def abstention_node(
     state: AgentState,
-    gate: Optional[AbstentionGate] = None,
-) -> Dict[str, Any]:
+    gate: AbstentionGate | None = None,
+) -> dict[str, Any]:
     """LangGraph node assessing evidence sufficiency and partial abstention.
 
     Args:

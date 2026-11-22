@@ -4,19 +4,17 @@ Provides singleton instances of ResearchAgent, ChatHistoryManager, DuckDBFinanci
 and S3Storage with lazy initialization and clean test-override support.
 """
 
-from functools import lru_cache
-from typing import Optional
-
 from src.ai.agent.research_agent import ResearchAgent
 from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from src.ai.vectordb.qdrant_client import QdrantStorage
 from src.api.chat_history import ChatHistoryManager
 from src.data.storage.s3_storage import S3Storage
 
-
-_agent_instance: Optional[ResearchAgent] = None
-_history_instance: Optional[ChatHistoryManager] = None
-_duckdb_repo_instance: Optional[DuckDBFinancialRepository] = None
-_s3_instance: Optional[S3Storage] = None
+_agent_instance: ResearchAgent | None = None
+_history_instance: ChatHistoryManager | None = None
+_duckdb_repo_instance: DuckDBFinancialRepository | None = None
+_s3_instance: S3Storage | None = None
+_qdrant_instance: QdrantStorage | None = None
 
 
 def get_research_agent() -> ResearchAgent:
@@ -43,7 +41,7 @@ def get_duckdb_repository() -> DuckDBFinancialRepository:
     return _duckdb_repo_instance
 
 
-def get_s3_storage() -> Optional[S3Storage]:
+def get_s3_storage() -> S3Storage | None:
     """Retrieve or lazily initialize the S3Storage adapter."""
     global _s3_instance
     if _s3_instance is None:
@@ -52,6 +50,17 @@ def get_s3_storage() -> Optional[S3Storage]:
         except Exception:
             _s3_instance = None
     return _s3_instance
+
+
+def get_qdrant_storage() -> QdrantStorage | None:
+    """Retrieve or lazily initialize the QdrantStorage adapter."""
+    global _qdrant_instance
+    if _qdrant_instance is None:
+        try:
+            _qdrant_instance = QdrantStorage()
+        except Exception:
+            _qdrant_instance = None
+    return _qdrant_instance
 
 
 def override_research_agent(agent: ResearchAgent) -> None:

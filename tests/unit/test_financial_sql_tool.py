@@ -69,9 +69,9 @@ class TestFinancialQueryInputValidation:
             FinancialQueryInput(tickers=["AAPL"], metrics=[])
 
     def test_unsupported_ticker_rejection(self):
-        """Verify tickers outside Group A are rejected with ValueError."""
+        """Verify tickers outside supported registry are rejected with ValueError."""
         with pytest.raises(ValidationError) as exc_info:
-            FinancialQueryInput(ticker="TSLA", metric="revenues")
+            FinancialQueryInput(ticker="VFS", metric="revenues")
         assert "Unsupported ticker" in str(exc_info.value)
 
     def test_unsupported_metric_rejection(self):

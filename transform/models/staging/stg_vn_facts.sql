@@ -53,10 +53,23 @@ standardized AS (
         is_amendment,
         source_file,
         market,
-        unit AS currency
+        SPLIT_PART(unit, '/', 1) AS currency
     FROM raw_facts
     WHERE unit IN ('VND', 'VND/shares', '%')
       AND duration_scope != 'unclassified'
+      AND NOT (
+          LOWER(TRIM(taxonomy)) = 'vas-bank'
+          AND LOWER(TRIM(tag)) IN (
+              'gross_profit',
+              'gross_profit_alt',
+              'cost_of_goods_sold',
+              'revenues',
+              'gross_revenues',
+              'operating_income',
+              'current_assets',
+              'current_liabilities'
+          )
+      )
 ),
 
 ranked AS (

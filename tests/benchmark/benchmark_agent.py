@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 # Ensure local parquet fixtures are resolved cleanly if MinIO is offline
 if not os.getenv("GOLD_STATEMENTS_PARQUET_PATH"):
@@ -19,7 +19,6 @@ if not os.getenv("GOLD_STATEMENTS_PARQUET_PATH"):
 if not os.getenv("GOLD_RATIOS_PARQUET_PATH"):
     os.environ["GOLD_RATIOS_PARQUET_PATH"] = "tests/fixtures/gold/fct_financial_ratios.parquet"
 
-from src.ai.agent.contracts import IntentType
 from src.ai.agent.research_agent import ResearchAgent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -30,7 +29,7 @@ REPORT_OUTPUT_PATH = "docs/benchmarks/DAY_12_AGENT_BENCHMARK.md"
 SEC_URL_REGEX = re.compile(r"^https://www\.sec\.gov/Archives/edgar/data/\d+/\d+/[\w\.-]+$")
 
 
-def run_benchmark() -> Dict[str, Any]:
+def run_benchmark() -> dict[str, Any]:
     """Run full evaluation suite across the 50 certified benchmark questions."""
     logger.info("Initializing ResearchAgent and compiling LangGraph...")
     agent = ResearchAgent()
@@ -38,13 +37,13 @@ def run_benchmark() -> Dict[str, Any]:
     if not os.path.exists(GROUND_TRUTH_PATH):
         raise FileNotFoundError(f"Missing evaluation fixture: {GROUND_TRUTH_PATH}")
 
-    with open(GROUND_TRUTH_PATH, "r", encoding="utf-8") as f:
-        eval_questions: List[Dict[str, Any]] = json.load(f)
+    with open(GROUND_TRUTH_PATH, encoding="utf-8") as f:
+        eval_questions: list[dict[str, Any]] = json.load(f)
 
     logger.info("Loaded %d certified questions for Quality Gate 3 evaluation.", len(eval_questions))
 
-    results: List[Dict[str, Any]] = []
-    latencies: Dict[str, List[float]] = {
+    results: list[dict[str, Any]] = []
+    latencies: dict[str, list[float]] = {
         "FINANCIAL_METRIC": [],
         "TEXTUAL_RESEARCH": [],
         "MIXED_RESEARCH": [],
@@ -53,8 +52,8 @@ def run_benchmark() -> Dict[str, Any]:
     }
 
     correct_intents = 0
-    tool_precisions: List[float] = []
-    tool_recalls: List[float] = []
+    tool_precisions: list[float] = []
+    tool_recalls: list[float] = []
     mixed_fanout_success = 0
     total_mixed = 0
     total_negatives = 0
@@ -81,7 +80,7 @@ def run_benchmark() -> Dict[str, Any]:
         selected_tools = set(tr.tool_name for tr in response.tool_results)
 
         # 1. Intent Accuracy
-        intent_match = (pred_intent == expected_intent)
+        intent_match = pred_intent == expected_intent
         if intent_match:
             correct_intents += 1
 
@@ -136,25 +135,29 @@ def run_benchmark() -> Dict[str, Any]:
         has_citations = len(response.citations) > 0
         status_ok = intent_match and abstention_ok and (must_abstain or has_citations)
         status_str = "PASS" if status_ok else "FAIL"
-        print(f"[{idx:02d}/50] {qid} | Expected: {expected_intent:<18} | Pred: {pred_intent:<18} | Latency: {elapsed_ms:6.1f}ms | {status_str}")
+        print(
+            f"[{idx:02d}/50] {qid} | Expected: {expected_intent:<18} | Pred: {pred_intent:<18} | Latency: {elapsed_ms:6.1f}ms | {status_str}"
+        )
 
-        results.append({
-            "id": qid,
-            "query": query,
-            "expected_intent": expected_intent,
-            "pred_intent": pred_intent,
-            "intent_match": intent_match,
-            "expected_tools": list(expected_tools),
-            "selected_tools": list(selected_tools),
-            "tool_precision": p,
-            "tool_recall": r,
-            "must_abstain": must_abstain,
-            "is_abstaining": is_abstaining,
-            "is_partial": is_partial,
-            "status": status_str,
-            "citation_count": len(response.citations),
-            "latency_ms": elapsed_ms,
-        })
+        results.append(
+            {
+                "id": qid,
+                "query": query,
+                "expected_intent": expected_intent,
+                "pred_intent": pred_intent,
+                "intent_match": intent_match,
+                "expected_tools": list(expected_tools),
+                "selected_tools": list(selected_tools),
+                "tool_precision": p,
+                "tool_recall": r,
+                "must_abstain": must_abstain,
+                "is_abstaining": is_abstaining,
+                "is_partial": is_partial,
+                "status": status_str,
+                "citation_count": len(response.citations),
+                "latency_ms": elapsed_ms,
+            }
+        )
 
     # Summary Metrics Calculation
     total_q = len(eval_questions)
@@ -178,12 +181,24 @@ def run_benchmark() -> Dict[str, Any]:
     print("\n" + "=" * 80)
     print("QUALITY GATE 3 BENCHMARK RESULTS")
     print("=" * 80)
-    print(f"Intent Classification Accuracy : {intent_accuracy:5.1f}% (Target: >= 95.0%) -> {'PASS' if intent_accuracy >= 95 else 'FAIL'}")
-    print(f"Tool Selection Precision       : {mean_tool_precision:5.1f}% (Target: >= 95.0%) -> {'PASS' if mean_tool_precision >= 95 else 'FAIL'}")
-    print(f"Tool Selection Recall          : {mean_tool_recall:5.1f}% (Target: >= 95.0%) -> {'PASS' if mean_tool_recall >= 95 else 'FAIL'}")
-    print(f"Mixed-Query Fan-Out Rate       : {mixed_fanout_rate:5.1f}% (Target: >= 90.0%) -> {'PASS' if mixed_fanout_rate >= 90 else 'FAIL'}")
-    print(f"Abstention Recall on Negatives : {abstention_recall:5.1f}% (Target: >= 95.0%) -> {'PASS' if abstention_recall >= 95 else 'FAIL'}")
-    print(f"Citation Link Validity         : {citation_validity:5.1f}% (Target: 100.0%)   -> {'PASS' if citation_validity == 100 else 'FAIL'}")
+    print(
+        f"Intent Classification Accuracy : {intent_accuracy:5.1f}% (Target: >= 95.0%) -> {'PASS' if intent_accuracy >= 95 else 'FAIL'}"
+    )
+    print(
+        f"Tool Selection Precision       : {mean_tool_precision:5.1f}% (Target: >= 95.0%) -> {'PASS' if mean_tool_precision >= 95 else 'FAIL'}"
+    )
+    print(
+        f"Tool Selection Recall          : {mean_tool_recall:5.1f}% (Target: >= 95.0%) -> {'PASS' if mean_tool_recall >= 95 else 'FAIL'}"
+    )
+    print(
+        f"Mixed-Query Fan-Out Rate       : {mixed_fanout_rate:5.1f}% (Target: >= 90.0%) -> {'PASS' if mixed_fanout_rate >= 90 else 'FAIL'}"
+    )
+    print(
+        f"Abstention Recall on Negatives : {abstention_recall:5.1f}% (Target: >= 95.0%) -> {'PASS' if abstention_recall >= 95 else 'FAIL'}"
+    )
+    print(
+        f"Citation Link Validity         : {citation_validity:5.1f}% (Target: 100.0%)   -> {'PASS' if citation_validity == 100 else 'FAIL'}"
+    )
     print(f"SQL Route Latency (P50)        : {sql_p50:5.1f}ms  (Target: < 1500ms) -> PASS")
     print(f"Overall Pipeline Latency (P50) : {p50_latency:5.1f}ms  (P95: {p95_latency:5.1f}ms)")
     print("=" * 80)
@@ -198,12 +213,24 @@ def run_benchmark() -> Dict[str, Any]:
         f.write("## 1. Summary Scorecard\n\n")
         f.write("| Evaluation Metric | Measured Value | Quality Gate Target | Outcome |\n")
         f.write("| :--- | :---: | :---: | :---: |\n")
-        f.write(f"| **Intent Accuracy** | **{intent_accuracy:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if intent_accuracy >= 95 else 'FAILED'} |\n")
-        f.write(f"| **Tool Selection Precision** | **{mean_tool_precision:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if mean_tool_precision >= 95 else 'FAILED'} |\n")
-        f.write(f"| **Tool Selection Recall** | **{mean_tool_recall:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if mean_tool_recall >= 95 else 'FAILED'} |\n")
-        f.write(f"| **Mixed-Query Fan-Out Rate** | **{mixed_fanout_rate:.1f}%** | $\\ge 90.0\\%$ | {'PASSED' if mixed_fanout_rate >= 90 else 'FAILED'} |\n")
-        f.write(f"| **Abstention Recall on Negatives** | **{abstention_recall:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if abstention_recall >= 95 else 'FAILED'} |\n")
-        f.write(f"| **Citation Link Validity** | **{citation_validity:.1f}%** | $100.0\\%$ | {'PASSED' if citation_validity == 100 else 'FAILED'} |\n")
+        f.write(
+            f"| **Intent Accuracy** | **{intent_accuracy:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if intent_accuracy >= 95 else 'FAILED'} |\n"
+        )
+        f.write(
+            f"| **Tool Selection Precision** | **{mean_tool_precision:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if mean_tool_precision >= 95 else 'FAILED'} |\n"
+        )
+        f.write(
+            f"| **Tool Selection Recall** | **{mean_tool_recall:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if mean_tool_recall >= 95 else 'FAILED'} |\n"
+        )
+        f.write(
+            f"| **Mixed-Query Fan-Out Rate** | **{mixed_fanout_rate:.1f}%** | $\\ge 90.0\\%$ | {'PASSED' if mixed_fanout_rate >= 90 else 'FAILED'} |\n"
+        )
+        f.write(
+            f"| **Abstention Recall on Negatives** | **{abstention_recall:.1f}%** | $\\ge 95.0\\%$ | {'PASSED' if abstention_recall >= 95 else 'FAILED'} |\n"
+        )
+        f.write(
+            f"| **Citation Link Validity** | **{citation_validity:.1f}%** | $100.0\\%$ | {'PASSED' if citation_validity == 100 else 'FAILED'} |\n"
+        )
         f.write(f"| **SQL Route Latency (P50)** | **{sql_p50:.1f}ms** | $< 1500\\text{{ms}}$ | PASSED |\n")
         f.write(f"| **RAG Route Latency (P50)** | **{rag_p50:.1f}ms** | $< 3500\\text{{ms}}$ | PASSED |\n\n")
         f.write("## 2. Granular Results Table\n\n")
@@ -212,7 +239,9 @@ def run_benchmark() -> Dict[str, Any]:
         for r in results:
             match = r["status"]
             tools_str = ", ".join(r["selected_tools"]) if r["selected_tools"] else "None"
-            f.write(f"| {r['id']} | {r['expected_intent']} | {r['pred_intent']} | `{tools_str}` | {r['latency_ms']:.1f} | **{match}** |\n")
+            f.write(
+                f"| {r['id']} | {r['expected_intent']} | {r['pred_intent']} | `{tools_str}` | {r['latency_ms']:.1f} | **{match}** |\n"
+            )
 
     logger.info("Authoritative report written to %s", REPORT_OUTPUT_PATH)
     return {

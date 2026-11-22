@@ -7,11 +7,15 @@ Validates query time horizons against dynamic SEC filing metadata and Lakehouse 
 Zero static calendar dates; 100% data-driven.
 """
 
+import logging
 from datetime import date
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+
 import duckdb
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class AvailabilityCode(str, Enum):
@@ -32,26 +36,28 @@ class PeriodAvailability(BaseModel):
     code: AvailabilityCode
     is_available: bool
     reason: str
-    end_date: Optional[date] = None
-    source_accession_number: Optional[str] = None
+    end_date: date | None = None
+    source_accession_number: str | None = None
 
 
 class FinancialAvailabilityValidator:
     """Validates period availability against dynamic Lakehouse metadata."""
 
-    def __init__(self, repository: Optional[Any] = None):
+    def __init__(self, repository: Any | None = None):
         """Initialize validator with DuckDB repository reference."""
         self.repository = repository
-        self._filing_cache: Optional[Dict[Tuple[str, int, str], Dict[str, Any]]] = None
+        self._filing_cache: dict[tuple[str, int, str], dict[str, Any]] | None = None
 
-    def _load_filing_catalog(self, conn: duckdb.DuckDBPyConnection, statements_path: str) -> Dict[Tuple[str, int, str], Dict[str, Any]]:
+    def _load_filing_catalog(
+        self, conn: duckdb.DuckDBPyConnection, statements_path: str
+    ) -> dict[tuple[str, int, str], dict[str, Any]]:
         """Load distinct period metadata from Gold statements mart."""
         if self._filing_cache is not None:
             return self._filing_cache
 
-        catalog: Dict[Tuple[str, int, str], Dict[str, Any]] = {}
+        catalog: dict[tuple[str, int, str], dict[str, Any]] = {}
         try:
-            query = f"""
+            query = """
                 SELECT DISTINCT
                     ticker,
                     fiscal_year,
@@ -59,9 +65,9 @@ class FinancialAvailabilityValidator:
                     end_date,
                     source_accession_number,
                     source_filed_date
-                FROM '{statements_path}'
+                FROM read_parquet(?)
             """
-            rows = conn.execute(query).fetchall()
+            rows = conn.execute(query, [statements_path]).fetchall()
             for r in rows:
                 key = (str(r[0]).upper(), int(r[1]), str(r[2]).upper())
                 catalog[key] = {
@@ -73,21 +79,21 @@ class FinancialAvailabilityValidator:
                     "source_filed_date": r[5],
                 }
             self._filing_cache = catalog
-        except Exception:
-            # Fall back to empty catalog if table is not yet accessible
-            self._filing_cache = {}
-
-        return self._filing_cache
+            return self._filing_cache
+        except Exception as exc:
+            # Do not permanently cache empty state on transient storage errors
+            logger.warning("Failed to load filing availability catalog from %s: %s", statements_path, exc)
+            return {}
 
     def validate_periods(
         self,
-        tickers: List[str],
-        fiscal_years: List[int],
-        fiscal_periods: List[str],
-        conn: Optional[duckdb.DuckDBPyConnection] = None,
-        statements_path: Optional[str] = None,
-        today: Optional[date] = None,
-    ) -> Tuple[List[int], List[PeriodAvailability]]:
+        tickers: list[str],
+        fiscal_years: list[int],
+        fiscal_periods: list[str],
+        conn: duckdb.DuckDBPyConnection | None = None,
+        statements_path: str | None = None,
+        today: date | None = None,
+    ) -> tuple[list[int], list[PeriodAvailability]]:
         """Validate requested periods against real SEC filing availability.
 
         Args:
@@ -103,15 +109,15 @@ class FinancialAvailabilityValidator:
         """
         current_date = today or date.today()
         periods = fiscal_periods or ["FY"]
-        reports: List[PeriodAvailability] = []
-        valid_years_set: Set[int] = set()
+        reports: list[PeriodAvailability] = []
+        valid_years_set: set[int] = set()
 
         # If fiscal_years is empty (e.g. unconstrained trend), all years in DB are considered
         if not fiscal_years:
             return [], []
 
         # If connection and path are provided, use Lakehouse catalog
-        catalog: Dict[Tuple[str, int, str], Dict[str, Any]] = {}
+        catalog: dict[tuple[str, int, str], dict[str, Any]] = {}
         if conn and statements_path:
             catalog = self._load_filing_catalog(conn, statements_path)
 
@@ -155,9 +161,7 @@ class FinancialAvailabilityValidator:
                     # 3. Check filing existence in Lakehouse
                     if entry is None and catalog:
                         # Check if any quarterly filings exist for this year
-                        has_quarterly = any(
-                            (ticker.upper(), year, q) in catalog for q in ("Q1", "Q2", "Q3", "Q4")
-                        )
+                        has_quarterly = any((ticker.upper(), year, q) in catalog for q in ("Q1", "Q2", "Q3", "Q4"))
                         if period == "FY" and has_quarterly:
                             reports.append(
                                 PeriodAvailability(

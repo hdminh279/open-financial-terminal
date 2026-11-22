@@ -15,9 +15,7 @@ class ChatMessage(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    role: Literal["system", "user", "assistant"] = Field(
-        description="Role of the message sender."
-    )
+    role: Literal["system", "user", "assistant"] = Field(description="Role of the message sender.")
     content: str = Field(description="Text content of the message.")
     reasoning_content: str | None = Field(
         default=None,
@@ -34,12 +32,8 @@ class TokenUsage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     prompt_tokens: int = Field(description="Number of tokens in the prompt.")
-    completion_tokens: int = Field(
-        description="Number of tokens generated in the completion."
-    )
-    total_tokens: int = Field(
-        description="Total token count for prompt plus completion."
-    )
+    completion_tokens: int = Field(description="Number of tokens generated in the completion.")
+    total_tokens: int = Field(description="Total token count for prompt plus completion.")
     reasoning_tokens: int | None = Field(
         default=None,
         description="Tokens consumed by internal reasoning / chain-of-thought.",
@@ -65,16 +59,12 @@ class LLMResponse(BaseModel):
         description="Separate chain-of-thought reasoning steps when thinking is enabled.",
     )
     model: str = Field(description="Model identifier that generated the response.")
-    finish_reason: str = Field(
-        description="Completion termination reason (e.g. 'stop', 'length')."
-    )
+    finish_reason: str = Field(description="Completion termination reason (e.g. 'stop', 'length').")
     usage: TokenUsage | None = Field(
         default=None,
         description="Verified token usage details if returned by the provider.",
     )
-    latency_ms: float = Field(
-        description="Total roundtrip request duration in milliseconds."
-    )
+    latency_ms: float = Field(description="Total roundtrip request duration in milliseconds.")
 
 
 class LLMStreamChunk(BaseModel):

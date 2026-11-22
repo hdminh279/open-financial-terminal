@@ -1,6 +1,7 @@
 """Unit tests for Vietnamese VN30 Registry and VAS Taxonomy Map."""
 
 from pathlib import Path
+
 import pytest
 import yaml
 
@@ -10,7 +11,7 @@ def companies_vn_data() -> dict:
     """Load configs/companies_vn.yaml."""
     config_path = Path("configs/companies_vn.yaml")
     assert config_path.exists(), "configs/companies_vn.yaml must exist."
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -19,7 +20,7 @@ def vas_taxonomy_data() -> dict:
     """Load configs/vas_taxonomy_map.yaml."""
     config_path = Path("configs/vas_taxonomy_map.yaml")
     assert config_path.exists(), "configs/vas_taxonomy_map.yaml must exist."
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -28,7 +29,7 @@ def us_taxonomy_data() -> dict:
     """Load configs/xbrl_taxonomy_map.yaml for cross-market metric alignment."""
     config_path = Path("configs/xbrl_taxonomy_map.yaml")
     assert config_path.exists(), "configs/xbrl_taxonomy_map.yaml must exist."
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -36,10 +37,12 @@ class TestVN30Registry:
     """Validate data contracts of configs/companies_vn.yaml."""
 
     def test_total_companies_count(self, companies_vn_data: dict):
-        """Verify exactly 30 companies are defined in the VN30 registry."""
+        """Verify 50 Vietnam companies (30 VN30 + 20 expanded HOSE leaders) are defined."""
         companies = companies_vn_data.get("companies", [])
-        assert len(companies) == 30, f"Expected 30 companies, found {len(companies)}"
-        assert companies_vn_data.get("total_companies") == 30
+        assert len(companies) == 50, f"Expected 50 companies, found {len(companies)}"
+        assert companies_vn_data.get("total_companies") == 50
+        vn30 = [c for c in companies if c.get("index_membership", "VN30") == "VN30"]
+        assert len(vn30) == 30, f"Expected 30 VN30 constituents, found {len(vn30)}"
 
     def test_unique_tickers(self, companies_vn_data: dict):
         """Ensure all 30 tickers are uppercase, alphanumeric, and strictly unique."""
@@ -74,9 +77,7 @@ class TestVN30Registry:
 class TestVASTaxonomyMap:
     """Validate completeness and schema integrity of configs/vas_taxonomy_map.yaml."""
 
-    def test_canonical_metrics_alignment_with_us_gaap(
-        self, vas_taxonomy_data: dict, us_taxonomy_data: dict
-    ):
+    def test_canonical_metrics_alignment_with_us_gaap(self, vas_taxonomy_data: dict, us_taxonomy_data: dict):
         """Ensure core financial metrics have exact naming parity across US and VN markets."""
         vas_metrics = set(vas_taxonomy_data.get("metrics", {}).keys())
         us_metrics = set(us_taxonomy_data.get("metrics", {}).keys())

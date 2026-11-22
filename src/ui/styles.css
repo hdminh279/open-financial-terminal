@@ -824,8 +824,16 @@ html, body {
   text-decoration: none; /* Prevent accidental strikethrough from tilde financial approximations */
 }
 
+.assistant-response-text hr {
+  display: none;
+}
+
 .citation-tag {
   display: inline-block;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
   color: var(--accent-sky-blue);
   font-size: 12px;
   font-weight: 600;
@@ -2522,4 +2530,310 @@ html, body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ========================================================================= */
+/* TASK-18.1: Quick Suggestion Chips, Trace Accordion, Export & Drawer       */
+/* ========================================================================= */
+
+.welcome-subtitle {
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.quick-suggestions-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+  max-width: 680px;
+}
+
+.action-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.action-chip:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-sky-blue);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.activity-intent-badge,
+.activity-latency-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.activity-latency-badge {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--accent-sky-blue);
+}
+
+.activity-step-row {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.step-main-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.step-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.step-duration {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.activity-step-row.failed .step-check-badge {
+  color: #EF4444;
+}
+
+.activity-step-row.skipped .step-check-badge {
+  color: var(--text-muted);
+}
+
+.table-card-container {
+  margin: 14px 0;
+}
+
+.table-card-container .table-scroll-wrapper {
+  margin-top: 6px;
+}
+
+.table-export-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.table-toolbar-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.table-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-mini-export {
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-mini-export:hover {
+  border-color: var(--accent-sky-blue);
+  color: var(--accent-sky-blue);
+  background: var(--bg-card-hover);
+}
+
+.source-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.btn-preview-citation {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-preview-citation:hover {
+  border-color: var(--accent-sky-blue);
+  color: var(--accent-sky-blue);
+}
+
+.citation-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 950;
+}
+
+.citation-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(440px, 92vw);
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.citation-drawer.open {
+  transform: translateX(0);
+}
+
+.citation-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.citation-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.citation-drawer-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.citation-drawer-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.citation-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drawer-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.drawer-field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.drawer-field-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.drawer-field-val.mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.drawer-excerpt-section,
+.drawer-ref-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-excerpt-box {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.drawer-ref-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.citation-drawer-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-open-official-source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--accent-sky-blue);
+  color: #06101E;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.btn-open-official-source:hover {
+  opacity: 0.9;
+}
+
 

@@ -1,18 +1,28 @@
 """DuckDB repository for querying standardized Gold Parquet financial marts."""
 
 import os
-from typing import Any, Optional
+import re
+import threading
+from typing import Any
+
 import duckdb
 
 from src.ai.agent.tools.financial_sql_tool import (
-    FinancialQueryInput,
     RATIO_METRICS,
     STATEMENT_METRICS,
+    FinancialQueryInput,
+)
+
+_READ_ONLY_SQL_RE = re.compile(r"^\s*(?:SELECT|WITH|DESCRIBE|SHOW)\b", re.IGNORECASE)
+_MUTATING_SQL_RE = re.compile(
+    r"(?:;|\b(?:DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|REPLACE|TRUNCATE|COPY|ATTACH|DETACH|CALL|LOAD|INSTALL)\b)",
+    re.IGNORECASE,
 )
 
 
 class DatabaseExecutionError(Exception):
     """Raised when an underlying database query or storage connection fails."""
+
     pass
 
 
@@ -21,9 +31,9 @@ class DuckDBFinancialRepository:
 
     def __init__(
         self,
-        statements_path: Optional[str] = None,
-        ratios_path: Optional[str] = None,
-        connection: Optional[duckdb.DuckDBPyConnection] = None,
+        statements_path: str | None = None,
+        ratios_path: str | None = None,
+        connection: duckdb.DuckDBPyConnection | None = None,
     ):
         """Initialize repository with optional custom paths and injected connection.
 
@@ -37,10 +47,39 @@ class DuckDBFinancialRepository:
         self.ratios_path = ratios_path or default_ratio
 
         self.conn = connection or duckdb.connect(":memory:")
+        self._lock = threading.Lock()
+        self._schema_cache: dict[str, set[str]] = {}
 
         # Automatically configure S3 httpfs if either path targets an S3 bucket
         if self._is_s3_path(self.statements_path) or self._is_s3_path(self.ratios_path):
             self._configure_s3()
+            if connection is None:
+                # Lock runtime config so DuckDB S3 credentials/endpoints cannot be altered
+                self.conn.execute("SET lock_configuration = true;")
+
+    def _has_column(self, parquet_path: str, column_name: str) -> bool:
+        """Check whether a Parquet dataset contains a given column (cached per path)."""
+        with self._lock:
+            if parquet_path not in self._schema_cache:
+                try:
+                    rows = self.conn.execute(
+                        "DESCRIBE SELECT * FROM read_parquet(?)",
+                        [parquet_path],
+                    ).fetchall()
+                    self._schema_cache[parquet_path] = {str(r[0]).lower() for r in rows}
+                except (duckdb.Error, OSError):
+                    self._schema_cache[parquet_path] = set()
+            return column_name.lower() in self._schema_cache[parquet_path]
+
+    def execute_fetchall(self, sql: str, params: list[Any] | None = None) -> list[tuple[Any, ...]]:
+        """Execute a parameterized read-only query safely under the repository lock."""
+        stripped = (sql or "").strip()
+        if not _READ_ONLY_SQL_RE.match(stripped) or _MUTATING_SQL_RE.search(stripped):
+            raise DatabaseExecutionError("Write or multi-statement SQL operations are blocked in read-only mode.")
+        with self._lock:
+            if params is not None:
+                return self.conn.execute(sql, params).fetchall()
+            return self.conn.execute(sql).fetchall()
 
     @staticmethod
     def resolve_default_paths() -> tuple[str, str]:
@@ -72,7 +111,7 @@ class DuckDBFinancialRepository:
     def _configure_s3(self) -> None:
         """Configure DuckDB httpfs extension for S3-compatible MinIO access."""
         app_env = os.getenv("APP_ENV", "").lower()
-        if app_env == "docker":
+        if app_env in ("docker", "prod", "production"):
             raw_endpoint = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
         else:
             raw_endpoint = os.getenv("S3_ENDPOINT_URL_LOCAL", "http://localhost:9000")
@@ -129,12 +168,16 @@ class DuckDBFinancialRepository:
             type_params = [query.period_type]
 
         # 1. Build queries for Statement metrics
+        stmt_currency_expr = (
+            "currency" if self._has_column(self.statements_path, "currency") else "CAST(NULL AS VARCHAR) AS currency"
+        )
         for m in stmt_metrics:
             subquery = f"""
                 SELECT
                     statement_key AS record_key,
                     ticker,
                     cik,
+                    {stmt_currency_expr},
                     fiscal_year,
                     fiscal_period,
                     period_type,
@@ -156,23 +199,37 @@ class DuckDBFinancialRepository:
             params.extend([m, self.statements_path] + query.tickers + year_params + period_params + type_params)
 
         # 2. Build queries for Ratio metrics
+        ratio_currency_expr = (
+            "currency" if self._has_column(self.ratios_path, "currency") else "CAST(NULL AS VARCHAR) AS currency"
+        )
+        ratio_acc_expr = (
+            "source_accession_number"
+            if self._has_column(self.ratios_path, "source_accession_number")
+            else "CAST(NULL AS VARCHAR) AS source_accession_number"
+        )
+        ratio_filed_expr = (
+            "source_filed_date"
+            if self._has_column(self.ratios_path, "source_filed_date")
+            else "CAST(NULL AS DATE) AS source_filed_date"
+        )
         for m in ratio_metrics:
             subquery = f"""
                 SELECT
                     ratio_key AS record_key,
                     ticker,
                     cik,
+                    {ratio_currency_expr},
                     fiscal_year,
                     fiscal_period,
                     period_type,
                     start_date,
                     end_date,
                     ? AS metric_name,
-                    CAST({m} AS DECIMAL(28, 2)) AS metric_value,
+                    CAST({m} AS DECIMAL(28, 4)) AS metric_value,
                     false AS is_derived,
                     NULL AS derivation_method,
-                    NULL AS source_accession_number,
-                    NULL AS source_filed_date
+                    {ratio_acc_expr},
+                    {ratio_filed_expr}
                 FROM read_parquet(?)
                 WHERE ticker IN ({ticker_placeholders})
                 {year_filter}
@@ -185,7 +242,9 @@ class DuckDBFinancialRepository:
         if not queries:
             return []
 
-        full_sql = " UNION ALL ".join(queries) + """
+        full_sql = (
+            " UNION ALL ".join(queries)
+            + """
             ORDER BY
                 ticker ASC,
                 fiscal_year ASC,
@@ -199,12 +258,14 @@ class DuckDBFinancialRepository:
                 END ASC,
                 metric_name ASC
         """
+        )
 
         try:
-            cursor = self.conn.execute(full_sql, params)
-            columns = [desc[0] for desc in cursor.description]
-            rows = cursor.fetchall()
+            with self._lock:
+                cursor = self.conn.execute(full_sql, params)
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
         except (duckdb.Error, OSError) as exc:
             raise DatabaseExecutionError(f"Database query execution failed: {exc}") from exc
 
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=False)) for row in rows]

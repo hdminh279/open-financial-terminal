@@ -1,7 +1,7 @@
 """Unit tests for market data contracts, providers, quote service, watchlist repository, and API routes."""
 
-import json
 from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,8 +11,6 @@ from src.data.market.contracts import (
     Market,
     QuoteStatus,
     StockQuote,
-    WatchlistConfig,
-    WatchlistItem,
 )
 from src.data.market.providers import (
     FinnhubQuoteProvider,
@@ -204,8 +202,10 @@ class TestQuoteServiceAndRepository:
 
     def test_watchlist_repository_lifecycle(self) -> None:
         """Test WatchlistRepository add, remove, and duplicate handling in memory."""
-        mock_s3 = MagicMock()
-        mock_s3.exists.return_value = False
+        from src.data.storage.s3_storage import S3Storage
+
+        mock_s3 = MagicMock(spec=S3Storage)
+        mock_s3.object_exists.return_value = False
         mock_quote_svc = MagicMock()
         mock_quote_svc.get_quote.side_effect = lambda sym, **kwargs: StockQuote(
             ticker=sym,
@@ -214,9 +214,7 @@ class TestQuoteServiceAndRepository:
             price=100.0,
             as_of="2026-11-20T12:00:00Z",
         )
-        mock_quote_svc.get_quotes_batch.side_effect = lambda syms, **kwargs: [
-            mock_quote_svc.get_quote(s) for s in syms
-        ]
+        mock_quote_svc.get_quotes_batch.side_effect = lambda syms, **kwargs: [mock_quote_svc.get_quote(s) for s in syms]
 
         repo = WatchlistRepository(s3_storage=mock_s3, quote_service=mock_quote_svc)
         initial_cfg = repo.get_watchlist()
@@ -263,16 +261,15 @@ class TestWatchlistAPI:
             as_of="2026-11-20T12:00:00Z",
             status=QuoteStatus.REAL_TIME,
         )
-        mock_quote_svc.get_quotes_batch.side_effect = lambda syms, **kwargs: [
-            mock_quote_svc.get_quote(s) for s in syms
-        ]
+        mock_quote_svc.get_quotes_batch.side_effect = lambda syms, **kwargs: [mock_quote_svc.get_quote(s) for s in syms]
 
         mock_s3 = MagicMock()
         mock_s3.exists.return_value = False
         repo = WatchlistRepository(s3_storage=mock_s3, quote_service=mock_quote_svc)
 
-        with patch.object(wl_module, "get_watchlist_repository", return_value=repo), patch.object(
-            wl_module, "get_quote_service", return_value=mock_quote_svc
+        with (
+            patch.object(wl_module, "get_watchlist_repository", return_value=repo),
+            patch.object(wl_module, "get_quote_service", return_value=mock_quote_svc),
         ):
             yield
 

@@ -23,10 +23,10 @@ from src.ai.agent.contracts import ChartType
 from src.ai.agent.router import IntentRouter
 from src.ai.agent.state import AgentState
 
-
 # ---------------------------------------------------------------------------
 # 1. Router Chart Preference & Fallback Tests
 # ---------------------------------------------------------------------------
+
 
 def test_router_chart_preference_parsing() -> None:
     """Verify router correctly parses valid chart preferences and falls back on invalid values."""
@@ -96,14 +96,27 @@ def test_router_chart_preference_parsing() -> None:
 # 2. Annual & Quarterly Planning
 # ---------------------------------------------------------------------------
 
+
 def test_annual_and_quarterly_planning() -> None:
     """Verify router plans annual vs quarterly periods without ambiguity."""
     normalizer = TimeSeriesNormalizer()
 
     # Annual records
     records_annual = [
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383285000000},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 391035000000},
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "FY",
+            "metric_value": 383285000000,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2024,
+            "fiscal_period": "FY",
+            "metric_value": 391035000000,
+        },
     ]
     ts_annual = normalizer.normalize(records_annual, "revenues", "AAPL", target_periods=["FY"])
     assert ts_annual is not None
@@ -111,8 +124,20 @@ def test_annual_and_quarterly_planning() -> None:
 
     # Quarterly records
     records_quarterly = [
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "Q1", "metric_value": 119575000000},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "Q2", "metric_value": 90753000000},
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2024,
+            "fiscal_period": "Q1",
+            "metric_value": 119575000000,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2024,
+            "fiscal_period": "Q2",
+            "metric_value": 90753000000,
+        },
     ]
     ts_quarterly = normalizer.normalize(records_quarterly, "revenues", "AAPL", target_periods=["Q1", "Q2"])
     assert ts_quarterly is not None
@@ -123,16 +148,45 @@ def test_annual_and_quarterly_planning() -> None:
 # 3. Annual FY Chart & Chronological Ordering
 # ---------------------------------------------------------------------------
 
+
 def test_annual_fy_chart_and_chronological_order() -> None:
     """Ensure annual records are strictly sorted by fiscal year regardless of input order."""
     engine = ChartEngine()
 
     shuffled_data = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 391.04, "unit": "USD"},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2021, "fiscal_period": "FY", "metric_value": 365.82, "unit": "USD"},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383.29, "unit": "USD"},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2022, "fiscal_period": "FY", "metric_value": 394.33, "unit": "USD"},
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 391.04,
+                "unit": "USD",
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2021,
+                "fiscal_period": "FY",
+                "metric_value": 365.82,
+                "unit": "USD",
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 383.29,
+                "unit": "USD",
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2022,
+                "fiscal_period": "FY",
+                "metric_value": 394.33,
+                "unit": "USD",
+            },
         ]
     }
 
@@ -159,16 +213,41 @@ def test_annual_fy_chart_and_chronological_order() -> None:
 # 4. Quarterly Chronological Order
 # ---------------------------------------------------------------------------
 
+
 def test_quarterly_chart_chronological_order() -> None:
     """Ensure quarterly records are strictly ordered Q1->Q4 chronologically across years."""
     engine = ChartEngine()
 
     shuffled_quarters = {
         "data": [
-            {"ticker": "MSFT", "metric_name": "net_income", "fiscal_year": 2023, "fiscal_period": "Q3", "metric_value": 18.3},
-            {"ticker": "MSFT", "metric_name": "net_income", "fiscal_year": 2023, "fiscal_period": "Q1", "metric_value": 17.56},
-            {"ticker": "MSFT", "metric_name": "net_income", "fiscal_year": 2023, "fiscal_period": "Q4", "metric_value": 20.08},
-            {"ticker": "MSFT", "metric_name": "net_income", "fiscal_year": 2023, "fiscal_period": "Q2", "metric_value": 16.43},
+            {
+                "ticker": "MSFT",
+                "metric_name": "net_income",
+                "fiscal_year": 2023,
+                "fiscal_period": "Q3",
+                "metric_value": 18.3,
+            },
+            {
+                "ticker": "MSFT",
+                "metric_name": "net_income",
+                "fiscal_year": 2023,
+                "fiscal_period": "Q1",
+                "metric_value": 17.56,
+            },
+            {
+                "ticker": "MSFT",
+                "metric_name": "net_income",
+                "fiscal_year": 2023,
+                "fiscal_period": "Q4",
+                "metric_value": 20.08,
+            },
+            {
+                "ticker": "MSFT",
+                "metric_name": "net_income",
+                "fiscal_year": 2023,
+                "fiscal_period": "Q2",
+                "metric_value": 16.43,
+            },
         ]
     }
 
@@ -190,15 +269,34 @@ def test_quarterly_chart_chronological_order() -> None:
 # 5. Missing Values Not Converted to Zero
 # ---------------------------------------------------------------------------
 
+
 def test_missing_values_preserved_not_zero() -> None:
     """Strictly enforce NULL != ZERO. Missing values must remain None/null in datasets and Plotly."""
     engine = ChartEngine()
 
     data_with_missing = {
         "data": [
-            {"ticker": "GOOGL", "metric_name": "gross_profit", "fiscal_year": 2022, "fiscal_period": "FY", "metric_value": 150.0},
-            {"ticker": "GOOGL", "metric_name": "gross_profit", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": None},
-            {"ticker": "GOOGL", "metric_name": "gross_profit", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 180.0},
+            {
+                "ticker": "GOOGL",
+                "metric_name": "gross_profit",
+                "fiscal_year": 2022,
+                "fiscal_period": "FY",
+                "metric_value": 150.0,
+            },
+            {
+                "ticker": "GOOGL",
+                "metric_name": "gross_profit",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": None,
+            },
+            {
+                "ticker": "GOOGL",
+                "metric_name": "gross_profit",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 180.0,
+            },
         ]
     }
 
@@ -227,16 +325,41 @@ def test_missing_values_preserved_not_zero() -> None:
 # 6. Multi-Ticker and Unit Consistency
 # ---------------------------------------------------------------------------
 
+
 def test_multi_ticker_and_unit_consistency() -> None:
     """Ensure multi-ticker comparisons are scaled consistently and plotted together."""
     engine = ChartEngine()
 
     peer_data = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383285000000},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 391035000000},
-            {"ticker": "MSFT", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 211915000000},
-            {"ticker": "MSFT", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 245122000000},
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 383285000000,
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 391035000000,
+            },
+            {
+                "ticker": "MSFT",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 211915000000,
+            },
+            {
+                "ticker": "MSFT",
+                "metric_name": "revenues",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 245122000000,
+            },
         ]
     }
 
@@ -266,13 +389,20 @@ def test_multi_ticker_and_unit_consistency() -> None:
 # 7. Insufficient Data and Preference None Guardrails
 # ---------------------------------------------------------------------------
 
+
 def test_insufficient_data_skips_rendering() -> None:
     """Ensure charts are NOT generated when preference is none or data points < 2."""
     engine = ChartEngine()
 
     single_point = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383.29},
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 383.29,
+            },
         ]
     }
 
@@ -282,8 +412,20 @@ def test_insufficient_data_skips_rendering() -> None:
     # Preference is 'none'
     multi_point = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383.29},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 391.04},
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 383.29,
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 391.04,
+            },
         ]
     }
     assert engine.extract_financial_charts(multi_point, chart_preference="none") == []
@@ -297,6 +439,7 @@ def test_insufficient_data_skips_rendering() -> None:
 # 8. Duration Metrics YTD Conversion & Q4 Derivation
 # ---------------------------------------------------------------------------
 
+
 def test_quarterly_duration_ytd_derivation() -> None:
     """Verify duration metrics YTD conversion:
     Q1 = YTD Q1 (100)
@@ -307,10 +450,40 @@ def test_quarterly_duration_ytd_derivation() -> None:
     normalizer = TimeSeriesNormalizer()
 
     records = [
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q1", "metric_value": 100.0, "duration_scope": "discrete_quarter"},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q2", "metric_value": 220.0, "is_cumulative": True, "duration_scope": "cumulative_6m"},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q3", "metric_value": 350.0, "is_cumulative": True, "duration_scope": "cumulative_9m"},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 500.0, "duration_scope": "annual_12m"},
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q1",
+            "metric_value": 100.0,
+            "duration_scope": "discrete_quarter",
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q2",
+            "metric_value": 220.0,
+            "is_cumulative": True,
+            "duration_scope": "cumulative_6m",
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q3",
+            "metric_value": 350.0,
+            "is_cumulative": True,
+            "duration_scope": "cumulative_9m",
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "FY",
+            "metric_value": 500.0,
+            "duration_scope": "annual_12m",
+        },
     ]
 
     ts = normalizer.normalize(records, "revenues", "AAPL", target_periods=["Q1", "Q2", "Q3", "Q4"])
@@ -338,16 +511,47 @@ def test_quarterly_duration_ytd_derivation() -> None:
 # 9. Point-in-Time Metrics (Assets) No Subtraction
 # ---------------------------------------------------------------------------
 
+
 def test_point_in_time_assets_no_subtraction() -> None:
     """Verify point-in-time metrics (e.g. total_assets) NEVER undergo cumulative subtraction."""
     normalizer = TimeSeriesNormalizer()
 
     records = [
-        {"ticker": "AAPL", "metric_name": "total_assets", "fiscal_year": 2023, "fiscal_period": "Q1", "metric_value": 350.0},
-        {"ticker": "AAPL", "metric_name": "total_assets", "fiscal_year": 2023, "fiscal_period": "Q2", "metric_value": 360.0},
-        {"ticker": "AAPL", "metric_name": "total_assets", "fiscal_year": 2023, "fiscal_period": "Q3", "metric_value": 370.0},
-        {"ticker": "AAPL", "metric_name": "total_assets", "fiscal_year": 2023, "fiscal_period": "Q4", "metric_value": 380.0},
-        {"ticker": "AAPL", "metric_name": "total_assets", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 380.0},
+        {
+            "ticker": "AAPL",
+            "metric_name": "total_assets",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q1",
+            "metric_value": 350.0,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "total_assets",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q2",
+            "metric_value": 360.0,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "total_assets",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q3",
+            "metric_value": 370.0,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "total_assets",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q4",
+            "metric_value": 380.0,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "total_assets",
+            "fiscal_year": 2023,
+            "fiscal_period": "FY",
+            "metric_value": 380.0,
+        },
     ]
 
     ts = normalizer.normalize(records, "total_assets", "AAPL", target_periods=["Q1", "Q2", "Q3", "Q4"])
@@ -366,14 +570,28 @@ def test_point_in_time_assets_no_subtraction() -> None:
 # 10. Missing or Incompatible Source Data Handling
 # ---------------------------------------------------------------------------
 
+
 def test_missing_or_incompatible_source_data() -> None:
     """Verify that if YTD data is missing or incompatible, values remain None without crashing."""
     normalizer = TimeSeriesNormalizer()
 
     # Missing YTD Q2 -> Q3 cannot be derived from YTD
     records_missing_q2 = [
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q1", "metric_value": 100.0},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q3", "metric_value": 350.0, "is_cumulative": True},
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q1",
+            "metric_value": 100.0,
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q3",
+            "metric_value": 350.0,
+            "is_cumulative": True,
+        },
     ]
     ts = normalizer.normalize(records_missing_q2, "revenues", "AAPL", target_periods=["Q1", "Q2", "Q3", "Q4"])
     # Q1 exists (100.0), Q2 is None, Q3 cannot be derived (None) -> only 1 valid point -> returns None
@@ -381,8 +599,23 @@ def test_missing_or_incompatible_source_data() -> None:
 
     # Incompatible units (USD vs EUR)
     records_mismatched_units = [
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q1", "metric_value": 100.0, "unit": "usd"},
-        {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "Q2", "metric_value": 220.0, "unit": "eur", "is_cumulative": True},
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q1",
+            "metric_value": 100.0,
+            "unit": "usd",
+        },
+        {
+            "ticker": "AAPL",
+            "metric_name": "revenues",
+            "fiscal_year": 2023,
+            "fiscal_period": "Q2",
+            "metric_value": 220.0,
+            "unit": "eur",
+            "is_cumulative": True,
+        },
     ]
     derived_val, _is_derived, _ = normalizer._derive_quarterly_duration(
         fy=2023,
@@ -398,12 +631,25 @@ def test_missing_or_incompatible_source_data() -> None:
 # 11. Regression with Existing Contracts & Citation Node
 # ---------------------------------------------------------------------------
 
+
 def test_citation_node_chart_preference_integration() -> None:
     """Verify citation_node extracts charts honoring query_plan.chart_preference."""
     sql_data = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2023, "fiscal_period": "FY", "metric_value": 383285000000},
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": 2024, "fiscal_period": "FY", "metric_value": 391035000000},
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2023,
+                "fiscal_period": "FY",
+                "metric_value": 383285000000,
+            },
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": 2024,
+                "fiscal_period": "FY",
+                "metric_value": 391035000000,
+            },
         ]
     }
 
@@ -438,10 +684,23 @@ def test_chart_engine_year_range_filtering() -> None:
     # Data containing all years from 2009 to 2026 (like the user experienced)
     all_years_data = {
         "data": [
-            {"ticker": "AAPL", "metric_name": "revenues", "fiscal_year": y, "fiscal_period": "FY", "metric_value": 100.0 + y}
+            {
+                "ticker": "AAPL",
+                "metric_name": "revenues",
+                "fiscal_year": y,
+                "fiscal_period": "FY",
+                "metric_value": 100.0 + y,
+            }
             for y in range(2009, 2027)
-        ] + [
-            {"ticker": "MSFT", "metric_name": "revenues", "fiscal_year": y, "fiscal_period": "FY", "metric_value": 50.0 + y}
+        ]
+        + [
+            {
+                "ticker": "MSFT",
+                "metric_name": "revenues",
+                "fiscal_year": y,
+                "fiscal_period": "FY",
+                "metric_value": 50.0 + y,
+            }
             for y in range(2009, 2027)
         ]
     }
@@ -459,4 +718,3 @@ def test_chart_engine_year_range_filtering() -> None:
     assert chart.x_labels == ["FY2020", "FY2021", "FY2022", "FY2023", "FY2024"]
     assert len(chart.datasets[0]["values"]) == 5
     assert len(chart.datasets[1]["values"]) == 5
-

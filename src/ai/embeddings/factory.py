@@ -1,7 +1,6 @@
 """Factory for instantiating embedding strategies based on configuration."""
 
 import os
-from typing import Optional
 
 from src.ai.embeddings.base import EmbeddingStrategy
 from src.ai.embeddings.fastembed_strategy import FastEmbedStrategy
@@ -12,8 +11,8 @@ class EmbeddingFactory:
 
     @staticmethod
     def create(
-        provider: Optional[str] = None,
-        model_name: Optional[str] = None,
+        provider: str | None = None,
+        model_name: str | None = None,
         **kwargs,
     ) -> EmbeddingStrategy:
         """Create and return an EmbeddingStrategy instance.
@@ -26,11 +25,7 @@ class EmbeddingFactory:
         Returns:
             Configured EmbeddingStrategy instance.
         """
-        selected_provider = (
-            provider
-            or os.getenv("EMBEDDING_PROVIDER")
-            or "fastembed"
-        ).lower().strip()
+        selected_provider = (provider or os.getenv("EMBEDDING_PROVIDER") or "fastembed").lower().strip()
 
         selected_model = model_name or os.getenv("EMBEDDING_MODEL")
 

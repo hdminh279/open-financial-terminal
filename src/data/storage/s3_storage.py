@@ -4,10 +4,11 @@ Implements an Adapter pattern around boto3 S3 client to handle bucket management
 object upload/download with metadata provenance, and existence checks.
 """
 
+import hashlib
 import logging
 import os
-import hashlib
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -18,37 +19,27 @@ logger = logging.getLogger(__name__)
 class S3Storage:
     """Gateway adapter for local MinIO S3-compatible storage."""
 
-    DEFAULT_BUCKETS = ["sec-bronze", "sec-silver", "sec-gold"]
+    DEFAULT_BUCKETS: tuple[str, ...] = ("sec-bronze", "sec-silver", "sec-gold")
 
     def __init__(
         self,
-        endpoint_url: Optional[str] = None,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
+        endpoint_url: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
         region_name: str = "us-east-1",
     ) -> None:
         """Initialize S3 client with environment fallback."""
         app_env = os.getenv("APP_ENV", "").lower()
-        if app_env == "docker":
+        if app_env in ("docker", "prod", "production"):
             default_endpoint = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
         else:
             default_endpoint = (
-                os.getenv("S3_ENDPOINT_URL_LOCAL")
-                or os.getenv("S3_ENDPOINT_URL")
-                or "http://localhost:9000"
+                os.getenv("S3_ENDPOINT_URL_LOCAL") or os.getenv("S3_ENDPOINT_URL") or "http://localhost:9000"
             )
 
         self.endpoint_url = endpoint_url or default_endpoint
-        self.access_key = (
-            access_key
-            or os.getenv("S3_ACCESS_KEY")
-            or os.getenv("MINIO_ROOT_USER")
-        )
-        self.secret_key = (
-            secret_key
-            or os.getenv("S3_SECRET_KEY")
-            or os.getenv("MINIO_ROOT_PASSWORD")
-        )
+        self.access_key = access_key or os.getenv("S3_ACCESS_KEY") or os.getenv("MINIO_ROOT_USER")
+        self.secret_key = secret_key or os.getenv("S3_SECRET_KEY") or os.getenv("MINIO_ROOT_PASSWORD")
         self.region_name = region_name
 
         self.client = boto3.client(
@@ -61,7 +52,7 @@ class S3Storage:
         )
         logger.info("Initialized S3Storage connected to %s", self.endpoint_url)
 
-    def ensure_buckets_exist(self, buckets: Optional[List[str]] = None) -> None:
+    def ensure_buckets_exist(self, buckets: list[str] | None = None) -> None:
         """Ensure all required medallion buckets exist, creating them if necessary."""
         target_buckets = buckets or self.DEFAULT_BUCKETS
         for bucket in target_buckets:
@@ -83,11 +74,11 @@ class S3Storage:
         key: str,
         data: bytes,
         content_type: str = "application/octet-stream",
-        metadata: Optional[Dict[str, str]] = None,
+        metadata: dict[str, str] | None = None,
     ) -> bool:
         """Upload raw bytes to a target bucket and key with optional custom metadata."""
         try:
-            extra_args: Dict[str, Any] = {"ContentType": content_type}
+            extra_args: dict[str, Any] = {"ContentType": content_type}
             if metadata:
                 # S3 metadata values must be strings
                 extra_args["Metadata"] = {k: str(v) for k, v in metadata.items()}
@@ -145,7 +136,7 @@ class S3Storage:
             logger.error("Failed to delete object from s3://%s/%s: %s", bucket, key, exc)
             raise
 
-    def get_metadata(self, bucket: str, key: str) -> Dict[str, Any]:
+    def get_metadata(self, bucket: str, key: str) -> dict[str, Any]:
         """Retrieve system and user metadata for an object."""
         try:
             response = self.client.head_object(Bucket=bucket, Key=key)
@@ -160,11 +151,11 @@ class S3Storage:
             logger.error("Failed to fetch metadata for s3://%s/%s: %s", bucket, key, exc)
             raise
 
-    def list_objects(self, bucket: str, prefix: str = "") -> List[str]:
+    def list_objects(self, bucket: str, prefix: str = "") -> list[str]:
         """List all object keys in a bucket matching an optional prefix."""
         try:
             paginator = self.client.get_paginator("list_objects_v2")
-            keys: List[str] = []
+            keys: list[str] = []
             for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
                 for item in page.get("Contents", []):
                     keys.append(item["Key"])

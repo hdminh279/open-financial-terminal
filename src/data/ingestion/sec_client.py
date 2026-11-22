@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
+
 import httpx
 from tenacity import (
     retry,
@@ -7,8 +8,11 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
 from src.data.ingestion.rate_limiter import RateLimiter
+
 logger = logging.getLogger(__name__)
+
 
 def _is_retryable_error(exception: BaseException) -> bool:
     """Determine whether an error is transient and safe to retry."""
@@ -22,16 +26,15 @@ def _is_retryable_error(exception: BaseException) -> bool:
 
 class SECClient:
     """Resilient HTTP client for SEC EDGAR APIs with mandatory headers and rate limiting."""
+
     def __init__(
         self,
         user_agent: str,
-        rate_limiter: Optional[RateLimiter] = None,
+        rate_limiter: RateLimiter | None = None,
         timeout_seconds: float = 15.0,
     ):
         if not user_agent or "@" not in user_agent:
-            raise ValueError(
-                "Invalid SEC User-Agent. SEC requires format: '<App_Name> <admin_contact@domain.com>'"
-            )
+            raise ValueError("Invalid SEC User-Agent. SEC requires format: '<App_Name> <admin_contact@domain.com>'")
         self.user_agent = user_agent.strip()
         self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=10.0)
         self.client = httpx.Client(
@@ -45,11 +48,10 @@ class SECClient:
     @retry(
         retry=retry_if_exception(_is_retryable_error),
         stop=stop_after_attempt(5),
-        wait = wait_exponential(multiplier=1.0, min=1.0, max=10.0),
+        wait=wait_exponential(multiplier=1.0, min=1.0, max=10.0),
         reraise=True,
     )
-
-    def get(self, url: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
+    def get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
         """Send a rate_limited GET request with exponential backoff on transient errors."""
         self.rate_limiter.acquire()
         logger.debug("Requesting URL: %s with params: %s", url, params)
@@ -58,7 +60,7 @@ class SECClient:
         response.raise_for_status()
         return response
 
-    def get_json(self, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Convenience wrapper that returns the parsed JSON payload."""
         response = self.get(url, params=params)
         return response.json()
@@ -72,5 +74,3 @@ class SECClient:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
-
-

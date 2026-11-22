@@ -10,13 +10,14 @@ Verifies:
 - Idempotent execution
 """
 
-from datetime import date, datetime
-from decimal import Decimal
 import json
-from typing import Any, List
-import pytest
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 
 from src.data.processing.facts_parser import FactsParser
 
@@ -366,7 +367,7 @@ class TestFactsParserPyArrowAndIdempotency:
         mock_s3.list_objects.return_value = ["raw/company_facts/AAPL_0000320193.json"]
         mock_s3.download_bytes.return_value = json.dumps(sample_json).encode("utf-8")
 
-        uploaded_buffers: List[bytes] = []
+        uploaded_buffers: list[bytes] = []
 
         def capture_upload(bucket: str, key: str, data: bytes, **kwargs: Any) -> bool:
             if "facts.parquet" in key:
@@ -397,9 +398,7 @@ class TestFactsParserTickerResolution:
 
     def test_resolve_ticker_from_explicit_argument(self, parser: FactsParser) -> None:
         """Verify explicit ticker overrides any lookup."""
-        ticker = parser.resolve_ticker(
-            cik="0000320193", entity_name="Apple Inc.", explicit_ticker="aapl"
-        )
+        ticker = parser.resolve_ticker(cik="0000320193", entity_name="Apple Inc.", explicit_ticker="aapl")
         assert ticker == "AAPL"
 
     def test_resolve_ticker_from_cik(self, parser: FactsParser) -> None:
@@ -539,5 +538,3 @@ class TestFactsParserTaxonomyAndUnits:
         eps_obs = next(o for o in obs if o["tag"] == "EarningsPerShareDiluted")
         assert eps_obs["value"] == Decimal("1.52")
         assert eps_obs["unit"] == "USD/shares"
-
-

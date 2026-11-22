@@ -9,48 +9,48 @@ import argparse
 import io
 import json
 import logging
-import os
 import re
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from dotenv import load_dotenv
 
 from src.data.chunking.chunking_engine import StructureAwareChunkingEngine, TextChunk
 from src.data.processing.section_extractor import (
-    ExtractedSection,
     ExtractionReport,
     HTMLSectionExtractor,
     SectionStatus,
 )
 from src.data.storage.s3_storage import S3Storage
 
-from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 # Strongly typed PyArrow schema for Gold chunks analytical mart
-CHUNK_PARQUET_SCHEMA = pa.schema([
-    ("chunk_id", pa.string()),
-    ("cik", pa.string()),
-    ("ticker", pa.string()),
-    ("accession_number", pa.string()),
-    ("form", pa.string()),
-    ("fiscal_year", pa.int64()),
-    ("filed_date", pa.string()),
-    ("period_end", pa.string()),
-    ("part", pa.string()),
-    ("item", pa.string()),
-    ("subsection", pa.string()),
-    ("content_type", pa.string()),
-    ("chunk_index", pa.int64()),
-    ("token_count", pa.int64()),
-    ("text", pa.string()),
-    ("source_url", pa.string()),
-    ("source_content_hash", pa.string()),
-])
+CHUNK_PARQUET_SCHEMA = pa.schema(
+    [
+        ("chunk_id", pa.string()),
+        ("cik", pa.string()),
+        ("ticker", pa.string()),
+        ("accession_number", pa.string()),
+        ("form", pa.string()),
+        ("fiscal_year", pa.int64()),
+        ("filed_date", pa.string()),
+        ("period_end", pa.string()),
+        ("part", pa.string()),
+        ("item", pa.string()),
+        ("subsection", pa.string()),
+        ("content_type", pa.string()),
+        ("chunk_index", pa.int64()),
+        ("token_count", pa.int64()),
+        ("text", pa.string()),
+        ("source_url", pa.string()),
+        ("source_content_hash", pa.string()),
+    ]
+)
 
 
 class FilingsTextPipeline:
@@ -58,9 +58,9 @@ class FilingsTextPipeline:
 
     def __init__(
         self,
-        s3_storage: Optional[S3Storage] = None,
-        section_extractor: Optional[HTMLSectionExtractor] = None,
-        chunking_engine: Optional[StructureAwareChunkingEngine] = None,
+        s3_storage: S3Storage | None = None,
+        section_extractor: HTMLSectionExtractor | None = None,
+        chunking_engine: StructureAwareChunkingEngine | None = None,
         bronze_bucket: str = "sec-bronze",
         silver_bucket: str = "sec-silver",
         gold_bucket: str = "sec-gold",
@@ -77,7 +77,7 @@ class FilingsTextPipeline:
         self,
         html_s3_key: str,
         force: bool = False,
-    ) -> Tuple[List[TextChunk], Dict[str, Any]]:
+    ) -> tuple[list[TextChunk], dict[str, Any]]:
         """Process a single HTML filing from Bronze to Silver and Gold chunks.
 
         Args:
@@ -91,7 +91,7 @@ class FilingsTextPipeline:
 
         # 1. Download companion metadata JSON if present
         meta_key = html_s3_key.rsplit(".", 1)[0] + "_metadata.json"
-        metadata: Dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
         if self.s3.object_exists(self.bronze_bucket, meta_key):
             try:
                 meta_bytes = self.s3.download_bytes(self.bronze_bucket, meta_key)
@@ -160,8 +160,7 @@ class FilingsTextPipeline:
         )
 
         extracted_sections = [
-            s for s in report.sections
-            if s.status in (SectionStatus.EXTRACTED, SectionStatus.NON_STANDARD)
+            s for s in report.sections if s.status in (SectionStatus.EXTRACTED, SectionStatus.NON_STANDARD)
         ]
 
         for sec in extracted_sections:
@@ -185,7 +184,7 @@ class FilingsTextPipeline:
             )
 
         # 5. Generate Gold Chunks using StructureAwareChunkingEngine
-        chunks: List[TextChunk] = []
+        chunks: list[TextChunk] = []
         chunk_offset = 0
         for sec in extracted_sections:
             sec_chunks = self.chunker.chunk_section(
@@ -219,9 +218,9 @@ class FilingsTextPipeline:
 
     def process_all(
         self,
-        tickers: Optional[List[str]] = None,
+        tickers: list[str] | None = None,
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process all HTML filings across companies, aggregate chunks, and upload Parquet.
 
         Args:
@@ -242,7 +241,7 @@ class FilingsTextPipeline:
         logger.info("Discovered %d HTML filing objects across target tickers.", len(html_keys))
 
         gold_key = "chunks/text_chunks.parquet"
-        existing_records: List[Dict[str, Any]] = []
+        existing_records: list[dict[str, Any]] = []
         existing_accessions: set[str] = set()
 
         # Step 1: Incremental check - inspect existing Gold Parquet mart
@@ -263,7 +262,7 @@ class FilingsTextPipeline:
                 existing_accessions = set()
 
         # Step 2: Separate up-to-date filings from new/changed filings
-        keys_to_process: List[str] = []
+        keys_to_process: list[str] = []
         skipped_count = 0
 
         for key in html_keys:
@@ -282,9 +281,9 @@ class FilingsTextPipeline:
             len(keys_to_process),
         )
 
-        all_new_chunks: List[TextChunk] = []
-        filing_summaries: List[Dict[str, Any]] = []
-        company_stats: Dict[str, Dict[str, Any]] = {}
+        all_new_chunks: list[TextChunk] = []
+        filing_summaries: list[dict[str, Any]] = []
+        company_stats: dict[str, dict[str, Any]] = {}
 
         # Step 3: Process only the new or modified filings
         for key in keys_to_process:
@@ -327,10 +326,7 @@ class FilingsTextPipeline:
         # Step 4: Incremental Merge into Gold Parquet
         if keys_to_process and (all_new_chunks or existing_records):
             reprocessed_accs = {s["accession_number"] for s in filing_summaries}
-            retained_records = [
-                r for r in existing_records
-                if r.get("accession_number") not in reprocessed_accs
-            ]
+            retained_records = [r for r in existing_records if r.get("accession_number") not in reprocessed_accs]
             new_chunk_records = [chunk.model_dump() for chunk in all_new_chunks]
             final_records = retained_records + new_chunk_records
 
@@ -392,11 +388,11 @@ class FilingsTextPipeline:
                         company_stats[tk]["10Q_count"] += 1
 
         # Format company stats for JSON report
-        for t, s in company_stats.items():
+        for s in company_stats.values():
             s["abnormal_sections"] = list(s["abnormal_sections"])
 
         overall_summary = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "incremental": True,
             "filings_skipped_up_to_date": skipped_count,
             "filings_newly_processed": len(keys_to_process),
@@ -409,7 +405,7 @@ class FilingsTextPipeline:
         return overall_summary
 
     @staticmethod
-    def format_verification_report(summary: Dict[str, Any]) -> str:
+    def format_verification_report(summary: dict[str, Any]) -> str:
         """Format aggregated summary dictionary into a clean Markdown audit report."""
         lines = [
             "# TEXT PIPELINE & CHUNKING VERIFICATION REPORT",
@@ -435,24 +431,28 @@ class FilingsTextPipeline:
                 f"{st['total_tables']} | {st['total_chunks']} | `{missing_str}` |"
             )
 
-        lines.extend([
-            "",
-            "## 2. Sample Chunk Verification (First 3 Chunks)",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## 2. Sample Chunk Verification (First 3 Chunks)",
+                "",
+            ]
+        )
 
         for i, sample in enumerate(summary.get("sample_chunks", [])):
-            lines.extend([
-                f"### Sample {i+1}: Chunk ID `{sample.get('chunk_id')[:12]}...`",
-                f"- **Ticker / Form / FY**: {sample.get('ticker')} | {sample.get('form')} | FY{sample.get('fiscal_year')}",
-                f"- **Section / Subsection**: {sample.get('item')} | {sample.get('subsection') or 'Root'}",
-                f"- **Type / Tokens**: `{sample.get('content_type')}` | {sample.get('token_count')} tokens",
-                f"- **Source URL**: [{sample.get('source_url')}]({sample.get('source_url')})",
-                "```text",
-                sample.get("text", "")[:280] + ("..." if len(sample.get("text", "")) > 280 else ""),
-                "```",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"### Sample {i + 1}: Chunk ID `{sample.get('chunk_id')[:12]}...`",
+                    f"- **Ticker / Form / FY**: {sample.get('ticker')} | {sample.get('form')} | FY{sample.get('fiscal_year')}",
+                    f"- **Section / Subsection**: {sample.get('item')} | {sample.get('subsection') or 'Root'}",
+                    f"- **Type / Tokens**: `{sample.get('content_type')}` | {sample.get('token_count')} tokens",
+                    f"- **Source URL**: [{sample.get('source_url')}]({sample.get('source_url')})",
+                    "```text",
+                    sample.get("text", "")[:280] + ("..." if len(sample.get("text", "")) > 280 else ""),
+                    "```",
+                    "",
+                ]
+            )
 
         return "\n".join(lines)
 
@@ -478,6 +478,7 @@ if __name__ == "__main__":
 
     pipeline = FilingsTextPipeline()
     from src.core.financial.company_registry import get_supported_tickers
+
     target_tickers = [args.ticker.upper()] if args.ticker else sorted(list(get_supported_tickers()))
 
     result = pipeline.process_all(tickers=target_tickers, force=args.force)

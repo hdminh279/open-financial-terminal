@@ -1,5 +1,7 @@
 import time
+
 import pytest
+
 from src.data.ingestion.rate_limiter import RateLimiter
 
 

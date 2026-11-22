@@ -5,11 +5,12 @@ split-span heading detection fallback, structural content extraction (paragraphs
 lists, tables), and non-standard narrative items (such as Executive Officers).
 """
 
-from enum import Enum
 import logging
 import re
 import unicodedata
-from typing import Any, Dict, List, Optional, Set, Tuple
+from enum import Enum
+from typing import Any
+
 from bs4 import BeautifulSoup, Comment, Tag
 from pydantic import BaseModel, Field
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class SectionStatus(str, Enum):
     """Extraction status flag for each document section."""
+
     EXTRACTED = "EXTRACTED"
     NOT_FOUND = "NOT_FOUND"
     UNCERTAIN_BOUNDARY = "UNCERTAIN_BOUNDARY"
@@ -26,6 +28,7 @@ class SectionStatus(str, Enum):
 
 class ContentNodeType(str, Enum):
     """Semantic type of content node within a section."""
+
     PARAGRAPH = "paragraph"
     HEADING = "heading"
     LIST = "list"
@@ -34,20 +37,22 @@ class ContentNodeType(str, Enum):
 
 class ExtractedContentNode(BaseModel):
     """Atomic structural unit extracted from filing HTML."""
+
     node_type: ContentNodeType
     text: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExtractedSection(BaseModel):
     """Complete representation of a parsed Part/Item section."""
-    part: Optional[str] = None
+
+    part: str | None = None
     item: str
     title: str
     status: SectionStatus = SectionStatus.EXTRACTED
     is_standard: bool = True
-    start_anchor: Optional[str] = None
-    nodes: List[ExtractedContentNode] = Field(default_factory=list)
+    start_anchor: str | None = None
+    nodes: list[ExtractedContentNode] = Field(default_factory=list)
     raw_text: str = ""
     table_count: int = 0
     char_count: int = 0
@@ -55,17 +60,18 @@ class ExtractedSection(BaseModel):
 
 class ExtractionReport(BaseModel):
     """Summary report of filing section extraction."""
-    ticker: Optional[str] = None
-    form: Optional[str] = None
-    accession_number: Optional[str] = None
-    sections: List[ExtractedSection] = Field(default_factory=list)
+
+    ticker: str | None = None
+    form: str | None = None
+    accession_number: str | None = None
+    sections: list[ExtractedSection] = Field(default_factory=list)
     toc_found: bool = False
     toc_anchors_count: int = 0
-    unidentified_sections: List[str] = Field(default_factory=list)
-    diagnostics: Dict[str, Any] = Field(default_factory=dict)
+    unidentified_sections: list[str] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
-CANONICAL_10K_ITEMS: Dict[str, str] = {
+CANONICAL_10K_ITEMS: dict[str, str] = {
     "ITEM 1": "Business",
     "ITEM 1A": "Risk Factors",
     "ITEM 1B": "Unresolved Staff Comments",
@@ -91,7 +97,7 @@ CANONICAL_10K_ITEMS: Dict[str, str] = {
     "ITEM 16": "Form 10-K Summary",
 }
 
-CANONICAL_10Q_ITEMS: Dict[str, Dict[str, str]] = {
+CANONICAL_10Q_ITEMS: dict[str, dict[str, str]] = {
     "PART I": {
         "ITEM 1": "Financial Statements",
         "ITEM 2": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
@@ -109,7 +115,7 @@ CANONICAL_10Q_ITEMS: Dict[str, Dict[str, str]] = {
     },
 }
 
-CANONICAL_20F_ITEMS: Dict[str, str] = {
+CANONICAL_20F_ITEMS: dict[str, str] = {
     # Part I: Operating & Business Information
     "ITEM 1": "Identity of Directors, Senior Management and Advisers",
     "ITEM 2": "Offer Statistics and Expected Timetable",
@@ -177,20 +183,18 @@ class HTMLSectionExtractor:
         for tag in soup.find_all(["ix:hidden", "ix:header"]):
             tag.decompose()
 
-        hidden_style_pattern = re.compile(
-            r"(?:display\s*:\s*none|visibility\s*:\s*hidden)", re.IGNORECASE
-        )
+        hidden_style_pattern = re.compile(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)", re.IGNORECASE)
         for tag in soup.find_all(style=hidden_style_pattern):
             tag.decompose()
 
-    def identify_toc_elements(self, soup: BeautifulSoup) -> Tuple[Set[Tag], Dict[str, str]]:
+    def identify_toc_elements(self, soup: BeautifulSoup) -> tuple[set[Tag], dict[str, str]]:
         """Identify Table of Contents containers and extract anchor links mapping items to IDs.
 
         Returns:
             Tuple of (set of TOC container tags, dict mapping canonical item keys to anchor IDs).
         """
-        toc_elements: Set[Tag] = set()
-        anchor_map: Dict[str, str] = {}
+        toc_elements: set[Tag] = set()
+        anchor_map: dict[str, str] = {}
 
         toc_anchors = soup.find_all("a", href=re.compile(r"^#.+"))
         for a in toc_anchors:
@@ -226,12 +230,12 @@ class HTMLSectionExtractor:
         norm = unicodedata.normalize("NFKC", text)
         return re.sub(r"\s+", " ", norm).strip()
 
-    def _extract_leaf_blocks(self, element: Tag, toc_elements: Set[Tag]) -> List[Tag]:
+    def _extract_leaf_blocks(self, element: Tag, toc_elements: set[Tag]) -> list[Tag]:
         """Recursively collect leaf block-level elements, skipping TOC containers."""
         if element in toc_elements:
             return []
 
-        blocks: List[Tag] = []
+        blocks: list[Tag] = []
         for child in element.children:
             if not isinstance(child, Tag):
                 continue
@@ -239,34 +243,31 @@ class HTMLSectionExtractor:
                 continue
 
             tag_name = child.name.lower()
-            if tag_name in ("table", "ul", "ol", "dl", "h1", "h2", "h3", "h4", "h5", "h6"):
-                blocks.append(child)
-            elif tag_name == "p":
+            if tag_name in ("table", "ul", "ol", "dl", "h1", "h2", "h3", "h4", "h5", "h6", "p"):
                 blocks.append(child)
             elif tag_name == "div":
-                has_nested_block = child.find(lambda t: t != child and t.name.lower() in BLOCK_TAGS) is not None
+                has_nested_block = (
+                    child.find(lambda t, current=child: t != current and t.name.lower() in BLOCK_TAGS) is not None
+                )
                 if has_nested_block:
                     blocks.extend(self._extract_leaf_blocks(child, toc_elements))
-                else:
-                    if child.get_text(strip=True):
-                        blocks.append(child)
+                elif child.get_text(strip=True):
+                    blocks.append(child)
             else:
                 blocks.extend(self._extract_leaf_blocks(child, toc_elements))
 
         return blocks
 
-    def _parse_content_node(self, tag: Tag) -> Optional[ExtractedContentNode]:
+    def _parse_content_node(self, tag: Tag) -> ExtractedContentNode | None:
         """Convert a BeautifulSoup tag into an ExtractedContentNode preserving structure."""
         tag_name = tag.name.lower()
         if tag_name == "table":
-            headers: List[str] = []
-            rows: List[List[str]] = []
+            headers: list[str] = []
+            rows: list[list[str]] = []
             for tr in tag.find_all("tr"):
                 th_cells = [self._normalize_text(th.get_text(" ", strip=True)) for th in tr.find_all("th")]
                 td_cells = [self._normalize_text(td.get_text(" ", strip=True)) for td in tr.find_all("td")]
                 if th_cells and not headers:
-                    headers = th_cells
-                elif th_cells and not td_cells and not headers:
                     headers = th_cells
                 elif td_cells:
                     rows.append(td_cells)
@@ -279,7 +280,7 @@ class HTMLSectionExtractor:
                 metadata={"headers": headers, "rows": rows, "caption": caption},
             )
         elif tag_name in ("ul", "ol", "dl"):
-            items: List[str] = []
+            items: list[str] = []
             for li in tag.find_all(["li", "dt", "dd"]):
                 item_text = self._normalize_text(li.get_text(" ", strip=True))
                 if item_text:
@@ -305,8 +306,7 @@ class HTMLSectionExtractor:
             if not text:
                 return None
             is_bold = bool(
-                tag.find(["b", "strong"])
-                or "font-weight:bold" in tag.get("style", "").replace(" ", "").lower()
+                tag.find(["b", "strong"]) or "font-weight:bold" in tag.get("style", "").replace(" ", "").lower()
             )
             if is_bold and len(text) < 120 and not text.endswith("."):
                 return ExtractedContentNode(
@@ -320,7 +320,7 @@ class HTMLSectionExtractor:
                 metadata={},
             )
 
-    def _is_note_heading(self, tag: Tag, text: str) -> Optional[Tuple[str, str]]:
+    def _is_note_heading(self, tag: Tag, text: str) -> tuple[str, str] | None:
         """Determine if block element represents an Item 8 Note disclosure heading.
 
         Must meet all constraints:
@@ -355,8 +355,8 @@ class HTMLSectionExtractor:
         self,
         html_content: str,
         form: str = "10-K",
-        ticker: Optional[str] = None,
-        accession_number: Optional[str] = None,
+        ticker: str | None = None,
+        accession_number: str | None = None,
     ) -> ExtractionReport:
         """Parse HTML, isolate TOC, resolve section boundaries, and extract structured content."""
         soup = BeautifulSoup(html_content, "lxml")
@@ -365,11 +365,11 @@ class HTMLSectionExtractor:
 
         leaf_blocks = self._extract_leaf_blocks(soup.body if soup.body else soup, toc_elements)
 
-        sections: List[ExtractedSection] = []
-        current_part: Optional[str] = None
-        current_section: Optional[ExtractedSection] = None
+        sections: list[ExtractedSection] = []
+        current_part: str | None = None
+        current_section: ExtractedSection | None = None
 
-        def finalize_section(sec: Optional[ExtractedSection]) -> None:
+        def finalize_section(sec: ExtractedSection | None) -> None:
             if not sec:
                 return
             sec.char_count = len(sec.raw_text)
@@ -391,11 +391,7 @@ class HTMLSectionExtractor:
             is_financial_item = current_section and any(
                 k in current_section.item for k in ("ITEM 8", "ITEM 17", "ITEM 18", "NOTE")
             )
-            note_info = (
-                self._is_note_heading(block, text)
-                if is_financial_item
-                else None
-            )
+            note_info = self._is_note_heading(block, text) if is_financial_item else None
 
             is_new_section = False
             item_key = ""
@@ -411,7 +407,9 @@ class HTMLSectionExtractor:
                 elif "20-F" in form.upper():
                     title = CANONICAL_20F_ITEMS.get(item_key, m_item.group(2).strip() or item_key)
                 else:
-                    if item_key in CANONICAL_10Q_ITEMS["PART II"] and item_key not in CANONICAL_10Q_ITEMS.get(current_part or "PART I", {}):
+                    if item_key in CANONICAL_10Q_ITEMS["PART II"] and item_key not in CANONICAL_10Q_ITEMS.get(
+                        current_part or "PART I", {}
+                    ):
                         current_part = "PART II"
                     part_map = CANONICAL_10Q_ITEMS.get(current_part or "PART I", {})
                     title = part_map.get(item_key, m_item.group(2).strip() or item_key)
@@ -455,7 +453,7 @@ class HTMLSectionExtractor:
 
         # Identify missing canonical items
         found_items = {s.item for s in sections}
-        unidentified: List[str] = []
+        unidentified: list[str] = []
 
         if "10-K" in form.upper():
             for exp_item, exp_title in CANONICAL_10K_ITEMS.items():

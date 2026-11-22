@@ -5,9 +5,10 @@ omissions (Incorporated by Reference, Not Applicable, Extracted, Missing Anomaly
 and generates audit reports in Markdown and JSON without graphical icons.
 """
 
-from enum import Enum
 import logging
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from src.data.processing.section_extractor import (
@@ -23,10 +24,10 @@ logger = logging.getLogger(__name__)
 class ItemClassification(str, Enum):
     """Categorization of an Item's status in a filing."""
 
-    EXTRACTED = "EXTRACTED"                                    # Parsed and populated with text
-    INCORPORATED_BY_REFERENCE = "INCORPORATED_BY_REFERENCE"    # Part III items deferred to DEF 14A
-    NOT_APPLICABLE = "NOT_APPLICABLE"                          # E.g. Mine Safety for tech companies
-    MISSING_ANOMALY = "MISSING_ANOMALY"                        # Expected standard item missing
+    EXTRACTED = "EXTRACTED"  # Parsed and populated with text
+    INCORPORATED_BY_REFERENCE = "INCORPORATED_BY_REFERENCE"  # Part III items deferred to DEF 14A
+    NOT_APPLICABLE = "NOT_APPLICABLE"  # E.g. Mine Safety for tech companies
+    MISSING_ANOMALY = "MISSING_ANOMALY"  # Expected standard item missing
 
 
 # Standard known tech company omissions in Form 10-K
@@ -50,11 +51,11 @@ class FilingCoverageSummary(BaseModel):
 
     ticker: str
     form: str
-    accession_number: Optional[str] = None
+    accession_number: str | None = None
     total_expected_items: int = 0
     total_extracted_items: int = 0
     coverage_ratio: float = 0.0
-    items: List[ItemCoverageDetail] = Field(default_factory=list)
+    items: list[ItemCoverageDetail] = Field(default_factory=list)
     has_item_8_notes: bool = False
     has_rd_disclosure: bool = False
 
@@ -76,11 +77,13 @@ class CoverageReporter:
 
         # Strict filter: ignore NOT_FOUND placeholders and empty sections
         valid_extracted_sections = [
-            s for s in report.sections
-            if s.status in (SectionStatus.EXTRACTED, SectionStatus.NON_STANDARD) and (s.char_count > 0 or len(s.raw_text.strip()) > 0)
+            s
+            for s in report.sections
+            if s.status in (SectionStatus.EXTRACTED, SectionStatus.NON_STANDARD)
+            and (s.char_count > 0 or len(s.raw_text.strip()) > 0)
         ]
 
-        details: List[ItemCoverageDetail] = []
+        details: list[ItemCoverageDetail] = []
         extracted_count = 0
         has_item_8_notes = False
         has_rd_disclosure = False
@@ -88,9 +91,10 @@ class CoverageReporter:
         # Scan for notes and R&D in sections
         for sec in valid_extracted_sections:
             sec_text_lower = sec.raw_text.lower()
-            if "item 8" in sec.item.lower() or "financial statement" in sec.title.lower():
-                if "note" in sec_text_lower or len(sec.raw_text) > 5_000:
-                    has_item_8_notes = True
+            if ("item 8" in sec.item.lower() or "financial statement" in sec.title.lower()) and (
+                "note" in sec_text_lower or len(sec.raw_text) > 5_000
+            ):
+                has_item_8_notes = True
             if any(k in sec_text_lower for k in ["research and development", "r&d"]):
                 has_rd_disclosure = True
 
@@ -141,13 +145,13 @@ class CoverageReporter:
                     )
         else:
             # Form 10-Q: Build composite keys f"{part} {item}" to avoid Part I vs Part II collision
-            extracted_10q_map: Dict[str, Any] = {}
+            extracted_10q_map: dict[str, Any] = {}
             for s in valid_extracted_sections:
                 p = (s.part or "PART I").upper()
                 composite_key = f"{p} {s.item.upper()}"
                 extracted_10q_map[composite_key] = s
 
-            expected_10q_items: Dict[str, str] = {}
+            expected_10q_items: dict[str, str] = {}
             for part, items in CANONICAL_10Q_ITEMS.items():
                 for it_k, it_name in items.items():
                     composite = f"{part.upper()} {it_k.upper()}"
@@ -193,7 +197,7 @@ class CoverageReporter:
             has_rd_disclosure=has_rd_disclosure,
         )
 
-    def generate_markdown_report(self, summaries: List[FilingCoverageSummary]) -> str:
+    def generate_markdown_report(self, summaries: list[FilingCoverageSummary]) -> str:
         """Format a list of FilingCoverageSummary objects into an executive Markdown report."""
         lines = [
             "# SEC EDGAR Filing Section Extraction Coverage Report",
