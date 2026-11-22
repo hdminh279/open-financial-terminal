@@ -21,6 +21,7 @@ from src.api.routes.health import router as health_router
 from src.api.routes.history import router as history_router
 from src.api.routes.metrics import router as metrics_router
 from src.api.routes.query import router as query_router
+from src.api.routes.watchlist import router as watchlist_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +64,7 @@ app.include_router(metrics_router, prefix="/api")
 app.include_router(companies_router, prefix="/api")
 app.include_router(history_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
+app.include_router(watchlist_router, prefix="/api")
 
 
 # Global Exception Handler

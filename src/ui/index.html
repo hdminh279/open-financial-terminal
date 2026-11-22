@@ -3,1840 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Corporate Filing Intelligence | Trợ Lý Nghiên Cứu BCTC</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261119_v7">
-  <style>
-/* Corporate Filing Intelligence - Modern Institutional AI Financial Terminal UI */
-/* Strict adherence to WCAG 2.1 AA Contrast, High Legibility & Professional Financial Typography */
-
-:root, [data-theme="dark"] {
-  /* Color Palette - Obsidian Dark */
-  --bg-app: #06090F;
-  --bg-desktop: #06090F;
-  --bg-window: #0A0D15;
-  --bg-sidebar: #0D111A;
-  --bg-chat-pane: #0F1420;
-  --bg-canvas-pane: #0C1019;
-
-  --bg-card: #131926;
-  --bg-card-hover: #182030;
-  --bg-elevated: #161D2C;
-  --bg-input: rgba(255, 255, 255, 0.04);
-  --bg-input-focus: rgba(255, 255, 255, 0.07);
-
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-hover: rgba(255, 255, 255, 0.28);
-  --border-focus: #38BDF8;
-
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --text-dim: #475569;
-
-  /* Table Grid Colors - Dark */
-  --table-border: rgba(255, 255, 255, 0.16);
-  --table-cell-border: rgba(255, 255, 255, 0.09);
-  --table-th-bg: #131926;
-  --table-th-color: #F8FAFC;
-  --table-tr-hover: rgba(255, 255, 255, 0.04);
-  --table-tr-stripe: rgba(255, 255, 255, 0.015);
-
-  /* Financial Semantic Accents */
-  --accent-sky-blue: #00A3FF;       /* Apple Series, Primary Actions, SEC Citation Tags */
-  --accent-emerald: #00E599;        /* Microsoft Series, Positive YoY Growth, Online Pulses */
-  --accent-amber: #F5A623;          /* Operating Margin % Line, Caution Audits */
-  --accent-crimson: #EF4444;        /* Negative Margin, Debt, Drop Variance */
-  --accent-purple: #8B5CF6;
-
-  /* User Bubble */
-  --user-bubble-bg: #1D4ED8;
-  --user-bubble-text: #FFFFFF;
-
-  /* Watchlist Tint Badges */
-  --bullish-bg: rgba(0, 229, 153, 0.08);
-  --bullish-border: rgba(0, 229, 153, 0.22);
-  --bullish-text: #00E599;
-
-  --bearish-bg: rgba(239, 68, 68, 0.08);
-  --bearish-border: rgba(239, 68, 68, 0.22);
-  --bearish-text: #EF4444;
-
-  /* Chart Colors */
-  --chart-grid: rgba(255, 255, 255, 0.07);
-  --chart-text: #94A3B8;
-  --chart-border: rgba(255, 255, 255, 0.1);
-
-  --shadow-window: 0 30px 80px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.35);
-
-  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
-}
-
-[data-theme="light"] {
-  /* Color Palette - Arctic Light with Crisp Financial Contrast */
-  --bg-app: #E2E8F0;
-  --bg-desktop: #E2E8F0;
-  --bg-window: #F8FAFC;
-  --bg-sidebar: #FFFFFF;
-  --bg-chat-pane: #F8FAFC;
-  --bg-canvas-pane: #FFFFFF;
-
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F1F5F9;
-  --bg-elevated: #F8FAFC;
-  --bg-input: #FFFFFF;
-  --bg-input-focus: #FFFFFF;
-
-  --border-color: #CBD5E1;         /* Crisp visible border */
-  --border-subtle: #E2E8F0;
-  --border-hover: #475569;          /* Darker, bolder border on hover per user request */
-  --border-focus: #0284C7;
-
-  --text-primary: #0F172A;
-  --text-secondary: #334155;        /* High-contrast readable typography */
-  --text-muted: #64748B;
-  --text-dim: #94A3B8;
-
-  /* Table Grid Colors - Light (High-Contrast Institutional Grid) */
-  --table-border: #94A3B8;          /* Solid dark outline */
-  --table-cell-border: #CBD5E1;     /* Distinct column and row grid lines */
-  --table-th-bg: #E2E8F0;           /* Distinct header tone */
-  --table-th-color: #0F172A;        /* Dark bold text */
-  --table-tr-hover: #F1F5F9;
-  --table-tr-stripe: #F8FAFC;
-
-  /* Financial Semantic Accents */
-  --accent-sky-blue: #0284C7;       /* Royal Sky Blue */
-  --accent-emerald: #059669;        /* Forest Emerald Green */
-  --accent-amber: #D97706;          /* Deep Amber Gold */
-  --accent-crimson: #DC2626;        /* Crisp Red */
-  --accent-purple: #7C3AED;
-
-  /* User Bubble */
-  --user-bubble-bg: #2563EB;
-  --user-bubble-text: #FFFFFF;
-
-  /* Watchlist Tint Badges */
-  --bullish-bg: rgba(5, 150, 105, 0.08);
-  --bullish-border: rgba(5, 150, 105, 0.35);
-  --bullish-text: #059669;
-
-  --bearish-bg: rgba(220, 38, 38, 0.08);
-  --bearish-border: rgba(220, 38, 38, 0.35);
-  --bearish-text: #DC2626;
-
-  /* Chart Colors */
-  --chart-grid: rgba(15, 23, 42, 0.09);
-  --chart-text: #334155;
-  --chart-border: #94A3B8;
-
-  --shadow-window: 0 24px 70px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.12);
-  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.06);
-
-  --scrollbar-thumb: rgba(15, 23, 42, 0.22);
-  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.4);
-}
-
-/* ========================================================================= */
-/* CSS Reset & Base Layout                                                   */
-/* ========================================================================= */
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14.5px;
-  background-color: var(--bg-desktop);
-  color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Custom Sleek Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-}
-
-/* ========================================================================= */
-/* Window Chrome (macOS Native Terminal Container)                           */
-/* ========================================================================= */
-
-.window-frame {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-window);
-  box-shadow: var(--shadow-window);
-  overflow: hidden;
-}
-
-/* Window Top Titlebar */
-.window-titlebar {
-  height: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background-color: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-color);
-  user-select: none;
-  z-index: 20;
-}
-
-/* Titlebar Left (Sidebar Toggle + Breadcrumb) */
-.titlebar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sidebar-toggle-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.sidebar-toggle-btn:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border-color: var(--border-focus);
-}
-
-.breadcrumb-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.breadcrumb-root {
-  color: var(--text-muted);
-}
-
-.breadcrumb-sep {
-  color: var(--text-dim);
-}
-
-.breadcrumb-active {
-  color: var(--text-primary);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 520px;
-}
-
-/* Top Right Actions */
-.titlebar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.theme-toggle-btn {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.theme-toggle-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  border-color: var(--border-focus);
-}
-
-/* ========================================================================= */
-/* Workstation Container (3 Columns + Draggable Resizer)                     */
-/* ========================================================================= */
-
-.workstation-container {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  position: relative;
-}
-
-/* ========================================================================= */
-/* COLUMN 1: SIDEBAR (NAVIGATION & WATCHLIST)                                */
-/* ========================================================================= */
-
-.sidebar-pane {
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
-  height: 100%;
-  background-color: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  padding: 16px 14px 14px 14px;
-  overflow: hidden; /* Lock sidebar height so user profile footer never gets pushed down */
-  user-select: none;
-  z-index: 10;
-  transition: all 0.25s ease;
-}
-
-.sidebar-pane.collapsed {
-  display: none !important;
-}
-
-/* Brand Header */
-.brand-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  padding: 0 4px;
-}
-
-.brand-logo-cube {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.brand-name {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.brand-sub {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  line-height: 1.2;
-}
-
-/* + New Chat Button */
-.btn-new-research {
-  flex-shrink: 0;
-  width: 100%;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 999px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 14px;
-}
-
-.btn-new-research:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover) !important;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
-  transform: translateY(-1px);
-}
-
-/* Section Title & Scrollable Session List */
-.sidebar-section {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 100px;
-  max-height: calc(100vh - 430px);
-  margin-bottom: 12px;
-  overflow: hidden;
-}
-
-.section-title {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  padding: 0 4px;
-  letter-spacing: 0.2px;
-}
-
-/* Session Items (Scrollable List with Sleek Track) */
-.session-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
-  flex: 1 1 auto;
-}
-
-.session-list::-webkit-scrollbar {
-  width: 5px;
-}
-.session-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.session-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-}
-.session-list::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-
-.session-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 12.8px;
-  font-weight: 500;
-  line-height: 1.35;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  min-width: 0; /* CRITICAL for ellipsis inside flex item */
-}
-
-.session-title-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.session-item:hover {
-  background: var(--bg-card);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-.session-item.active {
-  background: rgba(0, 163, 255, 0.1);
-  border-left: 3px solid var(--accent-sky-blue);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-/* Hover Trash Icon on Session Item */
-.session-trash-btn {
-  flex-shrink: 0;
-  opacity: 0;
-  visibility: hidden;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.session-item:hover .session-trash-btn,
-.session-item.active .session-trash-btn {
-  opacity: 1;
-  visibility: visible;
-}
-
-.session-trash-btn:hover {
-  color: #EF4444 !important;
-  background: rgba(239, 68, 68, 0.15);
-}
-
-/* Watchlist Card Container */
-.sidebar-watchlist-card {
-  flex-shrink: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-}
-
-.watchlist-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.watchlist-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-watchlist-more {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  padding: 2px;
-}
-.btn-watchlist-more:hover { color: var(--text-primary); }
-
-/* 2x2 Grid for Ticker Cards */
-.watchlist-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.watchlist-item {
-  padding: 9px 10px;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease;
-  cursor: pointer;
-}
-
-.watchlist-item:hover {
-  transform: translateY(-2px);
-}
-
-.watchlist-item.bullish {
-  background: var(--bullish-bg);
-  border: 1px solid var(--bullish-border);
-}
-
-.watchlist-item.bearish {
-  background: var(--bearish-bg);
-  border: 1px solid var(--bearish-border);
-}
-
-.watchlist-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.ticker-sym {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.trend-icon {
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.watchlist-item.bullish .trend-icon,
-.watchlist-item.bullish .ticker-change {
-  color: var(--bullish-text);
-}
-
-.watchlist-item.bearish .trend-icon,
-.watchlist-item.bearish .ticker-change {
-  color: var(--bearish-text);
-}
-
-.ticker-price {
-  font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-}
-
-.ticker-change {
-  font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* User Profile Footer (Clean Minh without senior subtitle) */
-.sidebar-footer {
-  margin-top: 18px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-
-.user-profile-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.user-profile-badge:hover {
-  background: var(--bg-card);
-}
-
-.user-avatar-circle {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  flex-shrink: 0;
-}
-
-.user-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.user-meta {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.user-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.user-chevron {
-  color: var(--text-dim);
-}
-
-/* ========================================================================= */
-/* COLUMN 2: CENTER CONVERSATIONAL AGENT FEED                                */
-/* ========================================================================= */
-
-.chat-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-chat-pane);
-  min-width: 360px;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Messages Scrollable Area */
-.messages-viewport {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* User Messages: Aligned on the RIGHT */
-.message-group.user-turn {
-  display: flex;
-  justify-content: flex-end;
-  align-self: flex-end;
-  max-width: 78%;
-  margin-left: auto;
-}
-
-.user-bubble {
-  background: var(--user-bubble-bg);
-  color: var(--user-bubble-text);
-  padding: 10px 16px;
-  border-radius: 16px 16px 3px 16px;
-  font-size: 14.5px;
-  font-weight: 500;
-  line-height: 1.5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  word-break: break-word;
-}
-
-/* Assistant Messages: Aligned on the LEFT */
-.message-group.assistant-turn {
-  display: flex;
-  justify-content: flex-start;
-  align-self: flex-start;
-  max-width: 96%;
-  width: 100%;
-  gap: 12px;
-  margin-right: auto;
-}
-
-.avatar-col {
-  width: 32px;
-  flex-shrink: 0;
-}
-
-.avatar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.assistant-avatar {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--accent-sky-blue);
-}
-
-.content-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-/* Agent Activity Accordion Card (Smooth Collapse & Expand) */
-.agent-activity-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--shadow-card);
-}
-
-.activity-card-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--text-primary);
-  user-select: none;
-}
-
-.activity-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.activity-spark-icon {
-  color: var(--accent-sky-blue);
-  font-size: 13px;
-}
-
-.activity-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.activity-chevron {
-  color: var(--text-dim);
-  font-size: 13px;
-  transition: transform 0.2s ease;
-}
-
-.activity-steps-list {
-  padding: 6px 14px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.activity-step-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.step-check-badge {
-  color: var(--accent-emerald);
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.step-label {
-  font-weight: 500;
-}
-
-/* Synthesized Assistant Text */
-.assistant-response-text {
-  font-size: 14.5px;
-  line-height: 1.65;
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.assistant-response-text strong {
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.citation-tag {
-  display: inline-block;
-  color: var(--accent-sky-blue);
-  font-size: 12.5px;
-  font-weight: 600;
-  text-decoration: none;
-  padding: 0 2px;
-  transition: all 0.2s ease;
-}
-
-.citation-tag:hover {
-  text-decoration: underline;
-  color: #7DD3FC;
-}
-
-/* Markdown Tables in Chat - Responsive, Crisp Borders & High Financial Legibility */
-.table-scroll-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  margin: 14px 0;
-  border: 1.5px solid var(--table-border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: border-color 0.2s ease;
-}
-
-.table-scroll-wrapper:hover {
-  border-color: var(--border-hover);
-}
-
-.assistant-response-text table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 13px;
-  text-align: left;
-}
-
-.assistant-response-text th {
-  background: var(--table-th-bg);
-  border-bottom: 2px solid var(--table-border);
-  border-right: 1px solid var(--table-cell-border);
-  padding: 10px 14px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--table-th-color);
-  white-space: nowrap;
-}
-
-.assistant-response-text th:last-child {
-  border-right: none;
-}
-
-.assistant-response-text td {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--table-cell-border);
-  border-right: 1px solid var(--table-cell-border);
-  color: var(--text-primary);
-  line-height: 1.45;
-}
-
-.assistant-response-text td:last-child {
-  border-right: none;
-}
-
-.assistant-response-text td:nth-child(n+2) {
-  font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
-
-.assistant-response-text tr:nth-child(even) td {
-  background: var(--table-tr-stripe);
-}
-
-.assistant-response-text tr:last-child td {
-  border-bottom: none;
-}
-
-.assistant-response-text tr:hover td {
-  background: var(--table-tr-hover);
-}
-
-/* Suggested Action Chips (Pill Buttons) */
-.action-chips-wrapper {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.action-chip {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-chip:hover {
-  background: rgba(0, 163, 255, 0.08);
-  border-color: rgba(0, 163, 255, 0.35);
-  color: var(--text-primary);
-  transform: translateY(-1px);
-}
-
-/* Chat Input Dock */
-.chat-input-dock {
-  padding: 14px 24px 20px;
-  background: var(--bg-chat-pane);
-  border-top: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.input-form {
-  width: 100%;
-}
-
-.input-container {
-  display: flex;
-  align-items: center;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 6px 12px;
-  transition: all 0.2s ease;
-}
-
-.input-container:focus-within {
-  background: var(--bg-input-focus);
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
-}
-
-.query-textarea {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 14px;
-  resize: none;
-  min-height: 24px;
-  max-height: 120px;
-  padding: 4px 4px;
-  line-height: 1.45;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.query-textarea::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.query-textarea::placeholder {
-  color: var(--text-dim);
-}
-
-.input-actions-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.input-icon-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.input-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-}
-
-.send-btn {
-  color: var(--accent-sky-blue);
-}
-
-.voice-btn.recording {
-  color: var(--accent-crimson);
-  animation: pulse-glow 1.5s infinite;
-}
-
-/* ========================================================================= */
-/* DRAGGABLE RESIZER HANDLE                                                  */
-/* ========================================================================= */
-
-.pane-resizer {
-  width: 6px;
-  cursor: col-resize;
-  background: var(--border-subtle);
-  transition: background 0.15s ease;
-  position: relative;
-  z-index: 15;
-  flex-shrink: 0;
-}
-
-.pane-resizer:hover,
-.pane-resizer.is-dragging {
-  background: var(--accent-sky-blue);
-  box-shadow: 0 0 8px rgba(0, 163, 255, 0.5);
-}
-
-/* ========================================================================= */
-/* COLUMN 3: RIGHT DYNAMIC FINANCIAL CANVAS & EVIDENCE                       */
-/* ========================================================================= */
-
-.canvas-pane {
-  width: 48%;
-  min-width: 380px;
-  background-color: var(--bg-canvas-pane);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  padding: 16px 20px;
-  user-select: none;
-}
-
-/* Canvas Header */
-.canvas-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.canvas-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-/* Canvas Toolbar */
-.canvas-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 14px;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.canvas-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.canvas-action-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  border-color: var(--border-focus);
-}
-
-/* Chart Canvas Wrapper */
-.canvas-chart-wrapper {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: var(--shadow-card);
-}
-
-.custom-chart-legend {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  user-select: none;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.legend-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-  transform: translateY(-1px);
-}
-
-[data-theme="light"] .legend-item:hover {
-  background: rgba(15, 23, 42, 0.06);
-}
-
-.legend-item.hidden {
-  opacity: 0.35;
-  text-decoration: line-through;
-}
-
-.legend-box {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-.legend-box.sky-blue { background-color: var(--accent-sky-blue); }
-.legend-box.emerald-green { background-color: var(--accent-emerald); }
-
-.legend-line {
-  width: 16px;
-  height: 3px;
-  border-radius: 2px;
-}
-.legend-line.amber-gold { background-color: var(--accent-amber); }
-
-.chart-canvas-container {
-  width: 100%;
-  height: 250px;
-  position: relative;
-}
-
-/* Bottom Table Section */
-.canvas-table-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.table-section-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 6px;
-}
-
-.tab-item.active {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  position: relative;
-  padding-bottom: 6px;
-}
-
-.tab-item.active::after {
-  content: "";
-  position: absolute;
-  bottom: -7px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--accent-sky-blue);
-  border-radius: 2px;
-}
-
-.accession-provenance {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.acc-num {
-  color: var(--text-secondary);
-}
-
-/* Koyfin-Style Financial Table */
-.koyfin-table-container {
-  background: var(--bg-card);
-  border: 1.5px solid var(--table-border);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: border-color 0.2s ease;
-}
-
-.koyfin-table-container:hover {
-  border-color: var(--border-hover);
-}
-
-.financial-data-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12.5px;
-  text-align: left;
-}
-
-.financial-data-table thead th {
-  background: var(--table-th-bg);
-  border-bottom: 2px solid var(--table-border);
-  border-right: 1px solid var(--table-cell-border);
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--table-th-color);
-}
-
-.financial-data-table thead th:last-child {
-  border-right: none;
-}
-
-.financial-data-table tbody td {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--table-cell-border);
-  border-right: 1px solid var(--table-cell-border);
-  color: var(--text-primary);
-}
-
-.financial-data-table tbody td:last-child {
-  border-right: none;
-}
-
-.financial-data-table tbody tr:nth-child(even) td {
-  background: var(--table-tr-stripe);
-}
-
-.financial-data-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.financial-data-table tbody tr:hover td {
-  background: var(--table-tr-hover);
-}
-
-.col-metric { text-align: left; }
-.col-num { text-align: right; }
-
-.metric-name {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.num-val {
-  text-align: right;
-  font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
-
-.num-val.badge-pos {
-  color: var(--accent-emerald);
-  font-weight: 600;
-}
-
-.num-val.badge-neg {
-  color: var(--accent-crimson);
-  font-weight: 600;
-}
-
-/* ========================================================================= */
-/* Settings Modal                                                            */
-/* ========================================================================= */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal-card {
-  width: 90%;
-  max-width: 480px;
-  background: var(--bg-window);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: var(--shadow-window);
-  overflow: hidden;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.btn-icon-subtle {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.modal-body {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.setting-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.setting-label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.theme-switch-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.theme-choice-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.theme-choice-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.theme-choice-btn.active {
-  background: rgba(0, 163, 255, 0.1);
-  border-color: var(--accent-sky-blue);
-  color: var(--text-primary);
-}
-
-.setting-input {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 9px 12px;
-  color: var(--text-primary);
-  font-size: 13.5px;
-  outline: none;
-}
-.setting-input:focus { border-color: var(--border-focus); }
-
-.engine-status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.status-dot.online {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--accent-emerald);
-}
-
-.modal-footer {
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-save-settings {
-  background: var(--accent-sky-blue);
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-.btn-save-settings:hover { background: #0284C7; }
-
-/* Dynamic Canvas Collapsible & Resizer States */
-.canvas-pane.collapsed {
-  display: none !important;
-}
-
-.pane-resizer.hidden {
-  display: none !important;
-}
-
-.chat-pane.canvas-hidden {
-  flex: 1 1 100% !important;
-  max-width: 100% !important;
-  width: 100% !important;
-}
-
-/* Topbar Canvas Toggle Button */
-.canvas-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.canvas-toggle-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  border-color: var(--accent-sky-blue);
-}
-
-.canvas-toggle-btn.active {
-  background: rgba(0, 163, 255, 0.12);
-  color: var(--accent-sky-blue);
-  border-color: rgba(0, 163, 255, 0.4);
-}
-
-/* In-Chat Chart Preview Card (Sleek Compact 1-Line Bar) */
-.chart-preview-card {
-  margin: 10px 0 0 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 6px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  width: fit-content;
-  max-width: 100%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chart-preview-card + .sources-accordion-card {
-  margin-top: 5px;
-}
-
-.chart-preview-card:hover {
-  border-color: var(--accent-sky-blue);
-  background: var(--bg-card-hover);
-  box-shadow: 0 2px 8px rgba(0, 163, 255, 0.12);
-  transform: translateY(-1px);
-}
-
-.chart-preview-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
-}
-
-.chart-preview-title span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chart-preview-title svg {
-  color: var(--accent-sky-blue);
-  flex-shrink: 0;
-}
-
-.btn-view-canvas {
-  flex-shrink: 0 !important;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--accent-sky-blue);
-  color: #FFFFFF;
-  border: none;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-view-canvas:hover {
-  background: #0284C7;
-  box-shadow: 0 2px 6px rgba(0, 163, 255, 0.25);
-  transform: scale(1.02);
-}
-
-/* Canvas Empty State */
-.canvas-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 380px;
-  height: 100%;
-  padding: 40px 24px;
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.canvas-empty-state .empty-icon {
-  font-size: 38px;
-  margin-bottom: 12px;
-  opacity: 0.7;
-}
-
-.canvas-empty-state .empty-title {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.canvas-empty-state .empty-sub {
-  font-size: 12.5px;
-  max-width: 280px;
-  line-height: 1.5;
-}
-
-/* Facebook Default Silhouette Avatar */
-.user-avatar-circle.fb-silhouette {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #374151;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--border-color);
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-}
-
-.user-avatar-circle.fb-silhouette svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* User Settings Gear Icon */
-.user-settings-icon {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color 0.2s ease, transform 0.25s ease;
-}
-
-.user-profile-badge:hover .user-settings-icon {
-  color: var(--accent-sky-blue);
-  transform: rotate(45deg);
-}
-
-/* Clear Chat Trash Button */
-.delete-chat-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 11px;
-  border-radius: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.delete-chat-btn:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #EF4444;
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-/* Session Item Hover Trash Button */
-.session-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.session-trash-btn {
-  display: none;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-}
-
-.session-item:hover .session-trash-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.session-trash-btn:hover {
-  color: #EF4444;
-  background: rgba(239, 68, 68, 0.15);
-}
-
-/* Intuitive Expand/Collapse Vector Chevrons */
-.activity-chevron-icon,
-.sources-chevron-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.agent-activity-card.collapsed .activity-chevron-icon,
-.sources-accordion-card.collapsed .sources-chevron-icon {
-  transform: rotate(-90deg);
-}
-
-.agent-activity-card.collapsed .activity-steps-list,
-.sources-accordion-card.collapsed .sources-list-content {
-  display: none !important;
-}
-
-/* Collapsible Sources & References Card */
-.sources-accordion-card {
-  margin-top: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  overflow: hidden;
-  transition: border-color 0.2s ease;
-}
-
-.sources-accordion-card:hover {
-  border-color: rgba(56, 189, 248, 0.3);
-}
-
-.sources-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--bg-card);
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s ease;
-}
-
-.sources-card-header:hover {
-  background: var(--bg-card-hover);
-}
-
-.sources-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.sources-header-left svg {
-  color: var(--accent-sky-blue);
-}
-
-.sources-list-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px 14px 14px;
-  border-top: 1px solid var(--border-subtle);
-  background: rgba(0, 0, 0, 0.12);
-}
-
-.source-item-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: border-color 0.2s ease;
-}
-
-.source-item-card:hover {
-  border-color: var(--accent-sky-blue);
-}
-
-.source-item-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.citation-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent-sky-blue);
-  background: rgba(0, 163, 255, 0.12);
-  border: 1px solid rgba(0, 163, 255, 0.25);
-  border-radius: 4px;
-  padding: 1px 6px;
-}
-
-.source-company {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.source-badge {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--bg-input);
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.source-excerpt {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.45;
-}
-
-.source-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--accent-sky-blue);
-  text-decoration: none;
-  margin-top: 2px;
-  transition: color 0.15s ease;
-}
-
-.source-link:hover {
-  text-decoration: underline;
-  color: #38BDF8;
-}
-
-  </style>
+  <title>Corporate Filing Intelligence | Open Financial Terminal</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20261121_v7">
   <!-- Chart.js for High-Fidelity Financial Canvas Visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <!-- Marked.js for Markdown Formatting -->
@@ -1857,9 +25,7 @@ html, body {
         </button>
 
         <div class="breadcrumb-nav">
-          <span class="breadcrumb-root">Nghiên cứu</span>
-          <span class="breadcrumb-sep">/</span>
-          <span class="breadcrumb-active" id="current-session-title">AAPL vs MSFT: Phân tích hoạt động (FY21–FY24)</span>
+          <span class="breadcrumb-active" id="current-session-title">Đoạn chat mới</span>
         </div>
       </div>
 
@@ -1928,10 +94,19 @@ html, body {
             </svg>
           </div>
           <div class="brand-text">
-            <div class="brand-name">Phân Tích Báo Cáo</div>
-            <div class="brand-sub">Tài Chính Doanh Nghiệp</div>
+            <div class="brand-name">Open Financial Terminal</div>
           </div>
         </div>
+
+        <!-- Stock Market & Watchlist Button (Gemini Style) -->
+        <button id="nav-stock-terminal-btn" class="nav-stock-terminal-btn" title="Bảng giá thị trường">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+            <polyline points="16 7 22 7 22 13"></polyline>
+          </svg>
+          <span>Thị trường</span>
+          <span class="stock-live-badge">LIVE</span>
+        </button>
 
         <!-- + New Chat Button -->
         <button id="new-chat-btn" class="btn-new-research" title="Bắt đầu đoạn chat mới">
@@ -1967,61 +142,6 @@ html, body {
           </div>
         </div>
 
-        <!-- Watchlist Card Section (2x2 Grid) -->
-        <div class="sidebar-watchlist-card">
-          <div class="watchlist-header">
-            <span class="watchlist-title">Danh mục theo dõi</span>
-            <button class="btn-watchlist-more" title="Tùy chọn danh mục" aria-label="Tùy chọn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="1.8"></circle>
-                <circle cx="19" cy="12" r="1.8"></circle>
-                <circle cx="5" cy="12" r="1.8"></circle>
-              </svg>
-            </button>
-          </div>
-
-          <div class="watchlist-grid">
-            <!-- AAPL Card -->
-            <div class="watchlist-item bullish" data-ticker="AAPL">
-              <div class="watchlist-item-top">
-                <span class="ticker-sym">AAPL</span>
-                <span class="trend-icon">↗</span>
-              </div>
-              <div class="ticker-price">24.23</div>
-              <div class="ticker-change">+1.4%</div>
-            </div>
-
-            <!-- MSFT Card -->
-            <div class="watchlist-item bullish" data-ticker="MSFT">
-              <div class="watchlist-item-top">
-                <span class="ticker-sym">MSFT</span>
-                <span class="trend-icon">↗</span>
-              </div>
-              <div class="ticker-price">48.90</div>
-              <div class="ticker-change">+0.8%</div>
-            </div>
-
-            <!-- GOOGL Card -->
-            <div class="watchlist-item bearish" data-ticker="GOOGL">
-              <div class="watchlist-item-top">
-                <span class="ticker-sym">GOOGL</span>
-                <span class="trend-icon">↘</span>
-              </div>
-              <div class="ticker-price">78.50</div>
-              <div class="ticker-change">-0.3%</div>
-            </div>
-
-            <!-- VN30 Card -->
-            <div class="watchlist-item bullish" data-ticker="VN30">
-              <div class="watchlist-item-top">
-                <span class="ticker-sym">VN30</span>
-                <span class="trend-icon">↗</span>
-              </div>
-              <div class="ticker-price">1,280.50</div>
-              <div class="ticker-change">+0.5%</div>
-            </div>
-          </div>
-        </div>
 
         <!-- User Profile Footer (Clean Minh with FB Default Silhouette) -->
         <div class="sidebar-footer">
@@ -2049,128 +169,10 @@ html, body {
       <section class="chat-pane" id="chat-pane">
         <!-- Messages Stream Scroll Area -->
         <div class="messages-viewport" id="messages-container">
-          <!-- User Question on the RIGHT -->
-          <div class="message-group user-turn">
-            <div class="user-bubble">
-              So sánh doanh thu và biên lợi nhuận hoạt động của Apple và Microsoft từ năm 2021 đến 2024
-            </div>
-          </div>
-
-          <!-- Assistant Response on the LEFT -->
-          <div class="message-group assistant-turn">
-            <div class="avatar-col">
-              <div class="avatar-icon assistant-avatar">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
-                </svg>
-              </div>
-            </div>
-
-            <div class="content-col">
-              <!-- Agent Activity Accordion Card (Fully Collapsible & Expandable - Default Collapsed) -->
-              <div class="agent-activity-card collapsed">
-                <div class="activity-card-header">
-                  <div class="activity-header-left">
-                    <span class="activity-spark-icon">✦</span>
-                    <span class="activity-title">Tiến trình Agent</span>
-                  </div>
-                  <span class="activity-chevron-icon" aria-label="Thu gọn / Mở rộng">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </span>
-                </div>
-                <div class="activity-steps-list" style="display: none;">
-                  <div class="activity-step-row completed">
-                    <span class="step-check-badge">✔</span>
-                    <span class="step-label">Bước 1: Phân loại ý định</span>
-                  </div>
-                  <div class="activity-step-row completed">
-                    <span class="step-check-badge">✔</span>
-                    <span class="step-label">Bước 2: Truy vấn DuckDB SQL</span>
-                  </div>
-                  <div class="activity-step-row completed">
-                    <span class="step-check-badge">✔</span>
-                    <span class="step-label">Bước 3: Tìm kiếm ngữ nghĩa Hybrid RAG</span>
-                  </div>
-                  <div class="activity-step-row completed">
-                    <span class="step-check-badge">✔</span>
-                    <span class="step-label">Bước 4: Đối soát & Kiểm chứng</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Synthesized Analysis Text in Vietnamese -->
-              <div class="assistant-response-text" id="initial-response-text">
-                <p>Doanh thu của Apple (<strong>AAPL</strong>) duy trì đà tăng trưởng mạnh mẽ, đạt <strong>83.3 tỷ</strong> <a href="https://www.sec.gov/edgar/browse/?CIK=0000320193" target="_blank" class="citation-tag">[1]</a>, trong khi Microsoft (<strong>MSFT</strong>) tăng trưởng ổn định đạt <strong>45.1 tỷ</strong> <a href="https://www.sec.gov/edgar/browse/?CIK=0000789019" target="_blank" class="citation-tag">[2]</a>. Microsoft, tuy vậy, duy trì hiệu quả biên lợi nhuận hoạt động tổng thể tốt hơn.</p>
-                <p>Thuyết minh Báo cáo tài chính thường niên xác nhận cơ cấu chỉ tiêu tài chính giữa Apple và Microsoft, đối soát tăng trưởng doanh thu và biên hoạt động tại <a href="https://www.sec.gov/edgar/browse/?CIK=0000789019" target="_blank" class="citation-tag">[2]</a>.</p>
-              </div>
-
-              <!-- In-Chat Interactive Chart Preview Card (Sleek Compact 1-Line Bar) -->
-              <div class="chart-preview-card" id="initial-chart-preview-card">
-                <div class="chart-preview-title">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="3" y1="9" x2="21" y2="9"></line>
-                    <line x1="9" y1="21" x2="9" y2="9"></line>
-                  </svg>
-                  <span>Dữ liệu & Biểu đồ BCTC</span>
-                </div>
-                <button type="button" class="btn-view-canvas" id="initial-btn-view-canvas">
-                  <span>Xem biểu đồ</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                </button>
-              </div>
-
-              <!-- Collapsible Sources & References Card (Nguồn & Trích Dẫn Thu Phóng Linh Hoạt - Default Collapsed) -->
-              <div class="sources-accordion-card collapsed">
-                <div class="sources-card-header" title="Bấm để mở rộng / thu gọn danh sách nguồn trích dẫn">
-                  <div class="sources-header-left">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                      <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                    <span class="sources-title">Nguồn & Trích dẫn hồ sơ SEC EDGAR (2 nguồn)</span>
-                  </div>
-                  <span class="sources-chevron-icon" aria-label="Thu phóng nguồn">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </span>
-                </div>
-                <div class="sources-list-content" style="display: none;">
-                  <div class="source-item-card">
-                    <div class="source-item-header">
-                      <span class="citation-badge">[1]</span>
-                      <span class="source-company">Apple Inc. (AAPL)</span>
-                      <span class="source-badge">Form 10-K FY2024</span>
-                    </div>
-                    <div class="source-excerpt">Báo cáo tài chính thường niên SEC EDGAR Accession: 0000320193-24-000106 - Thuyết minh doanh thu và biên hoạt động hợp nhất.</div>
-                    <a href="https://www.sec.gov/edgar/browse/?CIK=0000320193" target="_blank" rel="noopener noreferrer" class="source-link">
-                      <span>Xem hồ sơ gốc trên SEC EDGAR</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                    </a>
-                  </div>
-
-                  <div class="source-item-card">
-                    <div class="source-item-header">
-                      <span class="citation-badge">[2]</span>
-                      <span class="source-company">Microsoft Corporation (MSFT)</span>
-                      <span class="source-badge">Form 10-K FY2024</span>
-                    </div>
-                    <div class="source-excerpt">Báo cáo tài chính thường niên SEC EDGAR Accession: 0000789019-24-000058 - Phân đoạn kinh doanh Intelligent Cloud và Productivity.</div>
-                    <a href="https://www.sec.gov/edgar/browse/?CIK=0000789019" target="_blank" rel="noopener noreferrer" class="source-link">
-                      <span>Xem hồ sơ gốc trên SEC EDGAR</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                    </a>
-                  </div>
-                </div>
-              </div>
+          <div class="chat-welcome-hero" id="chat-welcome-hero">
+            <div class="welcome-badge">
+              <span class="welcome-sparkle">✦</span>
+              <span>AI Financial Terminal</span>
             </div>
           </div>
         </div>
@@ -2189,7 +191,7 @@ html, body {
 
               <div class="input-actions-group">
                 <!-- Voice Input Microphone Button -->
-                <button type="button" id="voice-btn" class="input-icon-btn voice-btn" title="Nhập liệu bằng giọng nói (Tiếng Việt)" aria-label="Nhập liệu giọng nói">
+                <button type="button" id="voice-btn" class="input-icon-btn voice-btn" title="Nhập liệu bằng giọng nói" aria-label="Nhập liệu giọng nói">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -2269,9 +271,6 @@ html, body {
             <div class="tab-item active">
               <span>Trích dẫn & Bằng chứng SEC EDGAR</span>
             </div>
-            <div class="accession-provenance">
-              Hồ sơ 10-K: <span class="acc-num" id="active-accession-num">0000320193-24-000106</span>
-            </div>
           </div>
 
           <!-- Structured Koyfin-Style Financial Table in Vietnamese -->
@@ -2279,11 +278,11 @@ html, body {
             <table class="financial-data-table" id="financial-data-table">
               <thead>
                 <tr>
-                  <th class="col-metric">Chỉ tiêu</th>
-                  <th class="col-num">Doanh thu</th>
-                  <th class="col-num">Lợi nhuận gộp</th>
-                  <th class="col-num">Biên hoạt động</th>
-                  <th class="col-num">Tăng trưởng YoY</th>
+                  <th class="col-metric" title="Bấm để sắp xếp">Chỉ tiêu <span class="canvas-sort-arrow"></span></th>
+                  <th class="col-num" title="Bấm để sắp xếp">Doanh thu <span class="canvas-sort-arrow"></span></th>
+                  <th class="col-num" title="Bấm để sắp xếp">Lợi nhuận gộp <span class="canvas-sort-arrow"></span></th>
+                  <th class="col-num" title="Bấm để sắp xếp">Biên hoạt động <span class="canvas-sort-arrow"></span></th>
+                  <th class="col-num" title="Bấm để sắp xếp">Tăng trưởng YoY <span class="canvas-sort-arrow"></span></th>
                 </tr>
               </thead>
               <tbody id="financial-table-body">
@@ -2325,6 +324,130 @@ html, body {
     </div>
   </div>
 
+  <!-- Full-Screen Stock Market & Watchlist Terminal Page -->
+  <div id="stock-terminal-page" class="stock-terminal-fullscreen" style="display: none;">
+    <!-- Top Header Navigation Bar -->
+    <header class="terminal-navbar">
+      <div class="terminal-nav-left">
+        <button id="stock-back-to-chat-btn" class="btn-terminal-back" title="Quay lại giao diện phân tích BCTC">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>Quay lại Đoạn Chat</span>
+        </button>
+        <div class="terminal-brand-divider"></div>
+        <div class="terminal-title-group">
+          <div class="terminal-title-row">
+            <h1 class="terminal-main-title">Open Financial Terminal</h1>
+            <span class="live-pulse-dot" title="Dữ liệu thị trường thời gian thực"></span>
+            <span class="terminal-clock" id="stock-last-updated-clock">Đang đồng bộ...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal-nav-right">
+        <button id="stock-refresh-btn" class="btn-terminal-action" title="Cập nhật giá mới nhất">
+          <svg class="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Làm mới giá</span>
+        </button>
+        <button id="stock-reset-btn" class="btn-terminal-action secondary" title="Khôi phục danh mục mặc định">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span>Mặc định</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Terminal Body Container -->
+    <main class="terminal-content-area">
+      <!-- Market Summary Stats Strip -->
+      <section class="terminal-stats-strip">
+        <div class="stat-pill-card">
+          <div class="stat-pill-label">Số mã đang theo dõi</div>
+          <div class="stat-pill-val" id="stat-total-symbols">0</div>
+        </div>
+        <div class="stat-pill-card">
+          <div class="stat-pill-label">Cổ phiếu tăng giá</div>
+          <div class="stat-pill-val gainers" id="stat-gainers-count">0 ↗</div>
+        </div>
+        <div class="stat-pill-card">
+          <div class="stat-pill-label">Cổ phiếu giảm giá</div>
+          <div class="stat-pill-val losers" id="stat-losers-count">0 ↘</div>
+        </div>
+        <div class="stat-pill-card">
+          <div class="stat-pill-label">Hạ tầng dữ liệu</div>
+          <div class="stat-pill-val neutral">MinIO Lakehouse S3</div>
+        </div>
+      </section>
+
+      <!-- Toolbar: Filter Tabs & Add Stock Form -->
+      <section class="terminal-toolbar-row">
+        <!-- Market Filter Tabs -->
+        <div class="market-filter-tabs">
+          <button class="market-tab-btn active" data-filter="ALL">Tất cả thị trường</button>
+          <button class="market-tab-btn" data-filter="US">Mỹ</button>
+          <button class="market-tab-btn" data-filter="VN">Việt Nam</button>
+        </div>
+
+        <!-- Add Ticker Form -->
+        <form id="stock-add-form" class="stock-add-form">
+          <div class="stock-input-wrapper">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              type="text"
+              id="stock-ticker-input"
+              class="stock-ticker-input"
+              placeholder="Nhập mã chứng khoán VD AAPL, FPT, NVDA, VNM..."
+              required
+              autocomplete="off"
+            />
+          </div>
+          <button type="submit" class="btn-stock-add" id="btn-stock-add">
+            <span>+ Thêm mã</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Stock Table View -->
+      <section class="terminal-table-card">
+        <div class="terminal-table-responsive">
+          <table class="stock-data-table" id="stock-table">
+            <thead>
+              <tr>
+                <th class="sortable-th" data-sort="ticker" title="Bấm để sắp xếp">Mã CK <span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort="company_name" title="Bấm để sắp xếp">Tên Doanh Nghiệp <span class="sort-arrow"></span></th>
+                <th>Thị Trường</th>
+                <th class="sortable-th text-right" data-sort="price" title="Bấm để sắp xếp">Giá Hiện Tại <span class="sort-arrow"></span></th>
+                <th class="sortable-th text-right" data-sort="change" title="Bấm để sắp xếp">Biến Động <span class="sort-arrow"></span></th>
+                <th class="sortable-th text-right" data-sort="percent_change" title="Bấm để sắp xếp">% Thay Đổi <span class="sort-arrow"></span></th>
+                <th>Biên Độ Ngày</th>
+                <th class="sortable-th text-right" data-sort="volume" title="Bấm để sắp xếp">Khối Lượng <span class="sort-arrow"></span></th>
+                <th class="text-center">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="stock-table-body">
+              <!-- Dynamically populated via app.js -->
+            </tbody>
+          </table>
+        </div>
+        <div class="stock-loading-overlay" id="stock-loading-spinner" style="display: none;">
+          <div class="spinner-ring"></div>
+          <span>Đang tải thị giá thời gian thực...</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
   <!-- Settings Modal (Vietnamese) -->
   <div class="modal-overlay" id="settings-modal" style="display: none;">
     <div class="modal-card">
@@ -2348,13 +471,13 @@ html, body {
                 <line x1="12" y1="1" x2="12" y2="3"></line>
                 <line x1="12" y1="21" x2="12" y2="23"></line>
               </svg>
-              Chế độ Sáng (Arctic)
+              Chế độ Sáng
             </button>
             <button class="theme-choice-btn active" id="theme-btn-dark" data-theme="dark">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
               </svg>
-              Chế độ Tối (Obsidian)
+              Chế độ Tối
             </button>
           </div>
         </div>
@@ -2368,7 +491,7 @@ html, body {
           <label class="setting-label">Trạng thái lưu trữ Lakehouse & Vector</label>
           <div class="engine-status-row">
             <span class="status-dot online"></span>
-            <span class="engine-desc">MinIO S3 (Bronze/Silver/Gold) + Qdrant Vector DB Đang Hoạt Động</span>
+            <span class="engine-desc">MinIO S3 Bronze/Silver/Gold + Qdrant Vector DB Đang Hoạt Động</span>
           </div>
         </div>
       </div>
@@ -2380,6 +503,6 @@ html, body {
   </div>
 
   <!-- Application Controller Scripts -->
-  <script src="/static/app.js?v=20261119_v5"></script>
+  <script src="/static/app.js?v=20261121_v7"></script>
 </body>
 </html>

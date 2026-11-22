@@ -12,7 +12,6 @@ services:
       - minio
       - qdrant
     volumes:
-      - ./models:/app/models
       - ./src:/app/src
       - ./tests:/app/tests
       - ./configs:/app/configs

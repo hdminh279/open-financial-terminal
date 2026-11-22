@@ -13,8 +13,8 @@ htmlcov/
 /data/
 
 # Models & Binary Weights
-models/*.gguf
-models/*.bin
+/models/*.gguf
+/models/*.bin
 *.duckdb
 *.duckdb.wal
 
@@ -43,5 +43,7 @@ AGENTS.md
 master-plan.md
 master_plan.md
 
-# Private Internal Docs
+# Private Internal Docs & Excluded Folders
 docs/
+scripts/
+/models/

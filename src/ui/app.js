@@ -96,8 +96,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize Dual-Axis Chart Canvas
   initFinancialCanvasChart();
 
-  // Load Past Sessions from MinIO Lakehouse
-  loadRecentsSessions();
+  // Initialize App Session (Restore active session or start clean new chat)
+  async function initializeAppSession() {
+    await loadRecentsSessions();
+    const savedActiveSessionId = localStorage.getItem("current_active_session_id");
+    if (savedActiveSessionId) {
+      await loadSession(savedActiveSessionId);
+    } else {
+      startNewSession();
+    }
+  }
+  initializeAppSession();
 
   /* ========================================================================= */
   /* Sidebar Toggle (Ẩn / Hiện Cột Bên Trái)                                  */
@@ -358,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
         borderColor: s.color,
         type: isLine ? "line" : "bar",
         yAxisID: isMargin ? "y1" : "y",
+        hidden: isMargin, // Default turned off per user requirement
         borderRadius: 4,
         borderWidth: isLine ? 2.5 : 0,
         pointRadius: isLine ? 4 : 0,
@@ -422,6 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
           y1: {
             type: "linear",
             position: "right",
+            display: false, // Default hidden when operating margin is toggled off
             suggestedMin: 0,
             title: {
               display: true,
@@ -604,15 +615,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function renderWelcomeHero() {
+    if (!messagesContainer) return;
+    messagesContainer.innerHTML = `
+      <div class="chat-welcome-hero" id="chat-welcome-hero">
+        <div class="welcome-badge">
+          <span class="welcome-sparkle">✦</span>
+          <span>AI Financial Terminal</span>
+        </div>
+      </div>
+    `;
+  }
+
   function startNewSession() {
     currentSessionId = generateUUID();
+    localStorage.removeItem("current_active_session_id");
     localStorage.setItem("current_session_id", currentSessionId);
-    messagesContainer.innerHTML = "";
-    currentSessionTitle.textContent = "Đoạn chat mới";
+    renderWelcomeHero();
+    if (currentSessionTitle) {
+      currentSessionTitle.textContent = "Đoạn chat mới";
+    }
     collapseCanvas();
     showCanvasEmptyState(true);
-    queryInput.value = "";
-    queryInput.focus();
+    if (queryInput) {
+      queryInput.value = "";
+      queryInput.focus();
+    }
+    const allItems = sessionList ? sessionList.querySelectorAll(".session-item") : [];
+    allItems.forEach(item => item.classList.remove("active"));
   }
 
   async function submitQuery(queryText) {
@@ -646,6 +676,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await response.json();
       currentSessionId = data.session_id;
+      localStorage.setItem("current_active_session_id", currentSessionId);
       localStorage.setItem("current_session_id", currentSessionId);
 
       if (currentSessionTitle && data.query) {
@@ -755,6 +786,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!cleanAnswer && data.abstention && data.abstention.explanation) {
       cleanAnswer = data.abstention.explanation;
     }
+
+    // Escape tildes so marked doesn't misinterpret Vietnamese financial approximations (~383 tỷ) as strikethrough <del>
+    cleanAnswer = cleanAnswer.replace(/~/g, "\\~");
 
     let formattedAnswer = marked.parse(cleanAnswer);
 
@@ -944,6 +978,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const isMargin = isChartPercent || name.toLowerCase().includes("margin") || name.toLowerCase().includes("biên") || name.toLowerCase().includes("ratio");
       const color = s.color || palette[idx % palette.length];
 
+      const shouldHide = !isChartPercent && isMargin;
+
       return {
         label: name,
         data: rawValues,
@@ -951,6 +987,7 @@ document.addEventListener("DOMContentLoaded", () => {
         borderColor: color,
         type: isMargin ? (chartMode === "bar" && isChartPercent ? "bar" : "line") : (chartMode === "line" ? "line" : "bar"),
         yAxisID: isChartPercent ? "y1" : (isMargin ? "y1" : "y"),
+        hidden: shouldHide, // Default hidden for secondary margin line per user requirement
         borderRadius: 4,
         borderWidth: isMargin || chartMode === "line" ? 2.5 : 0,
         pointRadius: isMargin || chartMode === "line" ? 4 : 0,
@@ -966,7 +1003,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     if (financialChart.options.scales.y1) {
-      financialChart.options.scales.y1.display = isChartPercent || financialChart.data.datasets.some(d => d.yAxisID === "y1");
+      financialChart.options.scales.y1.display = isChartPercent || financialChart.data.datasets.some(d => d.yAxisID === "y1" && !d.hidden);
       if (financialChart.options.scales.y1.title) {
         financialChart.options.scales.y1.title.text = isChartPercent ? (chartSpec.unit || "%") : "Biên hoạt động (%)";
       }
@@ -1003,9 +1040,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!labels || !seriesList || !Array.isArray(seriesList) || seriesList.length === 0) return;
 
     // Build Table Header: "Chỉ tiêu / Doanh nghiệp" + each year label
-    let theadHtml = `<th class="col-metric">Chỉ tiêu / Doanh nghiệp</th>`;
+    let theadHtml = `<th class="col-metric" title="Bấm để sắp xếp">Chỉ tiêu / Doanh nghiệp <span class="canvas-sort-arrow"></span></th>`;
     labels.forEach(l => {
-      theadHtml += `<th class="col-num">${escapeHtml(String(l))}</th>`;
+      theadHtml += `<th class="col-num" title="Bấm để sắp xếp">${escapeHtml(String(l))} <span class="canvas-sort-arrow"></span></th>`;
     });
     theadTr.innerHTML = theadHtml;
 
@@ -1034,6 +1071,83 @@ document.addEventListener("DOMContentLoaded", () => {
       return `<tr>${cells}</tr>`;
     }).join("");
   }
+
+  // Sort Financial Table on Canvas
+  let canvasSortColIdx = null;
+  let canvasSortAsc = true;
+
+  function initCanvasTableSorting() {
+    const tableEl = document.getElementById("financial-data-table");
+    if (!tableEl) return;
+    const thead = tableEl.querySelector("thead");
+    if (!thead) return;
+
+    thead.addEventListener("click", (e) => {
+      const th = e.target.closest("th");
+      if (!th) return;
+      const thList = Array.from(thead.querySelectorAll("th"));
+      const colIdx = thList.indexOf(th);
+      if (colIdx < 0) return;
+
+      if (canvasSortColIdx === colIdx) {
+        canvasSortAsc = !canvasSortAsc;
+      } else {
+        canvasSortColIdx = colIdx;
+        canvasSortAsc = true;
+      }
+
+      // Update header sort indicators
+      thList.forEach((h, idx) => {
+        let arrow = h.querySelector(".canvas-sort-arrow");
+        if (!arrow) {
+          arrow = document.createElement("span");
+          arrow.className = "canvas-sort-arrow";
+          h.appendChild(arrow);
+        }
+        if (idx === colIdx) {
+          h.classList.add("active-sort");
+          arrow.textContent = canvasSortAsc ? " ↑" : " ↓";
+        } else {
+          h.classList.remove("active-sort");
+          arrow.textContent = "";
+        }
+      });
+
+      // Sort tbody rows
+      const tbody = tableEl.querySelector("tbody");
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll("tr"));
+
+      rows.sort((rowA, rowB) => {
+        const cellA = rowA.children[colIdx];
+        const cellB = rowB.children[colIdx];
+        if (!cellA || !cellB) return 0;
+
+        const textA = cellA.textContent.trim();
+        const textB = cellB.textContent.trim();
+
+        // Check if numeric (handling $, %, commas, negative signs)
+        const cleanA = textA.replace(/[$%+,]/g, "").replace(/—|--/g, "NaN");
+        const cleanB = textB.replace(/[$%+,]/g, "").replace(/—|--/g, "NaN");
+
+        const numA = parseFloat(cleanA);
+        const numB = parseFloat(cleanB);
+
+        const isNumA = !isNaN(numA);
+        const isNumB = !isNaN(numB);
+
+        if (isNumA && isNumB) {
+          return canvasSortAsc ? (numA - numB) : (numB - numA);
+        }
+        return canvasSortAsc ? textA.localeCompare(textB) : textB.localeCompare(textA);
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  }
+
+  // Initialize canvas sorting on load
+  initCanvasTableSorting();
 
   function renderErrorMessage(msg) {
     const group = document.createElement("div");
@@ -1091,12 +1205,14 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (err) {}
           item.remove();
           if (currentSessionId === s.session_id) {
+            localStorage.removeItem("current_active_session_id");
             startNewSession();
           }
         });
         item.appendChild(trashBtn);
 
         item.addEventListener("click", () => {
+          localStorage.setItem("current_active_session_id", s.session_id);
           loadSession(s.session_id);
         });
         sessionList.appendChild(item);
@@ -1109,14 +1225,21 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadSession(sessionId) {
     try {
       const response = await fetch(`/api/history/${sessionId}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        startNewSession();
+        return;
+      }
       const sessionData = await response.json();
       currentSessionId = sessionId;
+      localStorage.setItem("current_active_session_id", currentSessionId);
       localStorage.setItem("current_session_id", currentSessionId);
+
+      if (currentSessionTitle) {
+        currentSessionTitle.textContent = sessionData.title || "Đoạn chat";
+      }
 
       if (sessionData.messages && sessionData.messages.length > 0) {
         messagesContainer.innerHTML = "";
-        currentSessionTitle.textContent = sessionData.title || "Đoạn chat";
 
         let hasAnyChart = false;
         sessionData.messages.forEach(msg => {
@@ -1143,11 +1266,20 @@ document.addEventListener("DOMContentLoaded", () => {
           collapseCanvas();
           showCanvasEmptyState(true);
         }
+      } else {
+        renderWelcomeHero();
+        collapseCanvas();
+        showCanvasEmptyState(true);
       }
       scrollToBottom();
-      loadRecentsSessions();
+      // Update active highlight in session list
+      const allItems = sessionList ? sessionList.querySelectorAll(".session-item") : [];
+      allItems.forEach(item => {
+        item.classList.toggle("active", item.getAttribute("data-session-id") === currentSessionId);
+      });
     } catch (e) {
       console.warn("Failed to load session details:", e);
+      startNewSession();
     }
   }
 
@@ -1193,6 +1325,393 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     voiceBtn.style.display = "none";
   }
+
+  /* ========================================================================= */
+  /* Real-Time Stock Market Terminal & Watchlist Controller (Task 17.4)         */
+  /* ========================================================================= */
+
+  const navStockTerminalBtn = document.getElementById("nav-stock-terminal-btn");
+  const stockTerminalPage = document.getElementById("stock-terminal-page");
+  const stockBackToChatBtn = document.getElementById("stock-back-to-chat-btn");
+  const stockTableBody = document.getElementById("stock-table-body");
+  const stockRefreshBtn = document.getElementById("stock-refresh-btn");
+  const stockResetBtn = document.getElementById("stock-reset-btn");
+  const stockAddForm = document.getElementById("stock-add-form");
+  const stockTickerInput = document.getElementById("stock-ticker-input");
+  const stockLoadingSpinner = document.getElementById("stock-loading-spinner");
+  const statTotalSymbols = document.getElementById("stat-total-symbols");
+  const statGainersCount = document.getElementById("stat-gainers-count");
+  const statLosersCount = document.getElementById("stat-losers-count");
+  const stockLastUpdatedClock = document.getElementById("stock-last-updated-clock");
+  const marketFilterTabs = document.querySelectorAll(".market-tab-btn");
+
+  let currentWatchlistQuotes = [];
+  let currentMarketFilter = "ALL";
+  let currentSortCol = null;
+  let currentSortAsc = true;
+
+  function openStockTerminal() {
+    if (!stockTerminalPage) return;
+    stockTerminalPage.style.display = "flex";
+    document.body.style.overflow = "hidden";
+    fetchWatchlistQuotes(false);
+  }
+
+  function closeStockTerminal() {
+    if (!stockTerminalPage) return;
+    stockTerminalPage.style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  if (navStockTerminalBtn) {
+    navStockTerminalBtn.addEventListener("click", openStockTerminal);
+  }
+
+  if (stockBackToChatBtn) {
+    stockBackToChatBtn.addEventListener("click", closeStockTerminal);
+  }
+
+  // Also allow clicking the sidebar watchlist header to open the full-screen terminal
+  const sidebarWatchlistCard = document.querySelector(".sidebar-watchlist-card");
+  if (sidebarWatchlistCard) {
+    const moreBtn = sidebarWatchlistCard.querySelector(".btn-watchlist-more");
+    if (moreBtn) {
+      moreBtn.addEventListener("click", openStockTerminal);
+    }
+  }
+
+  // Format currency helpers
+  function formatStockPrice(price, currency) {
+    if (price === null || price === undefined) return "N/A";
+    if (currency === "VND") {
+      return new Intl.NumberFormat("vi-VN").format(Math.round(price)) + " ₫";
+    }
+    return "$" + Number(price).toFixed(2);
+  }
+
+  function formatStockChange(change, currency) {
+    if (change === null || change === undefined) return "--";
+    const sign = change > 0 ? "+" : "";
+    if (currency === "VND") {
+      return sign + new Intl.NumberFormat("vi-VN").format(Math.round(change)) + " ₫";
+    }
+    return sign + "$" + Number(change).toFixed(2);
+  }
+
+  function formatStockPct(pct) {
+    if (pct === null || pct === undefined) return "--";
+    const sign = pct > 0 ? "+" : "";
+    return sign + Number(pct).toFixed(2) + "%";
+  }
+
+  function formatStockVolume(vol) {
+    if (!vol) return "--";
+    return new Intl.NumberFormat("en-US").format(vol);
+  }
+
+  // Fetch watchlist quotes from FastAPI backend
+  async function fetchWatchlistQuotes(forceRefresh = false) {
+    if (stockLoadingSpinner) stockLoadingSpinner.style.display = "flex";
+    if (stockRefreshBtn) stockRefreshBtn.classList.add("loading");
+
+    try {
+      const resp = await fetch(`/api/watchlist?refresh=${forceRefresh}`);
+      if (!resp.ok) throw new Error("Failed to fetch watchlist quotes");
+      const data = await resp.json();
+      currentWatchlistQuotes = data.items || [];
+
+      // Update Summary Statistics
+      updateStockSummaryStats(currentWatchlistQuotes, data.updated_at);
+
+      // Render Table
+      renderStockTable();
+    } catch (err) {
+      console.error("Watchlist fetch error:", err);
+    } finally {
+      if (stockLoadingSpinner) stockLoadingSpinner.style.display = "none";
+      if (stockRefreshBtn) stockRefreshBtn.classList.remove("loading");
+    }
+  }
+
+  function updateStockSummaryStats(items, updatedAt) {
+    if (statTotalSymbols) statTotalSymbols.textContent = items.length;
+
+    let gainers = 0;
+    let losers = 0;
+    items.forEach(q => {
+      if (q.change > 0) gainers++;
+      else if (q.change < 0) losers++;
+    });
+
+    if (statGainersCount) statGainersCount.textContent = `${gainers} ↗`;
+    if (statLosersCount) statLosersCount.textContent = `${losers} ↘`;
+
+    if (stockLastUpdatedClock && updatedAt) {
+      const date = new Date(updatedAt);
+      stockLastUpdatedClock.textContent = "Cập nhật lúc: " + date.toLocaleTimeString("vi-VN");
+    }
+  }
+
+  function renderStockTable() {
+    if (!stockTableBody) return;
+    stockTableBody.innerHTML = "";
+
+    let filtered = currentWatchlistQuotes.filter(item => {
+      if (currentMarketFilter === "ALL") return true;
+      return item.market === currentMarketFilter;
+    });
+
+    // Apply Sorting if active
+    if (currentSortCol) {
+      filtered = [...filtered].sort((a, b) => {
+        let valA = a[currentSortCol];
+        let valB = b[currentSortCol];
+        if (valA === null || valA === undefined) valA = currentSortAsc ? Infinity : -Infinity;
+        if (valB === null || valB === undefined) valB = currentSortAsc ? Infinity : -Infinity;
+
+        if (typeof valA === "string") {
+          return currentSortAsc
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        }
+        return currentSortAsc ? (valA - valB) : (valB - valA);
+      });
+    }
+
+    if (filtered.length === 0) {
+      stockTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">
+            Không có mã cổ phiếu nào trong danh mục này. Hãy thêm mã mới ở ô bên trên.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    filtered.forEach(item => {
+      const tr = document.createElement("tr");
+
+      const isUp = item.change > 0;
+      const isDown = item.change < 0;
+      const badgeClass = isUp ? "up" : (isDown ? "down" : "flat");
+      const marketClass = (item.market || "US").toLowerCase();
+
+      // Day Range: clean numerical format without bottom slider bar
+      let rangeHtml = `<span style="color: var(--text-muted);">--</span>`;
+      if (item.day_low !== null && item.day_high !== null) {
+        const lowStr = formatStockPrice(item.day_low, item.currency);
+        const highStr = formatStockPrice(item.day_high, item.currency);
+        rangeHtml = `<span class="day-range-val">${lowStr} — ${highStr}</span>`;
+      }
+
+      tr.innerHTML = `
+        <td><span class="stock-sym-cell">${escapeHtml(item.ticker)}</span></td>
+        <td><div class="stock-name-cell" title="${escapeHtml(item.company_name || item.ticker)}">${escapeHtml(item.company_name || "--")}</div></td>
+        <td><span class="market-badge ${marketClass}">${item.market}</span></td>
+        <td class="text-right"><span class="price-cell">${formatStockPrice(item.price, item.currency)}</span></td>
+        <td class="text-right" style="color: ${isUp ? '#00E599' : (isDown ? '#EF4444' : 'var(--text-muted)')}; font-weight: 550; font-feature-settings: 'tnum';">
+          ${formatStockChange(item.change, item.currency)}
+        </td>
+        <td class="text-right">
+          <span class="pct-badge ${badgeClass}">${formatStockPct(item.percent_change)}</span>
+        </td>
+        <td class="text-center">${rangeHtml}</td>
+        <td class="text-right num-val-cell">${formatStockVolume(item.volume)}</td>
+        <td class="text-center">
+          <div class="table-actions-cell">
+            <button class="btn-ask-ai" data-ticker="${escapeHtml(item.ticker)}" title="Hỏi trợ lý AI phân tích doanh nghiệp này">
+              <span>Hỏi AI</span>
+            </button>
+            <button class="btn-delete-symbol" data-ticker="${escapeHtml(item.ticker)}" title="Xóa khỏi danh mục theo dõi">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </td>
+      `;
+
+      // Wire Action: Ask AI
+      const askBtn = tr.querySelector(".btn-ask-ai");
+      if (askBtn) {
+        askBtn.addEventListener("click", () => {
+          closeStockTerminal();
+          if (queryInput) {
+            queryInput.value = `Phân tích tình hình tài chính, kết quả kinh doanh và các điểm nổi bật gần nhất của ${item.ticker}`;
+            if (chatForm) chatForm.dispatchEvent(new Event("submit"));
+          }
+        });
+      }
+
+      // Wire Action: Delete Ticker
+      const delBtn = tr.querySelector(".btn-delete-symbol");
+      if (delBtn) {
+        delBtn.addEventListener("click", async () => {
+          if (confirm(`Bạn có chắc chắn muốn xóa mã ${item.ticker} khỏi danh mục theo dõi?`)) {
+            try {
+              const res = await fetch(`/api/watchlist/${encodeURIComponent(item.ticker)}`, {
+                method: "DELETE"
+              });
+              if (res.ok) {
+                fetchWatchlistQuotes(false);
+              }
+            } catch (err) {
+              console.error("Failed to delete ticker:", err);
+            }
+          }
+        });
+      }
+
+      stockTableBody.appendChild(tr);
+    });
+  }
+
+  // Update Mini 2x2 Watchlist Grid in Left Sidebar
+  function updateSidebarWatchlist(quotes) {
+    const grid = document.querySelector(".sidebar-watchlist-card .watchlist-grid");
+    if (!grid || quotes.length === 0) return;
+
+    // Pick top 4 items
+    const top4 = quotes.slice(0, 4);
+    grid.innerHTML = "";
+
+    top4.forEach(q => {
+      const isUp = q.change >= 0;
+      const trendIcon = isUp ? "↗" : "↘";
+      const itemClass = isUp ? "bullish" : "bearish";
+
+      const card = document.createElement("div");
+      card.className = `watchlist-item ${itemClass}`;
+      card.setAttribute("data-ticker", q.ticker);
+      card.style.cursor = "pointer";
+      card.title = "Bấm để mở Bảng giá thời gian thực toàn màn hình";
+
+      card.innerHTML = `
+        <div class="watchlist-item-top">
+          <span class="ticker-sym">${escapeHtml(q.ticker)}</span>
+          <span class="trend-icon">${trendIcon}</span>
+        </div>
+        <div class="ticker-price">${formatStockPrice(q.price, q.currency)}</div>
+        <div class="ticker-change">${formatStockPct(q.percent_change)}</div>
+      `;
+
+      card.addEventListener("click", openStockTerminal);
+      grid.appendChild(card);
+    });
+  }
+
+  // Add Ticker Form
+  if (stockAddForm && stockTickerInput) {
+    stockAddForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const symbol = stockTickerInput.value.trim().toUpperCase();
+      if (!symbol) return;
+
+      // Check if already in currentWatchlistQuotes
+      if (currentWatchlistQuotes.some(q => q.ticker.toUpperCase() === symbol)) {
+        alert(`Mã cổ phiếu ${symbol} đã có sẵn trong danh mục theo dõi của bạn!`);
+        stockTickerInput.value = "";
+        return;
+      }
+
+      const btnAdd = document.getElementById("btn-stock-add");
+      if (btnAdd) {
+        btnAdd.disabled = true;
+        btnAdd.textContent = "Đang thêm...";
+      }
+
+      try {
+        const resp = await fetch("/api/watchlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticker: symbol })
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json();
+          alert(errData.detail || "Không thể thêm mã cổ phiếu này");
+          return;
+        }
+
+        stockTickerInput.value = "";
+        await fetchWatchlistQuotes(false);
+      } catch (err) {
+        console.error("Error adding ticker:", err);
+        alert("Lỗi kết nối khi thêm mã cổ phiếu");
+      } finally {
+        if (btnAdd) {
+          btnAdd.disabled = false;
+          btnAdd.innerHTML = "<span>+ Thêm mã</span>";
+        }
+      }
+    });
+  }
+
+  // Refresh & Reset Buttons
+  if (stockRefreshBtn) {
+    stockRefreshBtn.addEventListener("click", () => fetchWatchlistQuotes(true));
+  }
+
+  if (stockResetBtn) {
+    stockResetBtn.addEventListener("click", async () => {
+      if (confirm("Khôi phục danh mục theo dõi về danh sách mặc định AAPL, MSFT, GOOGL, NVDA, FPT, VNM, HPG?")) {
+        try {
+          if (stockLoadingSpinner) stockLoadingSpinner.style.display = "flex";
+          const resp = await fetch("/api/watchlist/reset", { method: "POST" });
+          if (resp.ok) await fetchWatchlistQuotes(true);
+        } catch (err) {
+          console.error("Error resetting watchlist:", err);
+        } finally {
+          if (stockLoadingSpinner) stockLoadingSpinner.style.display = "none";
+        }
+      }
+    });
+  }
+
+  // Column Sorting Handlers (Only Mã CK, Tên công ty, and numeric metrics)
+  const allowedSortCols = ["ticker", "company_name", "price", "change", "percent_change", "volume"];
+  const sortableHeaders = document.querySelectorAll(".sortable-th");
+  sortableHeaders.forEach(th => {
+    th.addEventListener("click", () => {
+      const col = th.getAttribute("data-sort");
+      if (!col || !allowedSortCols.includes(col)) return;
+
+      if (currentSortCol === col) {
+        currentSortAsc = !currentSortAsc;
+      } else {
+        currentSortCol = col;
+        currentSortAsc = true;
+      }
+
+      sortableHeaders.forEach(h => {
+        const arrow = h.querySelector(".sort-arrow");
+        if (h === th) {
+          h.classList.add("active-sort");
+          if (arrow) arrow.textContent = currentSortAsc ? " ↑" : " ↓";
+        } else {
+          h.classList.remove("active-sort");
+          if (arrow) arrow.textContent = "";
+        }
+      });
+
+      renderStockTable();
+    });
+  });
+
+  // Filter Tabs
+  marketFilterTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      marketFilterTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentMarketFilter = tab.getAttribute("data-filter") || "ALL";
+      renderStockTable();
+    });
+  });
+
+  // Initial Background Load for Watchlist
+  fetchWatchlistQuotes(false);
 
   /* ========================================================================= */
   /* Helper Utilities                                                          */
