@@ -218,26 +218,30 @@ class TestQuoteServiceAndRepository:
 
         repo = WatchlistRepository(s3_storage=mock_s3, quote_service=mock_quote_svc)
         initial_cfg = repo.get_watchlist()
-        assert len(initial_cfg.items) == 7
+        default_count = len(repo.DEFAULT_TICKERS)
+        assert default_count == 103
+        assert len(initial_cfg.items) == default_count
+        tickers_in_default = {item.ticker for item in initial_cfg.items}
+        assert {"AAPL", "MSFT", "NVDA", "TSM", "INFY", "FPT", "VNM", "HPG"}.issubset(tickers_in_default)
 
         # Add new ticker
         updated = repo.add_ticker("VIC")
         assert any(item.ticker == "VIC" for item in updated.items)
-        assert len(updated.items) == 8
+        assert len(updated.items) == default_count + 1
 
         # Adding duplicate does not increase count
         dup = repo.add_ticker("VIC")
-        assert len(dup.items) == 8
+        assert len(dup.items) == default_count + 1
 
         # Remove ticker
         removed = repo.remove_ticker("VIC")
         assert not any(item.ticker == "VIC" for item in removed.items)
-        assert len(removed.items) == 7
+        assert len(removed.items) == default_count
 
         # Enriched response contains live quotes
         enriched = repo.get_enriched_watchlist()
-        assert enriched.total == 7
-        assert len(enriched.items) == 7
+        assert enriched.total == default_count
+        assert len(enriched.items) == default_count
         assert enriched.items[0].price == 100.0
 
 

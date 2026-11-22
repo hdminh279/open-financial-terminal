@@ -20,7 +20,7 @@ def _is_retryable_http_error(exc: BaseException) -> bool:
     if isinstance(exc, (httpx.ConnectError, httpx.TimeoutException)):
         return True
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code in {429, 500, 502, 503, 504}
+        return exc.response.status_code in {500, 502, 503, 504}
     return False
 
 
@@ -138,6 +138,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
             logger.warning("Finnhub API key is not configured; cannot fetch quote for %s", ticker)
             return StockQuote(
                 ticker=ticker,
+                company_name=self._name_cache.get(ticker.upper()),
                 market=self.market,
                 price=None,
                 change=None,
@@ -159,6 +160,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
                 logger.info("Finnhub returned no price data for ticker %s (unsupported or inactive)", ticker)
                 return StockQuote(
                     ticker=ticker,
+                    company_name=self._name_cache.get(ticker.upper()),
                     market=self.market,
                     price=None,
                     change=None,
@@ -199,6 +201,7 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
             logger.error("Failed to fetch quote for %s from Finnhub: %s", ticker, exc)
             return StockQuote(
                 ticker=ticker,
+                company_name=self._name_cache.get(ticker.upper()),
                 market=self.market,
                 price=None,
                 change=None,

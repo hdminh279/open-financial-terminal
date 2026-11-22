@@ -1,9 +1,9 @@
-"""Quality Gate 3 Comprehensive Benchmark Runner for LangGraph Research Agent.
+"""Agent Benchmark Runner for LangGraph Research Agent.
 
 Executes the 50 certified ground truth questions from tests/fixtures/eval/agent_eval_questions.json,
 measures Intent Accuracy, Tool Precision/Recall, Mixed-Query Fan-Out, Citation Link Validity,
 Abstention Recall on Negatives, and Latency SLAs.
-Generates an authoritative Markdown report at docs/benchmarks/DAY_12_AGENT_BENCHMARK.md.
+Generates an authoritative Markdown report at docs/benchmarks/AGENT_BENCHMARK.md.
 """
 
 import json
@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 GROUND_TRUTH_PATH = "tests/fixtures/eval/agent_eval_questions.json"
-REPORT_OUTPUT_PATH = "docs/benchmarks/DAY_12_AGENT_BENCHMARK.md"
+REPORT_OUTPUT_PATH = "docs/benchmarks/AGENT_BENCHMARK.md"
 SEC_URL_REGEX = re.compile(r"^https://www\.sec\.gov/Archives/edgar/data/\d+/\d+/[\w\.-]+$")
 
 
@@ -206,7 +206,7 @@ def run_benchmark() -> dict[str, Any]:
     # Export Authoritative Report
     os.makedirs(os.path.dirname(REPORT_OUTPUT_PATH), exist_ok=True)
     with open(REPORT_OUTPUT_PATH, "w", encoding="utf-8") as f:
-        f.write("# DAY 12: QUALITY GATE 3 BENCHMARK REPORT\n\n")
+        f.write("# AGENT BENCHMARK REPORT\n\n")
         f.write(f"- **Execution Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"- **Evaluated Dataset**: `{GROUND_TRUTH_PATH}` (N=50 Certified Questions)\n")
         f.write("- **Architecture**: LangGraph StateGraph (Parallel Fan-Out + Multi-Layer Abstention Gate)\n\n")

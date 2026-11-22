@@ -1,4 +1,4 @@
-"""Regression and feature unit tests for TASK-18.4 audit fixes and query caching."""
+"""Regression and feature unit tests for API hardening, semantic validation, and TTL query caching."""
 
 import json
 import time

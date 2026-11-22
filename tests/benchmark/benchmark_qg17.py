@@ -1,4 +1,4 @@
-"""Quality Gate 17 Multi-Market & Adversarial Evaluation Harness.
+"""Multi-Market & Adversarial Evaluation Harness.
 
 Evaluates the LangGraph Research Agent across 20 adversarial multi-market scenarios
 (tests/fixtures/eval/qg17_multimarket_questions.json) covering:
@@ -16,7 +16,7 @@ Supports:
   --mode live    : Full live execution against DeepSeek API, Gold Lakehouse, Qdrant, DuckDuckGo,
                    plus LLM-as-a-Judge faithfulness and answer relevance scoring.
 
-Outputs an authoritative Markdown report at docs/benchmarks/DAY_17_QUALITY_GATE.md.
+Outputs an authoritative Markdown report at docs/benchmarks/MULTIMARKET_EVAL_GATE.md.
 """
 
 import argparse
@@ -43,7 +43,7 @@ from src.ai.retrieval.retriever import HybridRetriever, RetrievalResponse, Retri
 from src.core.financial.response_templates import detect_query_language
 
 DATASET_PATH = Path("tests/fixtures/eval/qg17_multimarket_questions.json")
-REPORT_OUTPUT_PATH = Path("docs/benchmarks/DAY_17_QUALITY_GATE.md")
+REPORT_OUTPUT_PATH = Path("docs/benchmarks/MULTIMARKET_EVAL_GATE.md")
 
 AUTHORITATIVE_URL_PREFIXES = (
     "https://www.sec.gov/",
@@ -651,7 +651,7 @@ def run_qg17_benchmark(mode: str = "offline", write_report: bool = True) -> list
 
 
 def _write_markdown_report(results: list[CaseEvalResult], mode: str) -> None:
-    """Render portfolio-ready Quality Gate 17 evaluation report at docs/benchmarks/DAY_17_QUALITY_GATE.md."""
+    """Render portfolio-ready Multi-Market evaluation report at docs/benchmarks/MULTIMARKET_EVAL_GATE.md."""
     n = len(results)
 
     def pct(num: int) -> float:
@@ -689,7 +689,7 @@ def _write_markdown_report(results: list[CaseEvalResult], mode: str) -> None:
     )
 
     lines = [
-        "# Quality Gate 17 — Multi-Market & Adversarial Agent Evaluation Report",
+        "# Multi-Market & Adversarial Agent Evaluation Report",
         "",
         f"> **Generated**: {now_iso}  ",
         f"> **Execution Mode**: {mode_label}  ",
@@ -770,14 +770,14 @@ def _write_markdown_report(results: list[CaseEvalResult], mode: str) -> None:
 
 
 def main() -> None:
-    """CLI entrypoint for Quality Gate 17 benchmark runner."""
-    parser = argparse.ArgumentParser(description="Run Quality Gate 17 Multi-Market Evaluation")
+    """CLI entrypoint for multi-market benchmark runner."""
+    parser = argparse.ArgumentParser(description="Run Multi-Market Agent Evaluation")
     parser.add_argument("--mode", choices=["offline", "live"], default="offline")
     args = parser.parse_args()
 
     results = run_qg17_benchmark(mode=args.mode, write_report=True)
     passed = sum(1 for r in results if r.passed)
-    print(f"Quality Gate 17 ({args.mode}): {passed}/{len(results)} passed. Report -> {REPORT_OUTPUT_PATH}")
+    print(f"Multi-Market Eval ({args.mode}): {passed}/{len(results)} passed. Report -> {REPORT_OUTPUT_PATH}")
     if passed < len(results):
         for r in results:
             if not r.passed:

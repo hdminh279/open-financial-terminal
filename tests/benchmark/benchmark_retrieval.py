@@ -4,7 +4,7 @@ Evaluates Dense Vector, BM25 Lexical, Hybrid RRF, and Hybrid + FlashRank Cross-E
 across Hit@1, Hit@3, Hit@5, Hit@10, Mean Reciprocal Rank (MRR), and Query Latency.
 Strictly isolates positive queries (42 queries) from negative out-of-scope queries (8 queries),
 enforces exact Item word-boundary matching and multi-keyword relevance criteria.
-Generates docs/benchmarks/DAY_10_RETRIEVAL_BENCHMARK.md.
+Generates docs/benchmarks/RETRIEVAL_BENCHMARK.md.
 """
 
 import json
@@ -347,7 +347,7 @@ def run_benchmark() -> None:
 
     # Generate Markdown Report
     os.makedirs("docs/benchmarks", exist_ok=True)
-    report_file = "docs/benchmarks/DAY_10_RETRIEVAL_BENCHMARK.md"
+    report_file = "docs/benchmarks/RETRIEVAL_BENCHMARK.md"
 
     per_query_table_md = "\n".join(per_query_rows_md)
     neg_table_md = "\n".join(neg_rows_md)
@@ -359,7 +359,7 @@ def run_benchmark() -> None:
     pos_count = len(positive_queries)
     neg_count = len(negative_queries)
 
-    md = f"""# RETRIEVAL BENCHMARK REPORT — DAY 10 (CERTIFIED N={total_count} GROUND TRUTH DATASET)
+    md = f"""# RETRIEVAL BENCHMARK REPORT (CERTIFIED N={total_count} GROUND TRUTH DATASET)
 
 **Evaluation Date:** {time.strftime("%Y-%m-%d %H:%M:%S")}
 **Corpus Size:** 6,674 chunks (SEC EDGAR Form 10-K & 10-Q for AAPL, MSFT, GOOGL)
@@ -391,7 +391,7 @@ def run_benchmark() -> None:
   - Minimum: `{neg_min:.4f}` | Median: `{neg_med:.4f}` | Maximum: `{neg_max:.4f}`
 - **Separation Margin ($\text{{Min}}_{{\text{{pos}}}} - \text{{Max}}_{{\text{{neg}}}}$):** `{separation_margin:.4f}`
 
-> **Statistical Finding:** A fixed static threshold (such as $0.15$) creates False Negatives on valid abstract financial questions (e.g., macroeconomic and trade sanction queries). The Abstention Gate in Day 12 must incorporate semantic entity verification and LLM self-reflection rather than an isolated cross-encoder score cutoff.
+> **Statistical Finding:** A fixed static threshold (such as $0.15$) creates False Negatives on valid abstract financial questions (e.g., macroeconomic and trade sanction queries). The Abstention Gate must incorporate semantic entity verification and LLM self-reflection rather than an isolated cross-encoder score cutoff.
 
 ---
 

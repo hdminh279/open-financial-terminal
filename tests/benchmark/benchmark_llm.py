@@ -190,7 +190,7 @@ def generate_markdown_report(results: dict[str, list[dict[str, Any]]]) -> str:
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     lines = [
-        "# Day 11: DeepSeek API Client & Reasoning Benchmark Report",
+        "# DeepSeek API Client & Reasoning Benchmark Report",
         "",
         f"> **Generated Date**: {now_str}  ",
         "> **Model Tested**: `deepseek-flash` (`deepseek-v4.1-flash-1017`)  ",
@@ -304,7 +304,7 @@ def generate_markdown_report(results: dict[str, list[dict[str, Any]]]) -> str:
             "",
             "---",
             "",
-            "## 4. Architectural Recommendations for Day 12 (Agent, Router & Synthesizer)",
+            "## 4. Architectural Recommendations (Agent, Router & Synthesizer)",
             "",
             "1. **Intent Router**: Use `chat` profile.",
             "   - Router only needs classification between SQL Tool, Hybrid RAG, and Out-of-Scope.",
@@ -313,7 +313,7 @@ def generate_markdown_report(results: dict[str, list[dict[str, Any]]]) -> str:
             "   - Direct extractions and single-step arithmetic are executed accurately without CoT latency.",
             "3. **Multi-Step & Discrepancy Synthesizer**: Use `reasoner` profile.",
             "   - Multi-period comparisons and complex reconciliations (e.g. GAAP vs Non-GAAP, derived quarterly numbers) benefit from Chain-of-Thought reasoning.",
-            "4. **Abstention Gate**: Both profiles properly identify out-of-scope requests when context lacks answers. Combined with Day 12's Abstention Gate confidence scoring, false positives will be eliminated.",
+            "4. **Abstention Gate**: Both profiles properly identify out-of-scope requests when context lacks answers. Combined with the Abstention Gate confidence scoring, false positives will be eliminated.",
         ]
     )
 
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     benchmark_data = run_benchmark()
     report_md = generate_markdown_report(benchmark_data)
 
-    out_path = Path("docs/benchmarks/DAY_11_LLM_BENCHMARK.md")
+    out_path = Path("docs/benchmarks/LLM_BENCHMARK.md")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(report_md)

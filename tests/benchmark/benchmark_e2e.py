@@ -146,9 +146,9 @@ def generate_markdown_report(summary: dict[str, Any]) -> None:
     output_path = Path("docs/EVALUATION_REPORT.md")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    report_content = f"""# Corporate Filing Intelligence — End-to-End Evaluation Report (Day 15)
+    report_content = f"""# Corporate Filing Intelligence — End-to-End Evaluation Report
 
-> **Platform**: Corporate Filing Intelligence (Accelerated 16-Day Sprint)
+> **Platform**: Corporate Filing Intelligence
 > **Evaluation Date**: {time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())}
 > **Ground Truth Dataset**: Certified N=50 SEC EDGAR Benchmark (`tests/fixtures/eval/agent_eval_questions.json`)
 > **Architecture**: Local MinIO S3 Medallion Lakehouse + Qdrant Vector DB + DuckDB Gold Marts + DeepSeek API

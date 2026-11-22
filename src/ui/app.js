@@ -1605,7 +1605,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ========================================================================= */
-  /* Real-Time Stock Market Terminal & Watchlist Controller (Task 17.4)         */
+  /* Real-Time Stock Market Terminal & Watchlist Controller                    */
   /* ========================================================================= */
 
   const navStockTerminalBtn = document.getElementById("nav-stock-terminal-btn");

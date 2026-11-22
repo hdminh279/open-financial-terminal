@@ -1,4 +1,4 @@
-"""Unit tests for TASK-17.5: Multi-Currency, Contextual Isolation, Strict Abstention & Fiscal Footnotes."""
+"""Unit tests for multi-currency support, contextual isolation, strict abstention, and fiscal footnotes."""
 
 import json
 from datetime import date
@@ -431,14 +431,14 @@ def test_citation_node_appends_deduped_fiscal_period_footnote() -> None:
     assert "Năm tài chính của Nvidia Corporation (NVDA) lệch so với năm dương lịch" in out["final_answer"]
 
 
-def test_qg17_offline_all_20_scenarios_pass() -> None:
-    """Verify full Quality Gate 17 offline multi-market benchmark achieves 20/20 pass rate."""
+def test_multimarket_offline_all_20_scenarios_pass() -> None:
+    """Verify full offline multi-market benchmark achieves 20/20 pass rate."""
     from tests.benchmark.benchmark_qg17 import run_qg17_benchmark
 
     results = run_qg17_benchmark(mode="offline", write_report=False)
     assert len(results) == 20
     failures = [(r.question_id, r.failure_causes) for r in results if not r.passed]
-    assert failures == [], f"Quality Gate 17 offline failures: {failures}"
+    assert failures == [], f"Multi-market offline benchmark failures: {failures}"
 
 
 def test_q1_to_q20_audit_fixes(tmp_path: Path) -> None:

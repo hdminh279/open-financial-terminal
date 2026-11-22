@@ -11,7 +11,7 @@ DEFAULT_VN_COMPANIES_PATH = "configs/companies_vn.yaml"
 
 
 @lru_cache(maxsize=8)
-def _load_company_catalog_cached(config_path: str) -> tuple[dict[str, Any], ...]:
+def _load_company_catalog_cached(config_path: str, include_vn: bool = True) -> tuple[dict[str, Any], ...]:
     """Read and cache company definitions from YAML configuration."""
     catalogs: list[dict[str, Any]] = []
     if os.path.exists(config_path):
@@ -20,7 +20,7 @@ def _load_company_catalog_cached(config_path: str) -> tuple[dict[str, Any], ...]
         catalogs.extend(data.get("companies", []))
 
     # Also include VN30 catalog when loading standard catalog
-    if config_path == DEFAULT_COMPANIES_PATH and os.path.exists(DEFAULT_VN_COMPANIES_PATH):
+    if include_vn and config_path == DEFAULT_COMPANIES_PATH and os.path.exists(DEFAULT_VN_COMPANIES_PATH):
         with open(DEFAULT_VN_COMPANIES_PATH, encoding="utf-8") as f:
             vn_data = yaml.safe_load(f) or {}
         catalogs.extend(vn_data.get("companies", []))
@@ -28,9 +28,12 @@ def _load_company_catalog_cached(config_path: str) -> tuple[dict[str, Any], ...]
     return tuple(catalogs)
 
 
-def load_company_catalog(config_path: str = DEFAULT_COMPANIES_PATH) -> list[dict[str, Any]]:
+def load_company_catalog(
+    config_path: str = DEFAULT_COMPANIES_PATH,
+    include_vn: bool = True,
+) -> list[dict[str, Any]]:
     """Load list of company dictionary definitions from configuration YAML."""
-    return list(_load_company_catalog_cached(config_path))
+    return list(_load_company_catalog_cached(config_path, include_vn=include_vn))
 
 
 def get_supported_tickers(config_path: str = DEFAULT_COMPANIES_PATH) -> set[str]:

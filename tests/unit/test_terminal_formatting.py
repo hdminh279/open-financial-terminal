@@ -1,4 +1,4 @@
-"""Unit tests for Task 18.1: AI Financial Terminal UI/UX & Clean Formatting."""
+"""Unit tests for AI Financial Terminal UI/UX & Clean Formatting."""
 
 from unittest.mock import MagicMock
 

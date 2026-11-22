@@ -86,7 +86,7 @@ def remove_ticker_from_watchlist(ticker: str) -> WatchlistResponse:
     summary="Reset user watchlist to default basket",
 )
 def reset_watchlist() -> WatchlistResponse:
-    """Reset watchlist back to default multi-market basket (AAPL, MSFT, GOOGL, NVDA, FPT, VNM, HPG)."""
+    """Reset watchlist back to default multi-market basket (100 SEC issuers plus VN benchmark tickers)."""
     repo = get_watchlist_repository()
     repo.reset_to_default()
     return repo.get_enriched_watchlist()

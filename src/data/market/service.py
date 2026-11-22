@@ -33,14 +33,14 @@ class QuoteService:
     def __init__(
         self,
         factory: QuoteProviderFactory | None = None,
-        ttl_seconds: float = 60.0,
+        ttl_seconds: float = 300.0,
         rate_limiter: RateLimiter | None = None,
     ) -> None:
         """Initialize QuoteService.
 
         Args:
             factory: Optional QuoteProviderFactory. Defaults to standard production factory.
-            ttl_seconds: Time-to-live for cached quotes in seconds (default 60s).
+            ttl_seconds: Time-to-live for cached quotes in seconds (default 300s).
             rate_limiter: Optional Token Bucket RateLimiter (default 5 req/sec burst for responsiveness).
         """
         self.factory = factory or QuoteProviderFactory()
@@ -106,14 +106,25 @@ class QuoteService:
             return [results[t] for t in tickers if t in results]
 
 
-class WatchlistRepository:
-    """Repository managing persistent user watchlists in MinIO S3 with local memory fallback."""
+def _load_default_watchlist_tickers() -> tuple[tuple[str, Market], ...]:
+    """Build default multi-market watchlist from all configured SEC issuers plus VN benchmark tickers."""
+    seen: set[str] = set()
+    entries: list[tuple[str, Market]] = []
 
-    BUCKET_NAME = "sec-silver"
-    STORAGE_KEY = "user_settings/watchlist.json"
-    MAX_ITEMS = 20
+    for company in load_company_catalog("configs/companies.yaml", include_vn=False):
+        ticker = str(company.get("ticker", "")).strip().upper()
+        if ticker and ticker not in seen:
+            seen.add(ticker)
+            entries.append((ticker, Market.US))
 
-    DEFAULT_TICKERS: tuple[tuple[str, Market], ...] = (
+    for vn_ticker in ("FPT", "VNM", "HPG"):
+        if vn_ticker not in seen:
+            seen.add(vn_ticker)
+            entries.append((vn_ticker, Market.VN))
+
+    if entries:
+        return tuple(entries)
+    return (
         ("AAPL", Market.US),
         ("MSFT", Market.US),
         ("GOOGL", Market.US),
@@ -122,6 +133,16 @@ class WatchlistRepository:
         ("VNM", Market.VN),
         ("HPG", Market.VN),
     )
+
+
+class WatchlistRepository:
+    """Repository managing persistent user watchlists in MinIO S3 with local memory fallback."""
+
+    BUCKET_NAME = "sec-silver"
+    STORAGE_KEY = "user_settings/watchlist.json"
+    MAX_ITEMS = 200
+
+    DEFAULT_TICKERS: tuple[tuple[str, Market], ...] = _load_default_watchlist_tickers()
 
     def __init__(
         self,
