@@ -45,8 +45,37 @@ def test_timeline_reducer_parallel_accumulation() -> None:
     assert "Searching SEC filings" in step_names
 
 
-def test_mixed_research_parallel_fanout_timeline() -> None:
+def test_mixed_research_parallel_fanout_timeline(monkeypatch: pytest.MonkeyPatch) -> None:
     """Validate that Mixed Research parallel execution records both tools without event loss."""
+    from src.ai.llm.contracts import LLMResponse
+    from src.ai.llm.deepseek_adapter import DeepSeekAdapter
+
+    # Force CI-like empty API key environment so this unit test never hits external network
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr(DeepSeekAdapter, "__init__", lambda self, *args, **kwargs: None)
+
+    def _fake_generate(self: DeepSeekAdapter, messages: list, json_mode: bool = False, **kwargs: object) -> LLMResponse:
+        if json_mode:
+            payload = {
+                "intent": "MIXED_RESEARCH",
+                "tickers": ["AAPL"],
+                "metrics": ["revenues"],
+                "fiscal_years": [2023],
+                "fiscal_periods": ["FY"],
+                "semantic_topics": ["China risks"],
+                "requires_sql": True,
+                "requires_rag": True,
+                "comparison_type": "none",
+                "chart_preference": "none",
+                "reasoning": "Offline unit test plan for parallel fan-out.",
+            }
+            content = json.dumps(payload)
+        else:
+            content = "Apple FY2023 revenue and China disclosure risks are grounded in the cited evidence [1]."
+        return LLMResponse(content=content, model="deepseek-flash", finish_reason="stop", latency_ms=1.0)
+
+    monkeypatch.setattr(DeepSeekAdapter, "generate", _fake_generate)
+
     agent = ResearchAgent()
     request = AgentRequest(query="What was Apple's revenue in 2023 and what risks did they disclose regarding China?")
 
