@@ -30,6 +30,16 @@ def test_cli_parser_ingest_facts_custom_config():
     assert args.force is True
 
 
+def test_cli_parser_ingest_vn():
+    """Verify parser parses 'ingest --vn' with optional ticker and custom config."""
+    parser = build_parser()
+    args = parser.parse_args(["ingest", "--vn", "--ticker", "FPT", "--force"])
+    assert args.command == "ingest"
+    assert args.vn is True
+    assert args.ticker == "FPT"
+    assert args.force is True
+
+
 def test_cli_parser_verify():
     """Verify parser parses 'verify' command."""
     parser = build_parser()
@@ -100,3 +110,12 @@ def test_cli_main_dispatches_process(mock_run_process):
     exit_code = main(["process", "--facts"])
     assert exit_code == 0
     mock_run_process.assert_called_once()
+
+
+def test_cli_parser_process_vn():
+    """Verify parser parses 'process --vn' option."""
+    parser = build_parser()
+    args = parser.parse_args(["process", "--vn", "--ticker", "FPT"])
+    assert args.command == "process"
+    assert args.vn is True
+    assert args.ticker == "FPT"

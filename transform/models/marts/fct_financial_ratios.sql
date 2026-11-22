@@ -12,6 +12,8 @@ WITH statements AS (
         statement_key,
         cik,
         ticker,
+        market,
+        currency,
         fiscal_year,
         fiscal_period,
         period_type,
@@ -26,13 +28,14 @@ WITH statements AS (
         total_assets,
         total_liabilities,
         stockholders_equity_parent,
+        stockholders_equity_total,
         -- Prior period lookup for exact YoY comparison (same fiscal period, prior fiscal year)
         LAG(revenues, 1) OVER (
-            PARTITION BY ticker, fiscal_period
+            PARTITION BY ticker, fiscal_period, period_type
             ORDER BY fiscal_year ASC
         ) AS prior_year_revenues,
         LAG(fiscal_year, 1) OVER (
-            PARTITION BY ticker, fiscal_period
+            PARTITION BY ticker, fiscal_period, period_type
             ORDER BY fiscal_year ASC
         ) AS prior_fiscal_year
     FROM {{ ref('fct_financial_statements') }}
@@ -42,6 +45,8 @@ SELECT
     statement_key AS ratio_key,
     cik,
     ticker,
+    market,
+    currency,
     fiscal_year,
     fiscal_period,
     period_type,
@@ -55,7 +60,7 @@ SELECT
     
     -- Liquidity & Solvency Ratios
     ROUND(current_assets / NULLIF(current_liabilities, 0), 4) AS current_ratio,
-    ROUND(total_liabilities / NULLIF(stockholders_equity_parent, 0), 4) AS debt_to_equity,
+    ROUND(total_liabilities / NULLIF(COALESCE(stockholders_equity_total, stockholders_equity_parent), 0), 4) AS debt_to_equity,
     
     -- Year-over-Year Growth (valid only when strictly consecutive fiscal years)
     CASE
@@ -65,6 +70,7 @@ SELECT
     END AS revenue_growth_yoy
 FROM statements
 ORDER BY
+    market ASC,
     ticker ASC,
     fiscal_year ASC,
     CASE fiscal_period

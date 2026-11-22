@@ -130,5 +130,7 @@ SELECT
     -- Audit provenance flags
     CASE WHEN rank_as_reported = 1 THEN TRUE ELSE FALSE END AS is_as_reported,
     CASE WHEN rank_latest_known = 1 THEN TRUE ELSE FALSE END AS is_latest_known,
-    source_file
+    source_file,
+    'US' AS market,
+    'USD' AS currency
 FROM ranked

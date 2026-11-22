@@ -56,6 +56,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ingest only 10-K and 10-Q HTML filings.",
     )
+    group.add_argument(
+        "--vn",
+        "--vn30",
+        dest="vn",
+        action="store_true",
+        help="Ingest VN30 financial statements (Income Statement, Balance Sheet, Cash Flow) into MinIO Bronze.",
+    )
+
+    ingest_parser.add_argument(
+        "--ticker",
+        type=str,
+        default=None,
+        help="Optional single company ticker for targeted ingestion (e.g. FPT, AAPL).",
+    )
 
     ingest_parser.add_argument(
         "--config",
@@ -193,6 +207,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Process raw HTML filings into Silver sections and Gold Parquet chunks.",
     )
+    p_group.add_argument(
+        "--vn",
+        "--vn30",
+        dest="vn",
+        action="store_true",
+        help="Process raw VN30 statements from Bronze into Silver Parquet and quarantine.",
+    )
     process_parser.add_argument(
         "--ticker",
         type=str,
@@ -223,6 +244,27 @@ def build_parser() -> argparse.ArgumentParser:
 def run_ingest(args: argparse.Namespace) -> int:
     """Execute ingestion pipeline according to provided arguments."""
     load_dotenv()
+
+    # Route VN30 financial statement ingestion
+    if getattr(args, "vn", False):
+        from src.data.ingestion.vn_ingestion import VNFinancialClient, VNIngestionPipeline
+
+        s3_storage = S3Storage()
+        s3_storage.ensure_buckets_exist()
+
+        vn_config = getattr(args, "config", "configs/companies_vn.yaml")
+        if vn_config == "configs/companies.yaml":
+            vn_config = "configs/companies_vn.yaml"
+
+        target_tickers = [args.ticker.upper()] if getattr(args, "ticker", None) else None
+
+        logger.info("Routing to VNIngestionPipeline (config='%s', target=%s)...", vn_config, target_tickers)
+        with VNFinancialClient() as vn_client:
+            pipeline = VNIngestionPipeline(client=vn_client, storage=s3_storage)
+            summary = pipeline.run(config_path=vn_config, target_tickers=target_tickers, force=args.force)
+            logger.info("Finished VN30 ingestion: %s", summary)
+        return 0
+
     user_agent = os.getenv("SEC_USER_AGENT")
     if not user_agent:
         logger.error("Missing SEC_USER_AGENT in environment. Please set it in .env file.")
@@ -401,11 +443,24 @@ def run_coverage(args: argparse.Namespace) -> int:
 def run_process(args: argparse.Namespace) -> int:
     """Execute data transformation pipelines (Bronze -> Silver facts & Silver/Gold text chunks)."""
     load_dotenv()
+    do_vn = getattr(args, "vn", False)
     do_facts = args.all or args.facts
     do_text = args.all or args.text
 
     s3_storage = S3Storage()
     s3_storage.ensure_buckets_exist()
+
+    if do_vn:
+        from src.data.processing.vn_facts_parser import VNFactsParser
+        logger.info("Starting VNFactsParser (Bronze VN statements -> Silver Parquet observations)...")
+        parser = VNFactsParser(
+            s3_storage=s3_storage,
+            companies_vn_path=getattr(args, "config", "configs/companies_vn.yaml"),
+        )
+        target = [args.ticker.upper()] if getattr(args, "ticker", None) else None
+        stats = parser.run(target_tickers=target)
+        logger.info("VN Facts processing complete: %s", stats)
+        return 0
 
     if do_facts:
         from src.data.processing.facts_parser import FactsParser
