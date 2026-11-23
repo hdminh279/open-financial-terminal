@@ -538,3 +538,9 @@ class TestFactsParserTaxonomyAndUnits:
         eps_obs = next(o for o in obs if o["tag"] == "EarningsPerShareDiluted")
         assert eps_obs["value"] == Decimal("1.52")
         assert eps_obs["unit"] == "USD/shares"
+
+    def test_allowed_units_include_sek_brl_dkk(self) -> None:
+        """Verify taxonomy config permits SEK, BRL, and DKK reporting currencies."""
+        parser = FactsParser()
+        for unit in ("SEK", "SEK/shares", "BRL", "BRL/shares", "DKK", "DKK/shares"):
+            assert unit in parser.allowed_units

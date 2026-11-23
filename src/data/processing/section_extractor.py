@@ -351,6 +351,35 @@ class HTMLSectionExtractor:
 
         return None
 
+    def _append_block_to_section(self, block: Tag, section: ExtractedSection) -> None:
+        """Parse a DOM block into a ContentNode and append it to the target section."""
+        node = self._parse_content_node(block)
+        if not node:
+            return
+        section.nodes.append(node)
+        if node.node_type == ContentNodeType.TABLE:
+            section.table_count += 1
+        if section.raw_text:
+            section.raw_text += "\n\n" + node.text
+        else:
+            section.raw_text = node.text
+
+    def _extract_integrated_20f_section(self, leaf_blocks: list[Tag]) -> ExtractedSection | None:
+        """Fallback extractor for Integrated Annual Report Form 20-F filings without Item headers."""
+        section = ExtractedSection(
+            part=None,
+            item="FORM 20-F",
+            title="Form 20-F Integrated Annual Report",
+            status=SectionStatus.NON_STANDARD,
+            is_standard=False,
+        )
+        for block in leaf_blocks:
+            self._append_block_to_section(block, section)
+        if not section.nodes or not section.raw_text.strip():
+            return None
+        section.char_count = len(section.raw_text)
+        return section
+
     def extract(
         self,
         html_content: str,
@@ -439,17 +468,16 @@ class HTMLSectionExtractor:
                 continue
 
             if current_section is not None:
-                node = self._parse_content_node(block)
-                if node:
-                    current_section.nodes.append(node)
-                    if node.node_type == ContentNodeType.TABLE:
-                        current_section.table_count += 1
-                    if current_section.raw_text:
-                        current_section.raw_text += "\n\n" + node.text
-                    else:
-                        current_section.raw_text = node.text
+                self._append_block_to_section(block, current_section)
 
         finalize_section(current_section)
+
+        # Fallback for Integrated Annual Report Form 20-F filings that use
+        # cross-reference tables instead of inline 'ITEM X' body headings.
+        if "20-F" in form.upper() and not sections and leaf_blocks:
+            integrated_section = self._extract_integrated_20f_section(leaf_blocks)
+            if integrated_section is not None:
+                sections.append(integrated_section)
 
         # Identify missing canonical items
         found_items = {s.item for s in sections}

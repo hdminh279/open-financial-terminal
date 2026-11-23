@@ -140,6 +140,21 @@ def test_resolve_empty_submissions():
     assert results == []
 
 
+def test_resolve_uses_explicit_ticker_when_submissions_tickers_empty(mock_submissions_dict):
+    """Verify explicit registry ticker overrides empty SEC submissions tickers array."""
+    payload = {**mock_submissions_dict, "cik": "0000034088", "tickers": []}
+    resolver = FilingResolver()
+    results = resolver.resolve_from_submissions_dict(
+        submissions_data=payload,
+        target_forms=("10-K",),
+        limit_per_form=1,
+        ticker="XOM",
+    )
+    assert len(results) == 1
+    assert results[0].ticker == "XOM"
+    assert results[0].s3_key.startswith("raw/filings/XOM/")
+
+
 """
 docker compose run --rm app uv run pytest tests/unit/test_filing_resolver.py -v
 """

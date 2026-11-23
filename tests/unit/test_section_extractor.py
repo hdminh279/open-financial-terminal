@@ -104,6 +104,25 @@ class TestHTMLSectionExtractorForm20F:
         assert "ITEM 8" in not_found_items
         assert "ITEM 4" in report.unidentified_sections
 
+    def test_form_20f_integrated_report_fallback_without_item_headers(self, extractor: HTMLSectionExtractor):
+        """Verify Integrated Annual Report 20-F filings without Item headers fall back cleanly."""
+        html_doc = """
+        <html>
+        <body>
+            <div><h1>Operating and Financial Review</h1></div>
+            <div><p>Group underlying EBITDA increased 12% year-over-year.</p></div>
+            <div><table><tr><th>Metric</th><th>FY2025</th></tr><tr><td>Revenue</td><td>55,000</td></tr></table></div>
+        </body>
+        </html>
+        """
+        report = extractor.extract(html_content=html_doc, form="20-F", ticker="BHP")
+        non_std = [s for s in report.sections if s.status == SectionStatus.NON_STANDARD]
+        assert len(non_std) == 1
+        assert non_std[0].item == "FORM 20-F"
+        assert "Group underlying EBITDA" in non_std[0].raw_text
+        assert non_std[0].table_count == 1
+        assert report.diagnostics["total_sections_extracted"] == 1
+
 
 class TestHTMLSectionExtractorForm10KAnd10Q:
     """Ensure backward compatibility for Form 10-K and 10-Q parsing."""

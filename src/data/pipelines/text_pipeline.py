@@ -244,8 +244,9 @@ class FilingsTextPipeline:
         existing_records: list[dict[str, Any]] = []
         existing_accessions: set[str] = set()
 
-        # Step 1: Incremental check - inspect existing Gold Parquet mart
-        if not force and self.s3.object_exists(self.gold_bucket, gold_key):
+        # Step 1: Incremental check - inspect existing Gold Parquet mart.
+        # Preserve existing records whenever running incrementally OR scoped to specific tickers.
+        if (not force or tickers is not None) and self.s3.object_exists(self.gold_bucket, gold_key):
             try:
                 gold_bytes = self.s3.download_bytes(self.gold_bucket, gold_key)
                 existing_table = pq.read_table(io.BytesIO(gold_bytes))

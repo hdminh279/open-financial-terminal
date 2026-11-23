@@ -1,6 +1,6 @@
 -- Staging model: stg_sec_facts
 -- Cleanses, standardizes canonical metrics across multi-currency SEC filings
--- (US-GAAP and IFRS 20-F: USD, EUR, TWD, INR, GBP, JPY), selects one primary
+-- (US-GAAP and IFRS 20-F: USD, EUR, TWD, INR, GBP, JPY, SEK, BRL, DKK), selects one primary
 -- reporting currency per issuer, and establishes As-reported vs Latest-known ranking.
 
 WITH raw_facts AS (
@@ -108,7 +108,10 @@ standardized AS (
         'TWD', 'TWD/shares',
         'INR', 'INR/shares',
         'GBP', 'GBP/shares',
-        'JPY', 'JPY/shares'
+        'JPY', 'JPY/shares',
+        'SEK', 'SEK/shares',
+        'BRL', 'BRL/shares',
+        'DKK', 'DKK/shares'
     )
       AND duration_scope != 'unclassified'
 ),

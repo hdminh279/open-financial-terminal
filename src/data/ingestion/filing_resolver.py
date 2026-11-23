@@ -174,6 +174,7 @@ class FilingResolver:
         limit_per_form: int | None = None,
         min_year: int | None = 2009,
         additional_blocks: list[dict[str, Any]] | None = None,
+        ticker: str | None = None,
     ) -> list[ResolvedFiling]:
         """Parse submissions payload and extract target filings up to limit_per_form.
 
@@ -183,6 +184,7 @@ class FilingResolver:
             limit_per_form: Maximum filings per form type (default: None for all historical).
             min_year: Earliest year to extract (default: 2009).
             additional_blocks: Optional historical submission blocks loaded from paginated files.
+            ticker: Optional canonical ticker override/fallback from company registry.
 
         Returns:
             List of ResolvedFiling instances ordered chronologically (newest first).
@@ -190,7 +192,9 @@ class FilingResolver:
         cik_raw = submissions_data.get("cik", "")
         cik = str(cik_raw).zfill(10)
         tickers = submissions_data.get("tickers", [])
-        ticker = tickers[0].upper() if tickers else "UNKNOWN"
+        resolved_ticker = (
+            ticker.strip().upper() if ticker and ticker.strip() else (tickers[0].upper() if tickers else "UNKNOWN")
+        )
 
         target_forms_set = {f.upper() for f in target_forms}
         filings_block = submissions_data.get("filings", {})
@@ -199,7 +203,7 @@ class FilingResolver:
         all_resolved = self._parse_entries_block(
             block=recent,
             cik=cik,
-            ticker=ticker,
+            ticker=resolved_ticker,
             target_forms_set=target_forms_set,
             min_year=min_year,
         )
@@ -209,7 +213,7 @@ class FilingResolver:
                 hist_items = self._parse_entries_block(
                     block=hist_block,
                     cik=cik,
-                    ticker=ticker,
+                    ticker=resolved_ticker,
                     target_forms_set=target_forms_set,
                     min_year=min_year,
                 )
@@ -244,7 +248,7 @@ class FilingResolver:
         logger.info(
             "Resolved %d filings for %s (CIK: %s): %s",
             len(deduped),
-            ticker,
+            resolved_ticker,
             cik,
             dict(counts),
         )
@@ -327,4 +331,5 @@ class FilingResolver:
             limit_per_form=limit_per_form,
             min_year=min_year,
             additional_blocks=additional_blocks,
+            ticker=ticker_clean,
         )

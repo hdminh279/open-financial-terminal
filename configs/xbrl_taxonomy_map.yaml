@@ -16,6 +16,12 @@ constraints:
     - "GBP/shares"
     - "JPY"
     - "JPY/shares"
+    - "SEK"
+    - "SEK/shares"
+    - "BRL"
+    - "BRL/shares"
+    - "DKK"
+    - "DKK/shares"
   null_allowed_metrics:
     - "gross_profit"  # Alphabet (GOOGL) does not report Gross Profit (TAC-based model); must remain NULL, never 0
   value_datatype: "DECIMAL(28, 2)"  # High-precision fixed point, avoids IEEE-754 floating-point errors
