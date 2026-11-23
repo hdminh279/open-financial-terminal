@@ -48,28 +48,40 @@ class QdrantStorage:
         else:
             app_env = os.getenv("APP_ENV", "").lower()
             qdrant_url = os.getenv("QDRANT_URL", "").strip()
-            url_host: str | None = None
-            url_port: int | None = None
-            if qdrant_url:
-                parsed = urlparse(qdrant_url if "://" in qdrant_url else f"http://{qdrant_url}")
-                url_host = parsed.hostname
-                url_port = parsed.port
+            api_key = os.getenv("QDRANT_API_KEY") or None
 
-            if app_env in ("docker", "prod", "production"):
-                resolved_host = host or url_host or os.getenv("QDRANT_HOST", "qdrant")
-            else:
-                resolved_host = (
-                    host or os.getenv("QDRANT_HOST_LOCAL") or url_host or os.getenv("QDRANT_HOST") or "localhost"
+            if qdrant_url and qdrant_url.startswith("https://"):
+                logger.info("Connecting to Qdrant Cloud via URL: %s...", qdrant_url)
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=api_key,
+                    timeout=timeout,
+                    check_compatibility=False,
                 )
-            resolved_port = port or url_port or int(os.getenv("QDRANT_PORT", "6333"))
+            else:
+                url_host: str | None = None
+                url_port: int | None = None
+                if qdrant_url:
+                    parsed = urlparse(qdrant_url if "://" in qdrant_url else f"http://{qdrant_url}")
+                    url_host = parsed.hostname
+                    url_port = parsed.port
 
-            logger.info("Connecting to Qdrant at %s:%d...", resolved_host, resolved_port)
-            self.client = QdrantClient(
-                host=resolved_host,
-                port=resolved_port,
-                timeout=timeout,
-                check_compatibility=False,
-            )
+                if app_env in ("docker", "prod", "production"):
+                    resolved_host = host or url_host or os.getenv("QDRANT_HOST", "qdrant")
+                else:
+                    resolved_host = (
+                        host or os.getenv("QDRANT_HOST_LOCAL") or url_host or os.getenv("QDRANT_HOST") or "localhost"
+                    )
+                resolved_port = port or url_port or int(os.getenv("QDRANT_PORT", "6333"))
+
+                logger.info("Connecting to Qdrant at %s:%d...", resolved_host, resolved_port)
+                self.client = QdrantClient(
+                    host=resolved_host,
+                    port=resolved_port,
+                    api_key=api_key,
+                    timeout=timeout,
+                    check_compatibility=False,
+                )
 
     def collection_exists(self, collection_name: str | None = None) -> bool:
         """Check whether a collection exists in Qdrant."""

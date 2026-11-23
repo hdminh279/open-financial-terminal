@@ -36,12 +36,16 @@ RUN mkdir -p /app/data /app/logs /app/models/fastembed /app/models/huggingface /
 
 USER appuser
 
-# Pre-install DuckDB httpfs extension at build time to prevent cold-start network delays
-RUN python -c "import duckdb; c = duckdb.connect(':memory:'); c.execute('INSTALL httpfs; LOAD httpfs;')"
+# Pre-install DuckDB httpfs and community gcs extensions at build time to prevent cold-start network delays
+RUN python -c "import duckdb; c = duckdb.connect(':memory:'); c.execute('INSTALL httpfs; LOAD httpfs;'); c.execute('INSTALL gcs FROM community; LOAD gcs;')"
 
+# Pre-download FastEmbed embedding model weights at build time for instant cold starts
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/app/models/fastembed')"
+
+ENV PORT=8000
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+    CMD ["python", "-c", "import os, urllib.request; port = os.getenv('PORT', '8000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=3)"]
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

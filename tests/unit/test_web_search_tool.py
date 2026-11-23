@@ -118,3 +118,46 @@ def test_search_when_ddgs_uninstalled(monkeypatch: pytest.MonkeyPatch, web_tool:
     response = web_tool.search("Apple stock")
     assert response.total_found == 0
     assert response.results == []
+
+
+def test_normalize_news_query_strips_conversational_filler() -> None:
+    """Verify Vietnamese and English conversational filler is stripped for news search."""
+    assert (
+        WebSearchTool._normalize_news_query("Cho tôi tin tức tài chính mới nhất của việt nam ngày hôm nay")
+        == "tài chính việt nam"
+    )
+    assert WebSearchTool._normalize_news_query("Latest breaking news about NVIDIA today") == "NVIDIA"
+
+
+@patch("src.ai.agent.tools.web_search_tool.DDGS")
+def test_news_query_prefers_rss_and_ddgs_news_over_text(mock_ddgs_cls: MagicMock) -> None:
+    """Verify news-like queries prioritize dated RSS and ddgs.news() articles over generic ddgs.text()."""
+    tool = WebSearchTool(timeout=2, max_retries=1, enable_rss_fallback=True)
+    mock_ddgs_instance = MagicMock()
+    mock_ddgs_cls.return_value.__enter__.return_value = mock_ddgs_instance
+    mock_ddgs_instance.news.return_value = [
+        {
+            "title": "VN-Index tăng điểm phiên chiều",
+            "url": "https://vnexpress.net/vn-index-tang-diem",
+            "body": "Thị trường chứng khoán Việt Nam khởi sắc.",
+            "date": "2026-11-23T08:00:00+00:00",
+        }
+    ]
+    with patch.object(
+        tool,
+        "_search_google_news_rss",
+        return_value=[
+            WebSearchResultItem(
+                title="Trái phiếu chính phủ huy động vốn dài hạn",
+                url="https://news.google.com/rss/articles/sample1",
+                snippet="Diễn biến thị trường trái phiếu chính phủ.",
+                date="Mon, 23 Nov 2026 09:25:34 GMT",
+            )
+        ],
+    ):
+        resp = tool.search("Cho tôi tin tức tài chính mới nhất của việt nam ngày hôm nay", max_results=5)
+
+    assert resp.total_found == 2
+    assert resp.results[0].url == "https://news.google.com/rss/articles/sample1"
+    assert resp.results[1].url == "https://vnexpress.net/vn-index-tang-diem"
+    mock_ddgs_instance.text.assert_not_called()

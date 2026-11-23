@@ -698,6 +698,7 @@ def web_node(
 
         evidence_items: list[dict[str, Any]] = []
         for idx, item in enumerate(response.results):
+            summary_with_date = f"[{item.date}] {item.snippet}" if item.date else item.snippet
             evidence = EvidenceItem(
                 citation_id=idx + 1,
                 source_type=EvidenceSourceType.WEB,
@@ -706,7 +707,7 @@ def web_node(
                 fiscal_year=None,
                 fiscal_period=None,
                 item_or_metric=f"Web: {item.title}",
-                content_summary=item.snippet,
+                content_summary=summary_with_date,
                 source_url=item.url,
                 accession_number=None,
             )

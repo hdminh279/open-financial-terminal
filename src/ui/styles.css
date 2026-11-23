@@ -1088,12 +1088,26 @@ html, body {
 }
 
 .send-btn {
-  color: var(--accent-sky-blue);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-sky-blue);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(0, 163, 255, 0.25);
 }
 
-.voice-btn.recording {
-  color: var(--accent-crimson);
-  animation: pulse-glow 1.5s infinite;
+.send-btn:hover:not(:disabled) {
+  background: #0284C7;
+  color: #FFFFFF;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 163, 255, 0.35);
+}
+
+.send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ========================================================================= */
@@ -1589,70 +1603,29 @@ html, body {
   border-color: rgba(0, 163, 255, 0.4);
 }
 
-/* In-Chat Chart Preview Card (Sleek Compact 1-Line Bar) */
-.chart-preview-card {
+/* In-Chat Chart Trigger Button */
+.chart-preview-actions {
   margin: 10px 0 0 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 6px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  width: fit-content;
-  max-width: 100%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chart-preview-card + .sources-accordion-card {
-  margin-top: 5px;
-}
-
-.chart-preview-card:hover {
-  border-color: var(--accent-sky-blue);
-  background: var(--bg-card-hover);
-  box-shadow: 0 2px 8px rgba(0, 163, 255, 0.12);
-  transform: translateY(-1px);
-}
-
-.chart-preview-title {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.chart-preview-title span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chart-preview-title svg {
-  color: var(--accent-sky-blue);
-  flex-shrink: 0;
+.chart-preview-actions + .sources-accordion-card {
+  margin-top: 8px;
 }
 
 .btn-view-canvas {
   flex-shrink: 0 !important;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
   background: var(--accent-sky-blue);
   color: #FFFFFF;
   border: none;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;

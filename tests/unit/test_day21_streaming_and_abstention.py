@@ -94,6 +94,37 @@ def test_rag_negative_router_and_citation_abstention_fixes() -> None:
     )
     assert flagged_pos is False
 
+    # Partial/substantive answer with Markdown table or SQL success keeps citations even if tagged
+    res_partial_table = citation_node(
+        {
+            "query": "Cho tôi tin tức mới nhất về FPT hôm nay",
+            "intent": IntentType.TEXTUAL_RESEARCH.value,
+            "is_abstaining": False,
+            "is_partial": False,
+            "draft_answer": (
+                "[INSUFFICIENT_EVIDENCE] Chưa có bài viết chi tiết trong ngày, nhưng nguồn [1] ghi nhận:\n\n"
+                "| Nội dung | Nguồn |\n| :--- | :---: |\n| FPT chia cổ tức tháng 12 | [1] |"
+            ),
+            "evidence_items": [
+                {
+                    "citation_id": 1,
+                    "source_type": "web",
+                    "ticker": "FPT",
+                    "form": "WEB_NEWS",
+                    "item_or_metric": "FPT News",
+                    "content_summary": "FPT dividend plan...",
+                    "source_url": "https://cafef.vn/fpt-news.htm",
+                }
+            ],
+            "tool_results": [{"tool_name": "web_search_tool", "status": "success"}],
+            "routing_decision": {"tickers": ["FPT"]},
+        }
+    )
+    assert not res_partial_table.get("is_abstaining", False)
+    assert len(res_partial_table["citations"]) == 1
+    assert res_partial_table["citations"][0]["source_type"] == "web"
+    assert "[INSUFFICIENT_EVIDENCE]" not in res_partial_table["final_answer"]
+
 
 def test_sse_stream_endpoint_and_agent_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify ResearchAgent.stream_query and POST /api/query/stream emit status, token, and done SSE frames."""

@@ -121,7 +121,14 @@ class CitationEngine:
         citations: list[Citation] = []
         for idx, ev_dict in enumerate(evidence_dicts):
             citation_id = idx + 1
-            source_type = ev_dict.get("source_type")
+            raw_source_type = ev_dict.get("source_type")
+            source_type = (
+                raw_source_type.value
+                if hasattr(raw_source_type, "value")
+                else str(raw_source_type)
+                if raw_source_type
+                else None
+            )
             ticker = ev_dict.get("ticker", "SEC")
             form = ev_dict.get("form", "Filing")
             fy = ev_dict.get("fiscal_year")
@@ -156,7 +163,7 @@ class CitationEngine:
                     item_or_metric=item_or_metric,
                     excerpt=ev_dict.get("content_summary") or None,
                     accession_number=ev_dict.get("accession_number") or None,
-                    source_type=str(source_type) if source_type else None,
+                    source_type=source_type,
                 )
             )
 
@@ -305,17 +312,17 @@ def detect_insufficient_evidence(
     if is_already_abstaining or is_partial:
         return False, cleaned
 
+    # Keep citations intact when the answer contains substantive disclosures
+    # (successful SQL metrics, Markdown tables, or multi-paragraph cited analysis).
+    has_substantive_content = has_sql_success or "|---" in cleaned or "| :---" in cleaned or len(cleaned) >= 1200
+    if has_substantive_content:
+        return False, cleaned
+
     if has_tag:
         return True, cleaned
 
-    # Fallback phrase check for RAG-only answers that explicitly report zero matching disclosures
-    if (
-        not has_sql_success
-        and "|---" not in cleaned
-        and "| :---" not in cleaned
-        and _NEGATIVE_DISCLOSURE_RE.search(cleaned)
-        and len(cleaned) < 1200
-    ):
+    # Fallback phrase check for short RAG-only answers that explicitly report zero matching disclosures
+    if _NEGATIVE_DISCLOSURE_RE.search(cleaned):
         return True, cleaned
 
     return False, cleaned

@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatForm = document.getElementById("chat-form");
   const queryInput = document.getElementById("query-input");
   const sendBtn = document.getElementById("send-btn");
-  const voiceBtn = document.getElementById("voice-btn");
   const messagesContainer = document.getElementById("messages-container");
   const currentSessionTitle = document.getElementById("current-session-title");
   const sessionList = document.getElementById("session-list");
@@ -61,8 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentSessionId = generateUUID();
   let financialChart = null;
   let chartMode = "combo"; // "combo", "bar", "line"
-  let isRecording = false;
-  let recognition = null;
   let isDraggingResizer = false;
   const turnCitationStore = [];
 
@@ -245,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // 2. Click on In-Chat Chart Preview Card / View Canvas Button
-      const previewCard = e.target.closest(".chart-preview-card");
+      const previewCard = e.target.closest(".chart-preview-card, .chart-preview-trigger");
       if (previewCard) {
         expandCanvas();
         showCanvasEmptyState(false);
@@ -647,7 +644,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function formatCitationDisplay(c) {
-    const isWeb = c.source_type === "web" || c.form === "WEB_NEWS";
+    const isWeb = c.source_type === "web" || c.source_type === "EvidenceSourceType.WEB" || c.form === "WEB_NEWS";
     const isVn = c.form === "BCTC" || (c.source_url && (c.source_url.includes("vndirect") || c.source_url.includes("vietstock")));
 
     let domain = "";
@@ -1091,7 +1088,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const rawHtml = marked.parse(cleanAnswer);
     let formattedAnswer = (typeof DOMPurify !== "undefined")
-      ? DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true } })
+      ? DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true }, ADD_ATTR: ["target", "rel"] })
       : rawHtml;
 
     // Wrap all <table> elements with an exportable card container (CSV / JSON)
@@ -1153,33 +1150,16 @@ document.addEventListener("DOMContentLoaded", () => {
       ? `<span class="activity-latency-badge">${(data.execution_time_ms / 1000).toFixed(2)}s</span>`
       : "";
 
-    // Interactive In-Chat Chart Preview Cards (supports multiple charts per response)
+    // Interactive In-Chat Chart Trigger Buttons (supports multiple charts per response)
     let chartPreviewHtml = "";
     if (data.charts && data.charts.length > 0) {
       if (!window.sessionCharts) window.sessionCharts = [];
-      chartPreviewHtml = data.charts.map((chartSpec) => {
+      const buttonsHtml = data.charts.map((chartSpec) => {
         const chartIdx = window.sessionCharts.length;
         window.sessionCharts.push(chartSpec);
-        const chartTitle = chartSpec.title || "Biểu đồ phân tích tài chính";
-        return `
-          <div class="chart-preview-card" data-chart-idx="${chartIdx}">
-            <div class="chart-preview-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="3" y1="9" x2="21" y2="9"></line>
-                <line x1="9" y1="21" x2="9" y2="9"></line>
-              </svg>
-              <span>${escapeHtml(chartTitle)}</span>
-            </div>
-            <button type="button" class="btn-view-canvas">
-              <span>Xem biểu đồ</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-          </div>
-        `;
+        return `<button type="button" class="btn-view-canvas chart-preview-trigger" data-chart-idx="${chartIdx}">Xem biểu đồ</button>`;
       }).join("");
+      chartPreviewHtml = `<div class="chart-preview-actions">${buttonsHtml}</div>`;
     }
 
     // Collapsible Sources & References Card
@@ -1642,49 +1622,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("Failed to load session details:", e);
       startNewSession();
     }
-  }
-
-  /* ========================================================================= */
-  /* Voice STT Integration (Web Speech API)                                    */
-  /* ========================================================================= */
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "vi-VN"; // Vietnamese speech recognition
-
-    recognition.onstart = () => {
-      isRecording = true;
-      voiceBtn.classList.add("recording");
-    };
-
-    recognition.onresult = (event) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      queryInput.value = transcript;
-    };
-
-    recognition.onend = () => {
-      isRecording = false;
-      voiceBtn.classList.remove("recording");
-      if (queryInput.value.trim()) {
-        chatForm.dispatchEvent(new Event("submit"));
-      }
-    };
-
-    voiceBtn.addEventListener("click", () => {
-      if (isRecording) {
-        recognition.stop();
-      } else {
-        recognition.start();
-      }
-    });
-  } else {
-    voiceBtn.style.display = "none";
   }
 
   /* ========================================================================= */

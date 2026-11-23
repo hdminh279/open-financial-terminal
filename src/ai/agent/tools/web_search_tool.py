@@ -138,16 +138,112 @@ class WebSearchTool:
                 )
         return items
 
+    _NEWS_QUERY_RE = re.compile(
+        r"\b(?:tin\s+tức|bản\s+tin|mới\s+nhất|hôm\s+nay|gần\s+đây|news|latest|breaking|today|recent|headlines?)\b",
+        re.IGNORECASE,
+    )
+    _NEWS_FILLER_RE = re.compile(
+        r"\b(?:cho\s+tôi|cho\s+mình|hãy|xem|tìm|cập\s+nhật|tin\s+tức|bản\s+tin|mới\s+nhất|ngày\s+hôm\s+nay|hôm\s+nay|gần\s+đây|về|của"
+        r"|please|give\s+me|find|latest|breaking|today'?s|today|recent|news|about|on|for)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _is_news_query(cls, query_str: str) -> bool:
+        """Return True when the search query targets current news or headlines."""
+        return bool(cls._NEWS_QUERY_RE.search(query_str))
+
+    @classmethod
+    def _normalize_news_query(cls, query_str: str) -> str:
+        """Strip conversational filler so news search engines match topic keywords."""
+        cleaned = cls._NEWS_FILLER_RE.sub(" ", query_str)
+        cleaned = re.sub(r"[,.;:!?]+", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned if len(cleaned) >= 3 else query_str
+
+    @staticmethod
+    def _merge_unique_results(
+        primary: list[WebSearchResultItem],
+        secondary: list[WebSearchResultItem],
+        max_results: int,
+    ) -> list[WebSearchResultItem]:
+        """Combine result lists while deduplicating by URL and normalized title."""
+        merged: list[WebSearchResultItem] = []
+        seen_urls: set[str] = set()
+        seen_titles: set[str] = set()
+        for item in [*primary, *secondary]:
+            norm_title = item.title.strip().lower()
+            if item.url in seen_urls or norm_title in seen_titles:
+                continue
+            seen_urls.add(item.url)
+            seen_titles.add(norm_title)
+            merged.append(item)
+            if len(merged) >= max_results:
+                break
+        return merged
+
+    def _search_ddgs_news(self, query_str: str, max_results: int) -> list[WebSearchResultItem]:
+        """Execute DuckDuckGo News search returning dated news articles."""
+        if DDGS is None:
+            return []
+        with DDGS(timeout=self.timeout) as ddgs:
+            if not hasattr(ddgs, "news"):
+                return []
+            try:
+                raw_items = ddgs.news(query_str, max_results=max_results)
+            except TypeError:
+                raw_items = ddgs.news(keywords=query_str, max_results=max_results)  # type: ignore
+
+            items: list[WebSearchResultItem] = []
+            for item in raw_items or []:
+                if not isinstance(item, dict):
+                    continue
+                title = (item.get("title") or "").strip()
+                url = (item.get("url") or item.get("href") or "").strip()
+                raw_body = item.get("body") or item.get("excerpt") or ""
+                if not url or not title:
+                    continue
+                items.append(
+                    WebSearchResultItem(
+                        title=title,
+                        url=url,
+                        snippet=self._clean_snippet(raw_body) or title,
+                        date=item.get("date"),
+                    )
+                )
+            return items
+
+    def _search_ddgs_text(self, query_str: str, max_results: int) -> list[WebSearchResultItem]:
+        """Execute standard DuckDuckGo web search."""
+        if DDGS is None:
+            raise RuntimeError("DuckDuckGo Search package is not installed")
+        with DDGS(timeout=self.timeout) as ddgs:
+            try:
+                raw_items = ddgs.text(query_str, max_results=max_results)
+            except TypeError:
+                raw_items = ddgs.text(keywords=query_str, max_results=max_results)  # type: ignore
+
+            items: list[WebSearchResultItem] = []
+            for item in raw_items or []:
+                if not isinstance(item, dict):
+                    continue
+                title = (item.get("title") or "").strip()
+                url = (item.get("href") or "").strip()
+                raw_body = item.get("body") or ""
+                if not url or not title:
+                    continue
+                items.append(
+                    WebSearchResultItem(
+                        title=title,
+                        url=url,
+                        snippet=self._clean_snippet(raw_body),
+                        date=item.get("date"),
+                    )
+                )
+            return items
+
     def search(self, query: str, max_results: int = 5) -> WebSearchResponse:
-        """Execute web search query via DuckDuckGo Search with backoff, cache, and RSS fallback.
-
-        Args:
-            query: User search query string.
-            max_results: Maximum number of search results to return (1-10).
-
-        Returns:
-            WebSearchResponse containing sanitized search result items.
-        """
+        """Execute web search query via DuckDuckGo Search with backoff, news routing, and RSS."""
         query_str = (query or "").strip()
         if not query_str:
             logger.warning("Empty search query passed to WebSearchTool.search")
@@ -176,37 +272,34 @@ class WebSearchTool:
 
         results: list[WebSearchResultItem] = []
         last_error: Exception | None = None
+        is_news_mode = self.enable_rss_fallback and self._is_news_query(query_str)
 
-        if DDGS is not None:
+        if is_news_mode:
+            news_query = self._normalize_news_query(query_str)
+            rss_items: list[WebSearchResultItem] = []
+            ddgs_news_items: list[WebSearchResultItem] = []
+            try:
+                rss_items = self._search_google_news_rss(news_query, clamped_max)
+            except Exception as rss_exc:
+                last_error = rss_exc
+                logger.warning("Google News RSS search failed for '%s': %s", news_query, rss_exc)
+            try:
+                ddgs_news_items = self._search_ddgs_news(news_query, clamped_max)
+            except Exception as news_exc:
+                if last_error is None:
+                    last_error = news_exc
+                logger.warning("DDGS news search failed for '%s': %s", news_query, news_exc)
+
+            results = self._merge_unique_results(rss_items, ddgs_news_items, clamped_max)
+            if results:
+                last_error = None
+
+        if not results and DDGS is not None:
             for attempt in range(1, self.max_retries + 1):
                 try:
-                    with DDGS(timeout=self.timeout) as ddgs:
-                        # Support positional query for both ddgs (query=...) and duckduckgo_search (keywords=...)
-                        try:
-                            raw_items = ddgs.text(query_str, max_results=clamped_max)
-                        except TypeError:
-                            raw_items = ddgs.text(keywords=query_str, max_results=clamped_max)  # type: ignore
-
-                        if raw_items:
-                            for item in raw_items:
-                                title = (item.get("title") or "").strip()
-                                url = (item.get("href") or "").strip()
-                                raw_body = item.get("body") or ""
-
-                                if not url or not title:
-                                    continue
-
-                                snippet = self._clean_snippet(raw_body)
-                                results.append(
-                                    WebSearchResultItem(
-                                        title=title,
-                                        url=url,
-                                        snippet=snippet,
-                                        date=item.get("date"),
-                                    )
-                                )
+                    results = self._search_ddgs_text(query_str, clamped_max)
                     last_error = None
-                    break  # Successful fetch, exit retry loop
+                    break
                 except Exception as exc:
                     last_error = exc
                     logger.warning(
@@ -218,10 +311,10 @@ class WebSearchTool:
                     )
                     if attempt < self.max_retries:
                         time.sleep(min(1.5 * attempt, 4.0))
-        else:
-            last_error = RuntimeError("DuckDuckGo Search package is not installed")
+        elif not results and DDGS is None:
+            last_error = last_error or RuntimeError("DuckDuckGo Search package is not installed")
 
-        if not results and self.enable_rss_fallback:
+        if not results and self.enable_rss_fallback and not is_news_mode:
             try:
                 results = self._search_google_news_rss(query_str, clamped_max)
                 if results:

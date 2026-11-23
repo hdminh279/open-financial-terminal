@@ -1,5 +1,6 @@
 """DuckDB repository for querying standardized Gold Parquet financial marts."""
 
+import logging
 import os
 import re
 import threading
@@ -12,6 +13,8 @@ from src.ai.agent.tools.financial_sql_tool import (
     STATEMENT_METRICS,
     FinancialQueryInput,
 )
+
+logger = logging.getLogger(__name__)
 
 _READ_ONLY_SQL_RE = re.compile(r"^\s*(?:SELECT|WITH|DESCRIBE|SHOW)\b", re.IGNORECASE)
 _MUTATING_SQL_RE = re.compile(
@@ -132,10 +135,28 @@ class DuckDBFinancialRepository:
 
     @staticmethod
     def _is_s3_path(path: str) -> bool:
-        return path.startswith("s3://")
+        return path.startswith("s3://") or path.startswith("gs://") or path.startswith("gcs://")
 
     def _configure_s3(self) -> None:
-        """Configure DuckDB httpfs extension for S3-compatible MinIO access."""
+        """Configure DuckDB extension for S3-compatible MinIO or Google Cloud Storage access."""
+        is_gcs = (
+            self.statements_path.startswith("gs://")
+            or self.statements_path.startswith("gcs://")
+            or self.ratios_path.startswith("gs://")
+            or self.ratios_path.startswith("gcs://")
+        )
+        if is_gcs:
+            try:
+                self.conn.execute("LOAD gcs;")
+            except duckdb.Error:
+                self.conn.execute("INSTALL gcs FROM community; LOAD gcs;")
+            # On GCP (Cloud Run), credential_chain automatically uses Application Default Credentials
+            try:
+                self.conn.execute("CREATE SECRET IF NOT EXISTS (TYPE gcp, PROVIDER credential_chain);")
+            except duckdb.Error as exc:
+                logger.debug("DuckDB GCS credential_chain setup notice: %s", exc)
+            return
+
         app_env = os.getenv("APP_ENV", "").lower()
         if app_env in ("docker", "prod", "production"):
             raw_endpoint = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
@@ -145,9 +166,11 @@ class DuckDBFinancialRepository:
         if not raw_endpoint:
             raw_endpoint = "http://localhost:9000"
 
+        use_ssl = raw_endpoint.startswith("https://") or os.getenv("S3_USE_SSL", "").lower() in ("true", "1")
         s3_endpoint = raw_endpoint.replace("http://", "").replace("https://", "")
         access_key = os.getenv("S3_ACCESS_KEY", "minioadmin")
         secret_key = os.getenv("S3_SECRET_KEY", "minioadmin")
+        s3_region = os.getenv("S3_REGION", "")
 
         try:
             self.conn.execute("LOAD httpfs;")
@@ -157,7 +180,9 @@ class DuckDBFinancialRepository:
         self.conn.execute(f"SET GLOBAL s3_endpoint='{s3_endpoint}';")
         self.conn.execute(f"SET GLOBAL s3_access_key_id='{access_key}';")
         self.conn.execute(f"SET GLOBAL s3_secret_access_key='{secret_key}';")
-        self.conn.execute("SET GLOBAL s3_use_ssl=false;")
+        self.conn.execute(f"SET GLOBAL s3_use_ssl={'true' if use_ssl else 'false'};")
+        if s3_region:
+            self.conn.execute(f"SET GLOBAL s3_region='{s3_region}';")
         self.conn.execute("SET GLOBAL s3_url_style='path';")
 
     def query_metric(self, query: FinancialQueryInput) -> list[dict[str, Any]]:

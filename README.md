@@ -3,7 +3,7 @@
 An open-source, local-first AI financial research terminal built to analyze audited corporate filings across **150 public companies**, combining **100 international SEC filings** and **50 Vietnamese market leaders** with exact financial calculations, verifiable source citations, and built-in anti-hallucination safeguards.
 
 - **Repository:** [https://github.com/hdminh279/open-financial-terminal](https://github.com/hdminh279/open-financial-terminal)
-- **Website:** 
+- **Website:** https://cfi-app-187950268913.us-central1.run.app
 
 ---
 
