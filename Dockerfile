@@ -36,6 +36,9 @@ RUN mkdir -p /app/data /app/logs /app/models/fastembed /app/models/huggingface /
 
 USER appuser
 
+# Pre-install DuckDB httpfs extension at build time to prevent cold-start network delays
+RUN python -c "import duckdb; c = duckdb.connect(':memory:'); c.execute('INSTALL httpfs; LOAD httpfs;')"
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

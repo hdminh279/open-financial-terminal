@@ -1,0 +1,14 @@
+FROM apache/airflow:2.10.4-python3.11
+
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+COPY --chown=airflow:root pyproject.toml /tmp/pyproject.toml
+RUN pip install --no-cache-dir \
+    beautifulsoup4 boto3 dbt-duckdb duckdb fastembed flashrank \
+    httpx langgraph lxml openai pyarrow pydantic python-dotenv \
+    pyyaml qdrant-client tenacity tiktoken \
+    && python -c "import duckdb; c = duckdb.connect(':memory:'); c.execute('INSTALL httpfs; LOAD httpfs;')"

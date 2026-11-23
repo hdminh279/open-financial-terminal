@@ -24,6 +24,7 @@ from src.api.deps import (
     get_research_agent,
 )
 from src.api.main import app
+from src.api.security import get_current_user_id
 
 
 @pytest.fixture
@@ -35,8 +36,10 @@ def memory_chat_history(monkeypatch: pytest.MonkeyPatch) -> ChatHistoryManager:
     mgr._s3 = None
     mgr._sessions.clear()
     app.dependency_overrides[get_chat_history] = lambda: mgr
+    app.dependency_overrides[get_current_user_id] = lambda: "default_user"
     yield mgr
     app.dependency_overrides.pop(get_chat_history, None)
+    app.dependency_overrides.pop(get_current_user_id, None)
 
 
 @pytest.fixture
@@ -258,8 +261,8 @@ def test_chat_history_s3_persistence() -> None:
     # Verify put_object / upload_bytes was invoked
     assert mock_s3.upload_bytes.called
     call_args = mock_s3.upload_bytes.call_args[1]
-    assert call_args["bucket"] == "sec-silver"
-    assert call_args["key"] == "chat_history/s3-test-session.json"
+    assert call_args["bucket"] == "cfi-app-state"
+    assert call_args["key"] == "sessions/default_user/s3-test-session.json"
     assert b"Microsoft gross profit was $146B" in call_args["data"]
 
 
@@ -305,4 +308,4 @@ def test_chat_history_s3_delete_and_reconcile() -> None:
     deleted = mgr.delete_session("sess-to-delete")
     assert deleted is True
     assert mock_s3.delete_object.called
-    assert "sess-to-delete" not in mgr._sessions
+    assert "default_user:sess-to-delete" not in mgr._sessions

@@ -10,8 +10,11 @@ import logging
 import os
 import random
 import uuid
+from pathlib import Path
 from typing import Any
 
+import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from dotenv import load_dotenv
 from fastembed import SparseTextEmbedding
@@ -47,6 +50,13 @@ class CorpusSyncEngine:
         """Convert a deterministic SHA-256 chunk_id into a stable UUIDv5 string."""
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk_id))
 
+    @staticmethod
+    def _table_to_chunks(table: pa.Table) -> list[dict[str, Any]]:
+        """Convert a PyArrow table into list of chunk dictionaries."""
+        pydict = table.to_pydict()
+        keys = list(pydict.keys())
+        return [{k: pydict[k][i] for k in keys} for i in range(table.num_rows)]
+
     def load_chunks_from_parquet(
         self,
         bucket: str = "sec-gold",
@@ -54,28 +64,66 @@ class CorpusSyncEngine:
         local_path: str | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Load text chunks from local Parquet file or MinIO S3 object."""
+        """Load text chunks from local Parquet, Hive partitions (chunks/ticker=*/chunks.parquet), or legacy Parquet."""
         resolved_local = local_path or os.getenv("CHUNKS_PARQUET_LOCAL_PATH")
+        chunks: list[dict[str, Any]] = []
+
+        if resolved_local and os.path.isdir(resolved_local):
+            parquet_files = sorted(Path(resolved_local).rglob("*.parquet"))
+            logger.info("Loading chunks from %d local Parquet file(s) under %s", len(parquet_files), resolved_local)
+            for pf in parquet_files:
+                tbl = pq.read_table(pf)
+                if limit is not None and limit > 0:
+                    remaining = limit - len(chunks)
+                    if remaining <= 0:
+                        break
+                    tbl = tbl.slice(0, remaining)
+                chunks.extend(self._table_to_chunks(tbl))
+            return chunks
 
         if resolved_local and os.path.isfile(resolved_local):
             logger.info("Loading chunks directly from local Parquet: %s", resolved_local)
             table = pq.read_table(resolved_local)
-        else:
-            logger.info("Downloading chunks from MinIO s3://%s/%s...", bucket, key)
+            if limit is not None and limit > 0:
+                table = table.slice(0, limit)
+            return self._table_to_chunks(table)
+
+        # S3 Mode: Discover Hive-partitioned chunks/ticker=*/chunks.parquet and/or legacy chunks/text_chunks.parquet
+        all_keys = self.s3.list_objects(bucket=bucket, prefix="chunks/")
+        hive_keys = sorted(k for k in all_keys if k.startswith("chunks/ticker=") and k.endswith(".parquet"))
+        hive_tickers: set[str] = set()
+
+        for hkey in hive_keys:
+            logger.info("Downloading Hive chunk partition s3://%s/%s...", bucket, hkey)
+            parquet_bytes = self.s3.download_bytes(bucket=bucket, key=hkey)
+            tbl = pq.read_table(io.BytesIO(parquet_bytes))
+            if tbl.num_rows > 0 and "ticker" in tbl.column_names:
+                hive_tickers.update(str(t).upper() for t in tbl["ticker"].to_pylist() if t)
+            if limit is not None and limit > 0:
+                remaining = limit - len(chunks)
+                if remaining <= 0:
+                    break
+                tbl = tbl.slice(0, remaining)
+            chunks.extend(self._table_to_chunks(tbl))
+
+        # Backward compatibility: read legacy text_chunks.parquet for any tickers not superseded by Hive partitions
+        has_legacy = (key in all_keys) or (not all_keys)
+        if has_legacy and (limit is None or limit <= 0 or len(chunks) < limit):
+            logger.info("Downloading legacy chunks from MinIO s3://%s/%s...", bucket, key)
             parquet_bytes = self.s3.download_bytes(bucket=bucket, key=key)
-            table = pq.read_table(io.BytesIO(parquet_bytes))
-
-        if limit is not None and limit > 0:
-            table = table.slice(0, limit)
-
-        pydict = table.to_pydict()
-        num_rows = table.num_rows
-        chunks: list[dict[str, Any]] = []
-
-        keys = list(pydict.keys())
-        for i in range(num_rows):
-            chunk = {k: pydict[k][i] for k in keys}
-            chunks.append(chunk)
+            legacy_tbl = pq.read_table(io.BytesIO(parquet_bytes))
+            if hive_tickers and "ticker" in legacy_tbl.column_names and legacy_tbl.num_rows > 0:
+                mask = pc.invert(
+                    pc.is_in(
+                        pc.utf8_upper(legacy_tbl["ticker"]),
+                        value_set=pa.array(list(hive_tickers), type=pa.string()),
+                    )
+                )
+                legacy_tbl = legacy_tbl.filter(mask)
+            if limit is not None and limit > 0:
+                remaining = limit - len(chunks)
+                legacy_tbl = legacy_tbl.slice(0, max(0, remaining))
+            chunks.extend(self._table_to_chunks(legacy_tbl))
 
         logger.info("Loaded %d chunks from Parquet source of truth.", len(chunks))
         return chunks

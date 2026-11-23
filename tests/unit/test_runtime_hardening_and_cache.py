@@ -53,7 +53,7 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
         connection=mock_conn,
     )
     executed_sql = " ".join(str(call.args[0]) for call in mock_conn.execute.call_args_list)
-    assert "SET s3_endpoint='minio:9000';" in executed_sql
+    assert "SET GLOBAL s3_endpoint='minio:9000';" in executed_sql
 
     with patch("src.ai.vectordb.qdrant_client.QdrantClient") as mock_qdrant:
         QdrantStorage()
@@ -76,7 +76,7 @@ def test_watchlist_loads_persisted_s3_config_using_object_exists() -> None:
     repo = WatchlistRepository(s3_storage=mock_s3, quote_service=MagicMock())
     cfg = repo.get_watchlist()
 
-    mock_s3.object_exists.assert_called_once_with("sec-silver", "user_settings/watchlist.json")
+    mock_s3.object_exists.assert_called_once_with("cfi-app-state", "watchlist/default_user.json")
     assert [item.ticker for item in cfg.items] == ["FPT"]
 
 
@@ -90,7 +90,7 @@ def test_session_id_path_traversal_rejected_and_cache_bounded(monkeypatch: pytes
     mgr.get_or_create_session("sess-1")
     mgr.get_or_create_session("sess-2")
     mgr.get_or_create_session("sess-3")
-    assert list(mgr._sessions.keys()) == ["sess-2", "sess-3"]
+    assert list(mgr._sessions.keys()) == ["default_user:sess-2", "default_user:sess-3"]
 
     app.dependency_overrides[get_chat_history] = lambda: mgr
     try:

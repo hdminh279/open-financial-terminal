@@ -868,14 +868,31 @@ document.addEventListener("DOMContentLoaded", () => {
     // Append User Message to the RIGHT
     appendUserTurn(queryText);
 
-    // Append Loading Skeleton
+    // Append Loading Skeleton with live streaming preview target
     const loadingId = appendAssistantSkeleton();
     scrollToBottom();
 
+    const loadingEl = document.getElementById(loadingId);
+    const titleEl = loadingEl ? loadingEl.querySelector(".activity-title") : null;
+    const previewEl = loadingEl ? loadingEl.querySelector(".streaming-answer-preview") : null;
+    let streamedText = "";
+    let finalData = null;
+
+    const applyStreamPreview = () => {
+      if (!previewEl || !streamedText) return;
+      previewEl.style.display = "block";
+      const safeText = streamedText.replace(/~/g, "\\~");
+      const rawHtml = marked.parse(safeText);
+      previewEl.innerHTML = (typeof DOMPurify !== "undefined")
+        ? DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true } })
+        : rawHtml;
+      scrollToBottom();
+    };
+
     try {
-      const response = await fetch("/api/query", {
+      const response = await fetch("/api/query/stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify({
           query: queryText,
           session_id: currentSessionId,
@@ -883,11 +900,73 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `Lỗi máy chủ: ${response.status}`);
+        let detail = `Lỗi máy chủ: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.detail) detail = errorData.detail;
+        } catch (_e) { /* ignore non-JSON error body */ }
+        throw new Error(detail);
       }
 
-      const data = await response.json();
+      if (!response.body || !response.body.getReader) {
+        throw new Error("Trình duyệt không hỗ trợ luồng SSE.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+
+        for (const frame of frames) {
+          if (!frame.trim()) continue;
+          let eventName = "message";
+          const dataLines = [];
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("event:")) {
+              eventName = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5).trim());
+            }
+          }
+          if (dataLines.length === 0) continue;
+
+          let payload = null;
+          try {
+            payload = JSON.parse(dataLines.join("\n"));
+          } catch (_e) {
+            continue;
+          }
+
+          if (eventName === "status" && payload) {
+            if (titleEl && payload.step) {
+              const stepLabel = payload.step === "Synthesizing answer"
+                ? "Đang tổng hợp câu trả lời..."
+                : translateStepName(payload.step);
+              titleEl.textContent = stepLabel;
+            }
+          } else if (eventName === "token" && payload && payload.delta) {
+            streamedText += payload.delta;
+            applyStreamPreview();
+          } else if (eventName === "done" && payload) {
+            finalData = payload;
+          } else if (eventName === "error" && payload) {
+            throw new Error(payload.detail || "Lỗi khi xử lý câu hỏi.");
+          }
+        }
+      }
+
+      if (!finalData) {
+        throw new Error("Không nhận được phản hồi hoàn chỉnh từ máy chủ.");
+      }
+
+      const data = finalData;
       currentSessionId = data.session_id;
       localStorage.setItem("current_active_session_id", currentSessionId);
       localStorage.setItem("current_session_id", currentSessionId);
@@ -966,10 +1045,11 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="activity-card-header">
             <div class="activity-header-left">
               <span class="activity-spark-icon">✦</span>
-              <span class="activity-title">Đang phân tích & truy vấn dữ liệu...</span>
+              <span class="activity-title">Đang phân tích &amp; truy vấn dữ liệu...</span>
             </div>
           </div>
         </div>
+        <div class="assistant-response-text streaming-answer-preview" style="display: none;"></div>
       </div>
     `;
     messagesContainer.appendChild(group);
@@ -1448,10 +1528,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       const sessions = data.sessions || [];
 
-      if (sessions.length === 0) return;
+      if (sessions.length === 0) {
+        sessionList.innerHTML = "";
+        return;
+      }
 
       sessionList.innerHTML = "";
-      sessions.slice(0, 8).forEach(s => {
+      sessions.forEach(s => {
         const item = document.createElement("button");
         item.className = `session-item ${s.session_id === currentSessionId ? 'active' : ''}`;
         item.setAttribute("data-session-id", s.session_id);
@@ -1622,9 +1705,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const statLosersCount = document.getElementById("stat-losers-count");
   const stockLastUpdatedClock = document.getElementById("stock-last-updated-clock");
   const marketFilterTabs = document.querySelectorAll(".market-tab-btn");
+  const stockPaginationBar = document.getElementById("stock-pagination-bar");
+  const stockPrevPageBtn = document.getElementById("stock-prev-page");
+  const stockNextPageBtn = document.getElementById("stock-next-page");
+  const stockPageInfo = document.getElementById("stock-page-info");
 
+  const WATCHLIST_PAGE_SIZE = 20;
   let currentWatchlistQuotes = [];
   let currentMarketFilter = "ALL";
+  let currentWatchlistPage = 1;
+  let totalWatchlistPages = 1;
+  let totalWatchlistSymbols = 0;
   let currentSortCol = null;
   let currentSortAsc = true;
 
@@ -1687,19 +1778,32 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Intl.NumberFormat("en-US").format(vol);
   }
 
-  // Fetch watchlist quotes from FastAPI backend
-  async function fetchWatchlistQuotes(forceRefresh = false) {
+  // Fetch paginated watchlist quotes from FastAPI backend
+  async function fetchWatchlistQuotes(forceRefresh = false, page = currentWatchlistPage) {
     if (stockLoadingSpinner) stockLoadingSpinner.style.display = "flex";
     if (stockRefreshBtn) stockRefreshBtn.classList.add("loading");
 
     try {
-      const resp = await fetch(`/api/watchlist?refresh=${forceRefresh}`);
+      const params = new URLSearchParams({
+        page: String(Math.max(1, page)),
+        page_size: String(WATCHLIST_PAGE_SIZE),
+        refresh: String(Boolean(forceRefresh)),
+      });
+      if (currentMarketFilter !== "ALL") {
+        params.set("market", currentMarketFilter);
+      }
+
+      const resp = await fetch(`/api/watchlist?${params.toString()}`);
       if (!resp.ok) throw new Error("Failed to fetch watchlist quotes");
       const data = await resp.json();
       currentWatchlistQuotes = data.items || [];
+      currentWatchlistPage = data.page || 1;
+      totalWatchlistPages = data.total_pages || 1;
+      totalWatchlistSymbols = typeof data.total === "number" ? data.total : currentWatchlistQuotes.length;
 
-      // Update Summary Statistics
-      updateStockSummaryStats(currentWatchlistQuotes, data.updated_at);
+      // Update Summary Statistics & Pagination Controls
+      updateStockSummaryStats(currentWatchlistQuotes, data.updated_at, totalWatchlistSymbols);
+      updateWatchlistPaginationUI();
 
       // Render Table
       renderStockTable();
@@ -1711,8 +1815,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function updateStockSummaryStats(items, updatedAt) {
-    if (statTotalSymbols) statTotalSymbols.textContent = items.length;
+  function updateWatchlistPaginationUI() {
+    if (!stockPaginationBar) return;
+    stockPaginationBar.style.display = totalWatchlistSymbols > WATCHLIST_PAGE_SIZE || totalWatchlistPages > 1 ? "flex" : "none";
+    if (stockPageInfo) {
+      stockPageInfo.textContent = `Trang ${currentWatchlistPage} / ${totalWatchlistPages} (${totalWatchlistSymbols} mã)`;
+    }
+    if (stockPrevPageBtn) stockPrevPageBtn.disabled = currentWatchlistPage <= 1;
+    if (stockNextPageBtn) stockNextPageBtn.disabled = currentWatchlistPage >= totalWatchlistPages;
+  }
+
+  function updateStockSummaryStats(items, updatedAt, totalCount = items.length) {
+    if (statTotalSymbols) statTotalSymbols.textContent = totalCount;
 
     let gainers = 0;
     let losers = 0;
@@ -1978,13 +2092,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Pagination Buttons
+  if (stockPrevPageBtn) {
+    stockPrevPageBtn.addEventListener("click", () => {
+      if (currentWatchlistPage > 1) fetchWatchlistQuotes(false, currentWatchlistPage - 1);
+    });
+  }
+  if (stockNextPageBtn) {
+    stockNextPageBtn.addEventListener("click", () => {
+      if (currentWatchlistPage < totalWatchlistPages) fetchWatchlistQuotes(false, currentWatchlistPage + 1);
+    });
+  }
+
   // Filter Tabs
   marketFilterTabs.forEach(tab => {
     tab.addEventListener("click", () => {
       marketFilterTabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
       currentMarketFilter = tab.getAttribute("data-filter") || "ALL";
-      renderStockTable();
+      currentWatchlistPage = 1;
+      fetchWatchlistQuotes(false, 1);
     });
   });
 

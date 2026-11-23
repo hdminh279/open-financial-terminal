@@ -11,6 +11,8 @@ from typing import Any
 
 from src.ai.agent.chart_engine import ChartEngine
 from src.ai.agent.contracts import (
+    AbstentionInfo,
+    AbstentionReason,
     Citation,
     EvidenceSourceType,
     IntentType,
@@ -87,7 +89,7 @@ grounded strictly and objectively in the provided verified evidence (including o
 
 ### Grounding & Citation Rules:
 1. Strict Grounding: Rely ONLY on the facts, numerical metrics, and text excerpts in the provided evidence.
-   Do not speculate, extrapolate, or inject outside knowledge. If a Yes/No question asks about a missing breakdown (e.g. geographic revenue split when only consolidated revenue exists), NEVER answer 'Yes' or 'No'; state transparently that it cannot be confirmed from the provided evidence.
+   Do not speculate, extrapolate, or inject outside knowledge. If the retrieved filing excerpts contain NO disclosure supporting the requested topic or claim, start your response with the exact tag `[INSUFFICIENT_EVIDENCE]` on the first line followed by a transparent explanation of what is missing. If a Yes/No question asks about a missing breakdown (e.g. geographic revenue split when only consolidated revenue exists), NEVER answer 'Yes' or 'No'; state transparently that it cannot be confirmed from the provided evidence.
 2. Inline Citations: Every statement containing numbers, dates, strategic claims, or risk disclosures
    MUST cite the corresponding evidence index using square brackets (e.g. [1], [2], or [1][2]).
 3. Partial Evidence Handling: If the user asked for both metrics and explanations, but only one type of
@@ -274,47 +276,70 @@ def build_fiscal_period_notes(
     return notes
 
 
+_INSUFFICIENT_TAG_RE = re.compile(r"^\s*\[INSUFFICIENT_EVIDENCE\]\s*", re.IGNORECASE)
+_NEGATIVE_DISCLOSURE_RE = re.compile(
+    r"(?:contains?\s+no\s+(?:mention|disclosure|reference|information|record)"
+    r"|does\s+not\s+(?:contain|disclose|mention|include)\s+(?:any|a)"
+    r"|do\s+not\s+(?:contain|disclose|mention|include)\s+(?:any|a)"
+    r"|there\s+(?:is|are)\s+no\s+(?:disclosure|mention|reference|information)"
+    r"|no\s+disclosure\s+of\b"
+    r"|không\s+(?:có|tìm\s+thấy)\s+(?:thông\s+tin|thuyết\s+minh|tài\s+liệu|bằng\s+chứng)"
+    r"|không\s+đề\s+cập\s+(?:đến|tới))",
+    re.IGNORECASE,
+)
+
+
+def detect_insufficient_evidence(
+    answer: str,
+    is_already_abstaining: bool = False,
+    is_partial: bool = False,
+    has_sql_success: bool = False,
+) -> tuple[bool, str]:
+    """Detect synthesis-level abstention when retrieved filing chunks lack requested disclosures."""
+    if not answer:
+        return False, ""
+
+    has_tag = bool(_INSUFFICIENT_TAG_RE.match(answer))
+    cleaned = _INSUFFICIENT_TAG_RE.sub("", answer).strip()
+
+    if is_already_abstaining or is_partial:
+        return False, cleaned
+
+    if has_tag:
+        return True, cleaned
+
+    # Fallback phrase check for RAG-only answers that explicitly report zero matching disclosures
+    if (
+        not has_sql_success
+        and "|---" not in cleaned
+        and "| :---" not in cleaned
+        and _NEGATIVE_DISCLOSURE_RE.search(cleaned)
+        and len(cleaned) < 1200
+    ):
+        return True, cleaned
+
+    return False, cleaned
+
+
 def sanitize_answer_formatting(text: str) -> str:
     """Remove horizontal dividers and square brackets around section headings."""
     if not text:
         return ""
-    cleaned = re.sub(r"(?m)^\s*(?:---+|\*\*\*+|___+)\s*$", "", text)
+    cleaned = _INSUFFICIENT_TAG_RE.sub("", text)
+    cleaned = re.sub(r"(?m)^\s*(?:---+|\*\*\*+|___+)\s*$", "", cleaned)
     cleaned = re.sub(r"(?m)^(#{1,4}\s+)\[([^\]]+)\]\s*$", r"\1\2", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 
-# ---------------------------------------------------------------------------
-# LangGraph Node Functions
-# ---------------------------------------------------------------------------
-
-
-def synthesis_node(
-    state: AgentState,
-    llm_adapter: BaseLLMAdapter | None = None,
-) -> dict[str, Any]:
-    """LangGraph node synthesizing a fully grounded response with [1], [2] citation tags.
-
-    Args:
-        state: Current AgentState.
-        llm_adapter: Injected or default DeepSeekAdapter instance.
-
-    Returns:
-        State dictionary update containing 'draft_answer'.
-    """
-    is_abstaining = state.get("is_abstaining", False)
-    is_partial = state.get("is_partial", False)
-
-    # Full abstention short-circuit: answer already formulated by abstention_node
-    if is_abstaining and not is_partial:
-        return {"draft_answer": state.get("final_answer", "")}
-
+def build_synthesis_messages(state: AgentState) -> list[ChatMessage]:
+    """Construct system and user messages for response synthesis from AgentState."""
     query = state.get("query", "")
     intent_str = state.get("intent", IntentType.FINANCIAL_METRIC.value)
     evidence_dicts = state.get("evidence_items", [])
     abstention_info = state.get("abstention_info") or {}
+    is_partial = state.get("is_partial", False)
 
-    # Format collected evidence blocks
     evidence_text_blocks: list[str] = []
     for idx, ev in enumerate(evidence_dicts):
         cid = idx + 1
@@ -337,14 +362,12 @@ def synthesis_node(
             "Answer the supported parts accurately, and explicitly disclose the missing aspect."
         )
 
-    # Layer 2: Ontology disambiguation guidance
     ontology = _get_financial_ontology()
     routing_decision = state.get("routing_decision") or {}
     primary_ticker = (routing_decision.get("tickers") or [None])[0]
     disambiguation = ontology.disambiguate_query(query, ticker=primary_ticker)
     ontology_note = f"\n\nONTOLOGY NOTE: {disambiguation['guidance']}" if disambiguation.get("guidance") else ""
 
-    # Dynamic Data Availability: Disclose excluded / future / unfiled periods
     sql_data = state.get("sql_data") or {}
     availability_reports = sql_data.get("availability_reports") or []
     unavail_items = [
@@ -378,18 +401,54 @@ def synthesis_node(
         f"Please provide a grounded, two-tier structured answer adhering strictly to citation and guardrail rules."
     )
 
-    adapter = llm_adapter or LLMFactory.get_adapter(profile="chat")
-    messages = [
+    return [
         ChatMessage(role="system", content=SYNTHESIS_SYSTEM_PROMPT),
         ChatMessage(role="user", content=user_prompt),
     ]
+
+
+# ---------------------------------------------------------------------------
+# LangGraph Node Functions
+# ---------------------------------------------------------------------------
+
+
+def synthesis_node(
+    state: AgentState,
+    llm_adapter: BaseLLMAdapter | None = None,
+) -> dict[str, Any]:
+    """LangGraph node synthesizing a fully grounded response with [1], [2] citation tags.
+
+    Args:
+        state: Current AgentState.
+        llm_adapter: Injected or default DeepSeekAdapter instance.
+
+    Returns:
+        State dictionary update containing 'draft_answer'.
+    """
+    is_abstaining = state.get("is_abstaining", False)
+    is_partial = state.get("is_partial", False)
+
+    # Full abstention short-circuit: answer already formulated by abstention_node
+    if is_abstaining and not is_partial:
+        return {"draft_answer": state.get("final_answer", "")}
+
+    # Streaming mode defers token generation to ResearchAgent.stream_query()
+    if state.get("stream_mode"):
+        return {"draft_answer": ""}
+
+    evidence_dicts = state.get("evidence_items", [])
+    adapter = llm_adapter or LLMFactory.get_adapter(profile="chat")
+    messages = build_synthesis_messages(state)
 
     try:
         response = adapter.generate(
             messages=messages,
             temperature=0.0,
         )
-        return {"draft_answer": response.content}
+        result: dict[str, Any] = {"draft_answer": response.content}
+        if response.usage is not None:
+            result["llm_usage"] = [response.usage.model_dump() | {"model": response.model}]
+        return result
     except Exception as exc:
         logger.error("Synthesis node failed: %s", exc, exc_info=True)
         return {
@@ -411,6 +470,10 @@ def citation_node(state: AgentState) -> dict[str, Any]:
     is_abstaining = state.get("is_abstaining", False)
     is_partial = state.get("is_partial", False)
     draft_answer = state.get("draft_answer") or state.get("final_answer") or ""
+
+    # In streaming mode, defer citation finalization until stream_query() finishes streaming tokens
+    if state.get("stream_mode") and not draft_answer and not (is_abstaining and not is_partial):
+        return {}
 
     # Full abstention short-circuit: no citations or charts to attach
     if is_abstaining and not is_partial:
@@ -471,7 +534,37 @@ def citation_node(state: AgentState) -> dict[str, Any]:
     ).strip()
     clean_draft = re.sub(r"```(?:mermaid)?\s*xychart-beta[\s\S]*?```", "", clean_draft).strip()
     clean_draft = re.sub(r"\bxychart-beta\s+title[\s\S]*?(?=\n\n|\Z)", "", clean_draft).strip()
-    final_answer = sanitize_answer_formatting(clean_draft if clean_draft else draft_answer.strip())
+    raw_clean = clean_draft if clean_draft else draft_answer.strip()
+
+    has_sql_success = any(
+        r.get("tool_name") == "financial_sql_tool" and r.get("status") == "success"
+        for r in (state.get("tool_results") or [])
+        if isinstance(r, dict)
+    )
+    synthesis_abstained, stripped_answer = detect_insufficient_evidence(
+        raw_clean,
+        is_already_abstaining=is_abstaining,
+        is_partial=is_partial,
+        has_sql_success=has_sql_success,
+    )
+    final_answer = sanitize_answer_formatting(stripped_answer)
+
+    if synthesis_abstained:
+        abstention_payload = AbstentionInfo(
+            is_abstaining=True,
+            is_partial=False,
+            reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
+            explanation=final_answer,
+        ).model_dump()
+        return {
+            "citations": [],
+            "charts": [],
+            "report_sections": [],
+            "final_answer": final_answer,
+            "is_abstaining": True,
+            "abstention_info": abstention_payload,
+            "activity_timeline": [vis_step],
+        }
 
     # 3b. Deterministically append localized fiscal-calendar footnotes when periods are shifted
     fiscal_notes = build_fiscal_period_notes(sql_data=sql_data, query=query)

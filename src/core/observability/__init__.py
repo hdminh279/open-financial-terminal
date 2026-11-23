@@ -1,8 +1,10 @@
 """Observability and telemetry modules for Corporate Filing Intelligence."""
 
+from src.core.observability.logging_config import configure_logging
 from src.core.observability.telemetry import (
     RunTelemetryRecord,
     TelemetryLogger,
+    estimate_deepseek_cost_usd,
     get_telemetry_logger,
     log_run_telemetry,
     sanitize_query,
@@ -10,6 +12,8 @@ from src.core.observability.telemetry import (
 )
 
 __all__ = [
+    "configure_logging",
+    "estimate_deepseek_cost_usd",
     "RunTelemetryRecord",
     "TelemetryLogger",
     "get_telemetry_logger",

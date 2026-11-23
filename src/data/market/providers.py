@@ -129,6 +129,9 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         url = f"{self.BASE_URL}/quote"
         params = {"symbol": ticker, "token": self.api_key}
         resp = client.get(url, params=params)
+        if resp.status_code == 429:
+            logger.warning("Finnhub HTTP 429 rate limit hit for ticker %s", ticker)
+            resp.raise_for_status()
         resp.raise_for_status()
         return resp.json()
 

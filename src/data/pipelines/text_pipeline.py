@@ -6,14 +6,18 @@ chunks to Gold S3. Generates multi-company verification and audit reports.
 """
 
 import argparse
+import gc
 import io
 import json
 import logging
 import re
+import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from dotenv import load_dotenv
 
@@ -64,6 +68,7 @@ class FilingsTextPipeline:
         bronze_bucket: str = "sec-bronze",
         silver_bucket: str = "sec-silver",
         gold_bucket: str = "sec-gold",
+        dead_letter_dir: str | Path = "data/dead_letter",
     ) -> None:
         """Initialize the text pipeline with storage adapter and engines."""
         self.s3 = s3_storage or S3Storage()
@@ -72,6 +77,7 @@ class FilingsTextPipeline:
         self.bronze_bucket = bronze_bucket
         self.silver_bucket = silver_bucket
         self.gold_bucket = gold_bucket
+        self.dead_letter_dir = Path(dead_letter_dir)
 
     def process_filing(
         self,
@@ -216,22 +222,68 @@ class FilingsTextPipeline:
 
         return chunks, filing_summary
 
+    @staticmethod
+    def hive_partition_key(ticker: str) -> str:
+        """Return canonical Hive-partitioned Gold Parquet key for a single ticker."""
+        return f"chunks/ticker={ticker.strip().upper()}/chunks.parquet"
+
+    def _write_dead_letter_manifest(self, entries: list[dict[str, Any]]) -> str | None:
+        """Persist failed-filing dead-letter manifest to local disk and MinIO Silver."""
+        if not entries:
+            return None
+
+        manifest = {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "failed_count": len(entries),
+            "entries": entries,
+        }
+        payload_bytes = json.dumps(manifest, indent=2).encode("utf-8")
+        s3_key = "dead_letter/text_pipeline_dead_letter.json"
+
+        try:
+            self.dead_letter_dir.mkdir(parents=True, exist_ok=True)
+            local_file = self.dead_letter_dir / "text_pipeline_dead_letter.json"
+            local_file.write_bytes(payload_bytes)
+        except OSError as exc:
+            logger.warning("Failed to write local dead-letter manifest: %s", exc)
+
+        try:
+            self.s3.upload_bytes(
+                self.silver_bucket,
+                s3_key,
+                payload_bytes,
+                content_type="application/json",
+            )
+            return f"s3://{self.silver_bucket}/{s3_key}"
+        except Exception as exc:
+            logger.warning("Failed to upload dead-letter manifest to MinIO: %s", exc)
+            return str(self.dead_letter_dir / "text_pipeline_dead_letter.json")
+
+    @staticmethod
+    def _new_company_stat() -> dict[str, Any]:
+        return {
+            "filings_count": 0,
+            "10K_count": 0,
+            "10Q_count": 0,
+            "20F_count": 0,
+            "total_sections": 0,
+            "total_tables": 0,
+            "total_chunks": 0,
+            "abnormal_sections": set(),
+        }
+
     def process_all(
         self,
         tickers: list[str] | None = None,
         force: bool = False,
     ) -> dict[str, Any]:
-        """Process all HTML filings across companies, aggregate chunks, and upload Parquet.
+        """Process HTML filings ticker-by-ticker into Hive-partitioned Gold Parquet.
 
-        Args:
-            tickers: Optional list of tickers to filter (e.g., ['AAPL', 'MSFT', 'GOOGL']).
-            force: If True, re-process filings.
-
-        Returns:
-            Dictionary containing aggregated statistics and verification summaries.
+        Streams each filing batch into a per-ticker ParquetWriter to keep memory bounded
+        at O(1 filing) and isolates malformed filings in a dead-letter manifest.
         """
         all_keys = self.s3.list_objects(self.bronze_bucket, prefix="raw/filings/")
-        html_keys = [k for k in all_keys if k.endswith(".htm")]
+        html_keys = [k for k in all_keys if k.endswith(".htm") or k.endswith(".html")]
 
         if tickers:
             ticker_set = {t.upper() for t in tickers}
@@ -240,170 +292,180 @@ class FilingsTextPipeline:
         html_keys.sort()
         logger.info("Discovered %d HTML filing objects across target tickers.", len(html_keys))
 
-        gold_key = "chunks/text_chunks.parquet"
-        existing_records: list[dict[str, Any]] = []
-        existing_accessions: set[str] = set()
-
-        # Step 1: Incremental check - inspect existing Gold Parquet mart.
-        # Preserve existing records whenever running incrementally OR scoped to specific tickers.
-        if (not force or tickers is not None) and self.s3.object_exists(self.gold_bucket, gold_key):
-            try:
-                gold_bytes = self.s3.download_bytes(self.gold_bucket, gold_key)
-                existing_table = pq.read_table(io.BytesIO(gold_bytes))
-                existing_records = existing_table.to_pylist()
-                existing_accessions = set(existing_table["accession_number"].to_pylist())
-                logger.info(
-                    "Loaded existing Gold analytical mart with %d chunks across %d filings.",
-                    len(existing_records),
-                    len(existing_accessions),
-                )
-            except Exception as exc:
-                logger.warning("Failed to read existing Gold Parquet (%s). Will re-build.", exc)
-                existing_records = []
-                existing_accessions = set()
-
-        # Step 2: Separate up-to-date filings from new/changed filings
-        keys_to_process: list[str] = []
-        skipped_count = 0
-
+        keys_by_ticker: dict[str, list[str]] = {}
         for key in html_keys:
-            filename = key.rsplit("/", 1)[-1]
-            parts = filename.replace(".htm", "").replace(".html", "").split("_")
-            acc_num = parts[-1] if len(parts) >= 3 else ""
+            tk = key.split("/")[-2].upper()
+            keys_by_ticker.setdefault(tk, []).append(key)
 
-            if not force and acc_num and acc_num in existing_accessions:
-                skipped_count += 1
-            else:
-                keys_to_process.append(key)
-
-        logger.info(
-            "Incremental check: %d filings already up-to-date (skipped), %d filings to process.",
-            skipped_count,
-            len(keys_to_process),
-        )
-
-        all_new_chunks: list[TextChunk] = []
-        filing_summaries: list[dict[str, Any]] = []
+        skipped_count = 0
+        newly_processed_count = 0
+        new_chunks_created = 0
+        total_chunks_in_gold = 0
         company_stats: dict[str, dict[str, Any]] = {}
+        sample_records: list[dict[str, Any]] = []
+        dead_letter_entries: list[dict[str, Any]] = []
+        written_partitions: list[str] = []
 
-        # Step 3: Process only the new or modified filings
-        for key in keys_to_process:
-            try:
-                chunks, summary = self.process_filing(key, force=force)
-                all_new_chunks.extend(chunks)
-                filing_summaries.append(summary)
+        for ticker in sorted(keys_by_ticker.keys()):
+            ticker_keys = keys_by_ticker[ticker]
+            partition_key = self.hive_partition_key(ticker)
+            existing_table: pa.Table | None = None
+            existing_accessions: set[str] = set()
 
-                ticker = summary["ticker"]
-                if ticker not in company_stats:
-                    company_stats[ticker] = {
-                        "filings_count": 0,
-                        "10K_count": 0,
-                        "10Q_count": 0,
-                        "20F_count": 0,
-                        "total_sections": 0,
-                        "total_tables": 0,
-                        "total_chunks": 0,
-                        "abnormal_sections": set(),
-                    }
+            if not force and self.s3.object_exists(self.gold_bucket, partition_key):
+                try:
+                    part_bytes = self.s3.download_bytes(self.gold_bucket, partition_key)
+                    existing_table = pq.read_table(io.BytesIO(part_bytes))
+                    existing_accessions = set(existing_table["accession_number"].to_pylist())
+                except Exception as exc:
+                    logger.warning("Failed to read existing partition %s (%s). Rebuilding ticker.", partition_key, exc)
+                    existing_table = None
+                    existing_accessions = set()
 
-                stat = company_stats[ticker]
-                stat["filings_count"] += 1
-                form_upper = summary["form"].upper()
-                if "10-K" in form_upper:
-                    stat["10K_count"] += 1
-                elif "20-F" in form_upper:
-                    stat["20F_count"] += 1
+            keys_to_process: list[str] = []
+            for key in ticker_keys:
+                filename = key.rsplit("/", 1)[-1]
+                parts = filename.replace(".htm", "").replace(".html", "").split("_")
+                acc_num = parts[-1] if len(parts) >= 3 else ""
+                if not force and acc_num and acc_num in existing_accessions:
+                    skipped_count += 1
                 else:
-                    stat["10Q_count"] += 1
-                stat["total_sections"] += summary["sections_extracted"]
-                stat["total_tables"] += summary["tables_extracted"]
-                stat["total_chunks"] += summary["total_chunks"]
-                for un_sec in summary["unidentified_sections"]:
-                    stat["abnormal_sections"].add(un_sec)
+                    keys_to_process.append(key)
 
-            except Exception as exc:
-                logger.error("Error processing filing %s: %s", key, exc, exc_info=True)
+            stat = company_stats.setdefault(ticker, self._new_company_stat())
 
-        # Step 4: Incremental Merge into Gold Parquet
-        if keys_to_process and (all_new_chunks or existing_records):
-            reprocessed_accs = {s["accession_number"] for s in filing_summaries}
-            retained_records = [r for r in existing_records if r.get("accession_number") not in reprocessed_accs]
-            new_chunk_records = [chunk.model_dump() for chunk in all_new_chunks]
-            final_records = retained_records + new_chunk_records
+            if not keys_to_process:
+                if existing_table is not None:
+                    total_chunks_in_gold += existing_table.num_rows
+                    stat["total_chunks"] += existing_table.num_rows
+                    seen_accs: set[str] = set()
+                    for row in existing_table.select(["accession_number", "form"]).to_pylist():
+                        acc = row.get("accession_number")
+                        if acc and acc not in seen_accs:
+                            seen_accs.add(acc)
+                            stat["filings_count"] += 1
+                            form_u = str(row.get("form") or "").upper()
+                            if "10-K" in form_u:
+                                stat["10K_count"] += 1
+                            elif "20-F" in form_u:
+                                stat["20F_count"] += 1
+                            else:
+                                stat["10Q_count"] += 1
+                    if len(sample_records) < 3 and existing_table.num_rows > 0:
+                        needed = 3 - len(sample_records)
+                        sample_records.extend(existing_table.slice(0, needed).to_pylist())
+                continue
 
-            table = pa.Table.from_pylist(final_records, schema=CHUNK_PARQUET_SCHEMA)
-            buf = pa.BufferOutputStream()
-            pq.write_table(table, buf, compression="snappy")
-            parquet_bytes = buf.getvalue().to_pybytes()
+            reprocessed_accs: set[str] = set()
+            ticker_new_chunks = 0
+            ticker_total_rows = 0
 
-            self.s3.upload_bytes(
-                self.gold_bucket,
-                gold_key,
-                parquet_bytes,
-                content_type="application/vnd.apache.parquet",
-                metadata={"total_chunks": str(len(final_records))},
-            )
-            logger.info(
-                "Incremental update complete: merged %d new chunks with %d existing chunks (Total: %d chunks) to s3://%s/%s",
-                len(new_chunk_records),
-                len(retained_records),
-                len(final_records),
-                self.gold_bucket,
-                gold_key,
-            )
-            total_chunks_in_gold = len(final_records)
-            sample_records = final_records[:3]
-        else:
-            total_chunks_in_gold = len(existing_records)
-            sample_records = existing_records[:3]
+            with tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024) as spooled_buf:
+                writer = pq.ParquetWriter(spooled_buf, CHUNK_PARQUET_SCHEMA, compression="snappy")
+                try:
+                    for key in keys_to_process:
+                        try:
+                            chunks, summary = self.process_filing(key, force=force)
+                            newly_processed_count += 1
+                            reprocessed_accs.add(summary["accession_number"])
 
-        # Reconstruct company stats if incremental no-op
-        if not keys_to_process and existing_records:
-            for r in existing_records:
-                tk = r.get("ticker", "UNKNOWN")
-                if tk not in company_stats:
-                    company_stats[tk] = {
-                        "filings_count": 0,
-                        "10K_count": 0,
-                        "10Q_count": 0,
-                        "total_sections": 0,
-                        "total_tables": 0,
-                        "total_chunks": 0,
-                        "abnormal_sections": set(),
-                    }
-                company_stats[tk]["total_chunks"] += 1
-            # Fill filing counts from existing unique accessions
-            for r in existing_records:
-                tk = r.get("ticker", "UNKNOWN")
-            # Distinct filings per ticker
-            seen_accs: set[str] = set()
-            for r in existing_records:
-                acc = r.get("accession_number")
-                tk = r.get("ticker", "UNKNOWN")
-                if acc and acc not in seen_accs:
-                    seen_accs.add(acc)
-                    company_stats[tk]["filings_count"] += 1
-                    if r.get("form") == "10-K":
-                        company_stats[tk]["10K_count"] += 1
-                    else:
-                        company_stats[tk]["10Q_count"] += 1
+                            stat["filings_count"] += 1
+                            form_upper = summary["form"].upper()
+                            if "10-K" in form_upper:
+                                stat["10K_count"] += 1
+                            elif "20-F" in form_upper:
+                                stat["20F_count"] += 1
+                            else:
+                                stat["10Q_count"] += 1
+                            stat["total_sections"] += summary["sections_extracted"]
+                            stat["total_tables"] += summary["tables_extracted"]
+                            stat["total_chunks"] += summary["total_chunks"]
+                            for un_sec in summary["unidentified_sections"]:
+                                stat["abnormal_sections"].add(un_sec)
 
-        # Format company stats for JSON report
+                            if chunks:
+                                records = [chunk.model_dump() for chunk in chunks]
+                                if len(sample_records) < 3:
+                                    sample_records.extend(records[: 3 - len(sample_records)])
+                                batch_table = pa.Table.from_pylist(records, schema=CHUNK_PARQUET_SCHEMA)
+                                writer.write_table(batch_table)
+                                ticker_new_chunks += len(records)
+                                ticker_total_rows += len(records)
+                                del records, batch_table
+                            del chunks
+                        except Exception as exc:
+                            logger.error("Error processing filing %s: %s", key, exc, exc_info=True)
+                            dead_letter_entries.append(
+                                {
+                                    "s3_key": key,
+                                    "ticker": ticker,
+                                    "error_type": type(exc).__name__,
+                                    "error": str(exc),
+                                    "timestamp": datetime.now(UTC).isoformat(),
+                                }
+                            )
+
+                    if existing_table is not None and existing_table.num_rows > 0:
+                        retained_table = existing_table
+                        if reprocessed_accs:
+                            mask = pc.invert(
+                                pc.is_in(
+                                    existing_table["accession_number"],
+                                    value_set=pa.array(list(reprocessed_accs), type=pa.string()),
+                                )
+                            )
+                            retained_table = existing_table.filter(mask)
+                        if retained_table.num_rows > 0:
+                            writer.write_table(retained_table.cast(CHUNK_PARQUET_SCHEMA))
+                            ticker_total_rows += retained_table.num_rows
+                            stat["total_chunks"] += retained_table.num_rows
+                finally:
+                    writer.close()
+
+                if ticker_total_rows > 0:
+                    spooled_buf.seek(0)
+                    parquet_bytes = spooled_buf.read()
+                    self.s3.upload_bytes(
+                        self.gold_bucket,
+                        partition_key,
+                        parquet_bytes,
+                        content_type="application/vnd.apache.parquet",
+                        metadata={"ticker": ticker, "total_chunks": str(ticker_total_rows)},
+                    )
+                    written_partitions.append(partition_key)
+                    logger.info(
+                        "Checkpointed Hive partition s3://%s/%s (%d chunks, %d new).",
+                        self.gold_bucket,
+                        partition_key,
+                        ticker_total_rows,
+                        ticker_new_chunks,
+                    )
+
+            new_chunks_created += ticker_new_chunks
+            total_chunks_in_gold += ticker_total_rows
+            del existing_table
+            gc.collect()
+
+        dead_letter_manifest_uri = self._write_dead_letter_manifest(dead_letter_entries)
+
         for s in company_stats.values():
             s["abnormal_sections"] = list(s["abnormal_sections"])
 
-        overall_summary = {
+        return {
             "timestamp": datetime.now(UTC).isoformat(),
-            "incremental": True,
+            "incremental": not force,
+            "hive_partitioned": True,
+            "partitions_written": written_partitions,
             "filings_skipped_up_to_date": skipped_count,
-            "filings_newly_processed": len(keys_to_process),
-            "new_chunks_created": len(all_new_chunks),
+            "filings_newly_processed": newly_processed_count,
+            "new_chunks_created": new_chunks_created,
             "total_chunks_in_gold": total_chunks_in_gold,
+            "dead_letter_count": len(dead_letter_entries),
+            "dead_letter_manifest": dead_letter_manifest_uri,
+            "dead_letter_entries": dead_letter_entries,
             "company_stats": company_stats,
             "sample_chunks": sample_records,
         }
-
-        return overall_summary
 
     @staticmethod
     def format_verification_report(summary: dict[str, Any]) -> str:

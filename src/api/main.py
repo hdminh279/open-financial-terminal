@@ -6,6 +6,7 @@ Medallion Lakehouse endpoints, and static UI file serving.
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.api.deps import get_duckdb_repository, get_s3_storage
 from src.api.routes.companies import router as companies_router
 from src.api.routes.health import router as health_router
 from src.api.routes.health import telemetry_router
@@ -26,14 +28,32 @@ from src.api.routes.metrics import router as metrics_router
 from src.api.routes.query import router as query_router
 from src.api.routes.watchlist import router as watchlist_router
 from src.api.security import SecurityHardeningMiddleware, get_allowed_origins
+from src.core.observability.logging_config import configure_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+configure_logging()
 logger = logging.getLogger("corporate_filing_intelligence.api")
 
 IS_PROD = os.getenv("APP_ENV", "local").lower() in ("prod", "production")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Warm up DuckDB repository and S3 buckets on startup to avoid first-request cold starts."""
+    try:
+        repo = get_duckdb_repository()
+        repo.execute_fetchall("SELECT 1")
+    except Exception as exc:
+        logger.warning("DuckDB warmup skipped: %s", exc)
+
+    try:
+        s3 = get_s3_storage()
+        if s3 is not None:
+            s3.ensure_buckets_exist()
+    except Exception as exc:
+        logger.warning("MinIO bucket warmup skipped: %s", exc)
+
+    yield
+
 
 app = FastAPI(
     title="Corporate Filing Intelligence API",
@@ -41,6 +61,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None if IS_PROD else "/docs",
     redoc_url=None if IS_PROD else "/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(SecurityHardeningMiddleware)
@@ -49,7 +70,7 @@ app.add_middleware(SecurityHardeningMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Accept"],
 )

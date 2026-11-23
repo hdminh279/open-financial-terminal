@@ -143,6 +143,7 @@ Your job is to analyze user inquiries across international corporations (US SEC 
 2. 'TEXTUAL_RESEARCH': Qualitative research into strategy, risk factors, legal matters, product categories, or management commentary.
    - Tools: ["hybrid_retriever"]
    - Strategy: "parallel"
+   - CRITICAL: Whenever a user asks what a supported company disclosed in its filings (10-K, 10-Q, 20-F) — even about unusual, historical, or potentially absent topics — ALWAYS classify as 'TEXTUAL_RESEARCH' with ["hybrid_retriever"] so the retrieval and abstention pipeline verifies the filings directly rather than guessing 'OUT_OF_SCOPE' upfront.
 3. 'MIXED_RESEARCH': Inquiries requiring BOTH concrete metrics and qualitative context/explanations, OR queries about specific product/service segments (e.g. iPhone, Azure, Cloud), OR inquiries combining filed data with recent news.
    - Tools: Relevant combination, e.g. ["financial_sql_tool", "hybrid_retriever"], ["financial_sql_tool", "web_search_tool"], or all three.
    - Strategy: "parallel"
@@ -162,6 +163,7 @@ Your job is to analyze user inquiries across international corporations (US SEC 
 6. 'OUT_OF_SCOPE': Strictly reserved for completely unrelated non-corporate trivia (weather, general programming syntax, personal chit-chat) OR speculative future stock price prediction / investment recommendations (e.g. 'Should I buy stock X?', 'Will price rise tomorrow?').
    - Tools: []
    - Strategy: "direct_abstain"
+   - Do NOT classify a filing-disclosure question about a supported company as 'OUT_OF_SCOPE' just because the topic sounds unlikely; route to 'TEXTUAL_RESEARCH' so 'hybrid_retriever' verifies the corpus.
 
 ### Parameter Planning Guidelines:
 - Product & Segment Inquiries: When the user asks about specific product lines or business segments (such as 'iPhone', 'iPad', 'Mac', 'Services', 'Wearables', 'Azure', 'Xbox', 'Surface', 'YouTube', 'Google Cloud', 'Google Search'):
@@ -314,6 +316,24 @@ class IntentRouter:
                 reasoning=f"Company '{', '.join(invalid_tickers)}' is outside the supported universe: {sorted(supported_tickers)}.",
                 query_plan=plan,
             )
+
+        # Safety net: if a query asks about filing disclosures for a supported company, never short-circuit as OUT_OF_SCOPE
+        if (
+            intent == IntentType.OUT_OF_SCOPE
+            and valid_tickers
+            and not is_realtime_news_query(original_query)
+            and re.search(
+                r"\b(?:10-k|10-q|20-f|sec\s+filing|item\s+\d+|disclos|filed\s+in|contracts?|thuyết\s+minh|báo\s+cáo)\b",
+                original_query,
+                re.IGNORECASE,
+            )
+            and not re.search(
+                r"\b(?:should\s+i\s+buy|should\s+i\s+sell|price\s+target|stock\s+price\s+tomorrow|predict)\b",
+                original_query,
+                re.IGNORECASE,
+            )
+        ):
+            intent = IntentType.TEXTUAL_RESEARCH
 
         # 2. Year parsing (Respect LLM's multi-year [] decision instead of single-year regex override)
         sp_raw_init = raw_data.get("sql_params") or {}
@@ -667,7 +687,11 @@ class IntentRouter:
                 json_mode=True,
             )
             data = json.loads(response.content)
-            return self._supervise_and_validate(data, query)
+            decision = self._supervise_and_validate(data, query)
+            if response.usage is not None:
+                usage_payload = response.usage.model_dump() | {"model": response.model}
+                return decision.model_copy(update={"token_usage": usage_payload})
+            return decision
 
         except Exception as exc:
             logger.warning("LLM Tool Planning encountered error: %s. Emitting safe fallback.", exc)
@@ -732,7 +756,7 @@ def router_node(state: AgentState, router: IntentRouter | None = None) -> dict[s
         "duration_ms": None,
     }
 
-    return {
+    state_update: dict[str, Any] = {
         "intent": decision.intent.value,
         "routing_decision": decision.model_dump(),
         "query_plan": decision.query_plan.model_dump() if decision.query_plan else None,
@@ -742,6 +766,9 @@ def router_node(state: AgentState, router: IntentRouter | None = None) -> dict[s
         "execution_strategy": decision.execution_strategy.value,
         "activity_timeline": [step_understanding, step_metrics],
     }
+    if decision.token_usage:
+        state_update["llm_usage"] = [decision.token_usage]
+    return state_update
 
 
 def route_next_step(state: AgentState) -> list[str] | str:

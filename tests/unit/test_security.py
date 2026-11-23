@@ -179,3 +179,83 @@ def test_privacy_first_traffic_telemetry_summary(tmp_path) -> None:
     resp = client.get("/api/telemetry")
     assert resp.status_code == 200
     assert "total_requests" in resp.json()
+
+
+def test_signed_cookie_user_isolation_and_tamper_rejection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify HMAC-signed HttpOnly cfi_uid cookie isolates users and rejects tampered cookies."""
+    from src.ai.agent.contracts import AgentResponse, IntentType
+    from src.api.security import USER_COOKIE_NAME, sign_user_id, verify_signed_user_id
+
+    monkeypatch.setenv("SESSION_COOKIE_SECRET", "unit-test-cookie-secret")
+    monkeypatch.setenv("ENABLE_S3_CHAT_HISTORY", "false")
+
+    mgr = ChatHistoryManager(s3_storage=None)
+    mgr._s3_enabled = False
+    mgr._s3 = None
+
+    mock_agent = MagicMock()
+    mock_agent.query.return_value = AgentResponse(
+        query="Apple revenue",
+        intent=IntentType.FINANCIAL_METRIC,
+        answer="Apple FY2024 revenue was $391B [1].",
+    )
+
+    app.dependency_overrides[get_chat_history] = lambda: mgr
+    app.dependency_overrides[get_research_agent] = lambda: mock_agent
+    try:
+        client_a = TestClient(app)
+        client_b = TestClient(app)
+
+        resp_a = client_a.post("/api/query", json={"query": "Apple revenue", "session_id": "user-a-sess"})
+        assert resp_a.status_code == 200
+        cookie_a = resp_a.cookies.get(USER_COOKIE_NAME)
+        assert cookie_a is not None
+        assert "HttpOnly" in resp_a.headers.get("set-cookie", "")
+        assert "SameSite=lax" in resp_a.headers.get("set-cookie", "")
+        assert verify_signed_user_id(cookie_a) is not None
+
+        # Tampered cookie must be rejected and replaced with a fresh user_id
+        tampered = cookie_a[:-4] + "0000"
+        assert verify_signed_user_id(tampered) is None
+
+        # Client B has a separate cookie and cannot see Client A's chat session
+        list_b = client_b.get("/api/history")
+        assert list_b.status_code == 200
+        assert not any(s["session_id"] == "user-a-sess" for s in list_b.json()["sessions"])
+        assert client_b.get("/api/history/user-a-sess").status_code == 404
+
+        # Client A can still access its own session
+        list_a = client_a.get("/api/history")
+        assert any(s["session_id"] == "user-a-sess" for s in list_a.json()["sessions"])
+        assert verify_signed_user_id(sign_user_id("11111111-1111-4111-8111-111111111111")) is not None
+    finally:
+        app.dependency_overrides.pop(get_chat_history, None)
+        app.dependency_overrides.pop(get_research_agent, None)
+
+
+def test_benchmark_sessions_filtered_and_legacy_cleanup() -> None:
+    """Verify benchmark junk sessions are not persisted/listed and legacy cleanup deletes only junk keys."""
+    from src.api.chat_history import is_benchmark_session_id
+
+    assert is_benchmark_session_id("prod50-P50-01")
+    assert is_benchmark_session_id("test-session-123")
+    assert is_benchmark_session_id("adversarial-session-s1-1795")
+    assert is_benchmark_session_id("edge-50-benchmark-1795")
+    assert not is_benchmark_session_id("0e3cf2d4-07bb-4889-a945-57a1eace99ab")
+
+    mock_s3 = MagicMock()
+    mock_s3.list_objects.return_value = [
+        "chat_history/prod50-P50-01.json",
+        "chat_history/adversarial-session-s1.json",
+        "chat_history/edge-50-benchmark-1.json",
+        "chat_history/test-session-123.json",
+        "chat_history/0e3cf2d4-07bb-4889-a945-57a1eace99ab.json",
+    ]
+    mgr = ChatHistoryManager(s3_storage=mock_s3)
+    mgr.add_user_message("prod50-P50-01", "benchmark prompt")
+    assert not mock_s3.upload_bytes.called
+    assert mgr.list_sessions() == []
+
+    cleanup = mgr.cleanup_legacy_benchmark_sessions()
+    assert cleanup == {"scanned": 5, "deleted": 4}
+    assert mock_s3.delete_object.call_count == 4

@@ -32,6 +32,36 @@ _AUTH_SECRET_PATTERN = re.compile(
     r"\b(password|passwd|secret|token|api_key|apikey)\s*[:=]\s*([^\s\[\]]+)", re.IGNORECASE
 )
 
+# Verified DeepSeek pricing (USD per 1M tokens) from docs/research/DEEPSEEK_API_COMPATIBILITY.md
+_DEEPSEEK_PRICING_PER_1M: tuple[tuple[str, tuple[float, float, float]], ...] = (
+    ("pro", (0.022, 0.66, 1.98)),
+    ("flash", (0.003, 0.15, 0.60)),
+)
+
+
+def estimate_deepseek_cost_usd(
+    model: str | None = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    cache_hit_tokens: int = 0,
+    cache_miss_tokens: int | None = None,
+) -> float:
+    """Estimate USD inference cost from verified DeepSeek token usage metrics."""
+    model_lower = (model or "deepseek-flash").lower()
+    hit_rate, miss_rate, out_rate = _DEEPSEEK_PRICING_PER_1M[1][1]
+    for marker, rates in _DEEPSEEK_PRICING_PER_1M:
+        if marker in model_lower:
+            hit_rate, miss_rate, out_rate = rates
+            break
+
+    p_tokens = max(0, int(prompt_tokens))
+    c_tokens = max(0, int(completion_tokens))
+    hits = max(0, min(p_tokens, int(cache_hit_tokens)))
+    misses = max(0, p_tokens - hits) if cache_miss_tokens is None else max(0, int(cache_miss_tokens))
+
+    cost = ((hits * hit_rate) + (misses * miss_rate) + (c_tokens * out_rate)) / 1_000_000.0
+    return round(cost, 8)
+
 
 def sanitize_query(query: str) -> str:
     """Sanitize and redact sensitive credentials or PII from raw query string.
@@ -78,6 +108,10 @@ class RunTelemetryRecord(BaseModel):
         description="Execution status per tool (e.g. {'financial_sql_tool': 'success'})",
     )
     latency_ms: float = Field(..., description="Total end-to-end execution latency in milliseconds")
+    prompt_tokens: int = Field(default=0, description="Total LLM prompt tokens consumed")
+    completion_tokens: int = Field(default=0, description="Total LLM completion tokens generated")
+    cache_hit_tokens: int = Field(default=0, description="Prompt tokens served from DeepSeek context cache")
+    estimated_cost_usd: float = Field(default=0.0, description="Estimated USD inference cost for this request")
     error_code: str | None = Field(
         default=None,
         description="Standardized error code if query encountered failures",
@@ -110,6 +144,10 @@ class TelemetryLogger:
         periods: list[str] | None = None,
         tools_called: list[str] | None = None,
         tool_status: dict[str, str] | None = None,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        cache_hit_tokens: int = 0,
+        estimated_cost_usd: float = 0.0,
         error_code: str | None = None,
     ) -> bool:
         """Serialize telemetry record and write append-only with concurrency protection.
@@ -132,6 +170,10 @@ class TelemetryLogger:
                 tools_called=tools_called or [],
                 tool_status=tool_status or {},
                 latency_ms=round(latency_ms, 2),
+                prompt_tokens=max(0, int(prompt_tokens)),
+                completion_tokens=max(0, int(completion_tokens)),
+                cache_hit_tokens=max(0, int(cache_hit_tokens)),
+                estimated_cost_usd=round(max(0.0, float(estimated_cost_usd)), 8),
                 error_code=error_code,
             )
 
@@ -195,6 +237,10 @@ def summarize_traffic_telemetry(
     ticker_counts: Counter[str] = Counter()
     tool_counts: Counter[str] = Counter()
     latencies: list[float] = []
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_cache_hit_tokens = 0
+    total_estimated_cost_usd = 0.0
 
     if src_path.exists():
         with open(src_path, encoding="utf-8") as f:
@@ -238,9 +284,25 @@ def summarize_traffic_telemetry(
                 if isinstance(lat, int | float) and lat >= 0:
                     latencies.append(float(lat))
 
+                pt = rec.get("prompt_tokens")
+                if isinstance(pt, int | float) and pt > 0:
+                    total_prompt_tokens += int(pt)
+                ct = rec.get("completion_tokens")
+                if isinstance(ct, int | float) and ct > 0:
+                    total_completion_tokens += int(ct)
+                cht = rec.get("cache_hit_tokens")
+                if isinstance(cht, int | float) and cht > 0:
+                    total_cache_hit_tokens += int(cht)
+                cost = rec.get("estimated_cost_usd")
+                if isinstance(cost, int | float) and cost > 0:
+                    total_estimated_cost_usd += float(cost)
+
     latencies.sort()
     p50 = round(statistics.median(latencies), 2) if latencies else 0.0
     p95 = round(latencies[min(len(latencies) - 1, int(0.95 * len(latencies)))], 2) if latencies else 0.0
+    cache_hit_rate_pct = (
+        round((total_cache_hit_tokens / total_prompt_tokens) * 100, 2) if total_prompt_tokens > 0 else 0.0
+    )
 
     summary: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -251,6 +313,12 @@ def summarize_traffic_telemetry(
         "abstention_rate_pct": round((abstention_count / total_requests) * 100, 2) if total_requests else 0.0,
         "latency_p50_ms": p50,
         "latency_p95_ms": p95,
+        "total_prompt_tokens": total_prompt_tokens,
+        "total_completion_tokens": total_completion_tokens,
+        "total_cache_hit_tokens": total_cache_hit_tokens,
+        "cache_hit_rate_pct": cache_hit_rate_pct,
+        "total_estimated_cost_usd": round(total_estimated_cost_usd, 6),
+        "avg_cost_per_request_usd": round(total_estimated_cost_usd / total_requests, 6) if total_requests else 0.0,
         "intent_breakdown": dict(intent_counts),
         "top_tickers": [{"ticker": k, "count": v} for k, v in ticker_counts.most_common(10)],
         "top_tools": [{"tool": k, "count": v} for k, v in tool_counts.most_common(10)],

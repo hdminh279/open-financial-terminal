@@ -1,9 +1,8 @@
 """Chat history management and MinIO S3 persistence engine.
 
-Provides session lifecycle tracking, conversation appending, and dual-layer persistence:
-in-memory caching for zero-latency retrieval and MinIO S3 object storage
-(bucket: sec-silver, key: chat_history/{session_id}.json) for immutable,
-reproducible data lakehouse audit trails.
+Provides user-isolated session lifecycle tracking, conversation appending, and
+dual-layer persistence: bounded in-memory LRU caching and MinIO S3 object storage
+(bucket: cfi-app-state, key: sessions/{user_id}/{session_id}.json).
 """
 
 import json
@@ -21,11 +20,24 @@ from src.api.contracts import (
     ChatSession,
     ChatSessionSummary,
 )
+from src.api.security import validate_user_id
 from src.data.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+BENCHMARK_SESSION_PREFIXES: tuple[str, ...] = (
+    "prod50-",
+    "test-session-",
+    "adversarial-",
+    "edge-50-",
+)
+
+
+def is_benchmark_session_id(session_id: str) -> bool:
+    """Return True for automated benchmark/test session IDs that must not pollute user history."""
+    sid = (session_id or "").strip().lower()
+    return any(sid.startswith(prefix) for prefix in BENCHMARK_SESSION_PREFIXES)
 
 
 def validate_session_id(session_id: str) -> str:
@@ -36,11 +48,12 @@ def validate_session_id(session_id: str) -> str:
 
 
 class ChatHistoryManager:
-    """Manages chat sessions with bounded local memory caching and MinIO S3 synchronization."""
+    """Manages per-user chat sessions with bounded LRU cache and MinIO S3 synchronization."""
 
-    BUCKET_NAME = "sec-silver"
-    KEY_PREFIX = "chat_history"
+    BUCKET_NAME = "cfi-app-state"
+    KEY_PREFIX = "sessions"
     MAX_CACHED_SESSIONS = 500
+    DEFAULT_USER_ID = "default_user"
 
     def __init__(self, s3_storage: S3Storage | None = None, max_sessions: int = MAX_CACHED_SESSIONS) -> None:
         """Initialize chat history manager with optional injected S3Storage adapter.
@@ -60,11 +73,23 @@ class ChatHistoryManager:
         if self._s3 is None and self._s3_enabled:
             self._init_s3()
 
-    def _put_cached_session(self, session_id: str, session: ChatSession) -> None:
+    @staticmethod
+    def _cache_key(user_id: str, session_id: str) -> str:
+        uid = validate_user_id(user_id)
+        sid = validate_session_id(session_id)
+        return f"{uid}:{sid}"
+
+    def _s3_key(self, user_id: str, session_id: str) -> str:
+        uid = validate_user_id(user_id)
+        sid = validate_session_id(session_id)
+        return f"{self.KEY_PREFIX}/{uid}/{sid}.json"
+
+    def _put_cached_session(self, user_id: str, session_id: str, session: ChatSession) -> None:
         """Store session in bounded LRU OrderedDict under lock."""
+        c_key = self._cache_key(user_id, session_id)
         with self._lock:
-            self._sessions[session_id] = session
-            self._sessions.move_to_end(session_id)
+            self._sessions[c_key] = session
+            self._sessions.move_to_end(c_key)
             while len(self._sessions) > self._max_sessions:
                 self._sessions.popitem(last=False)
 
@@ -82,30 +107,27 @@ class ChatHistoryManager:
             self._s3 = None
             return None
 
-    def get_or_create_session(self, session_id: str | None = None) -> ChatSession:
-        """Retrieve an existing session or initialize a new one.
-
-        Args:
-            session_id: Optional existing session UUID.
-
-        Returns:
-            Active ChatSession instance.
-        """
+    def get_or_create_session(
+        self,
+        session_id: str | None = None,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> ChatSession:
+        """Retrieve an existing user-scoped session or initialize a new one."""
+        uid = validate_user_id(user_id)
         if session_id is not None:
             validate_session_id(session_id)
+            c_key = self._cache_key(uid, session_id)
+            with self._lock:
+                if c_key in self._sessions:
+                    self._sessions.move_to_end(c_key)
+                    return self._sessions[c_key]
 
-        with self._lock:
-            if session_id and session_id in self._sessions:
-                self._sessions.move_to_end(session_id)
-                return self._sessions[session_id]
-
-        # Try loading from S3 if session_id is provided but not in memory
-        s3 = self._init_s3()
-        if session_id and s3 is not None:
-            persisted = self._load_from_s3(session_id)
-            if persisted:
-                self._put_cached_session(session_id, persisted)
-                return persisted
+            s3 = self._init_s3()
+            if s3 is not None and not is_benchmark_session_id(session_id):
+                persisted = self._load_from_s3(session_id, user_id=uid)
+                if persisted:
+                    self._put_cached_session(uid, session_id, persisted)
+                    return persisted
 
         # Create brand-new session (lazy persistence: only saved to S3 when first message is added)
         new_id = session_id or str(uuid.uuid4())
@@ -117,26 +139,22 @@ class ChatHistoryManager:
             updated_at=now,
             messages=[],
         )
-        self._put_cached_session(new_id, session)
+        self._put_cached_session(uid, new_id, session)
         return session
 
-    def add_user_message(self, session_id: str, content: str) -> ChatMessage:
-        """Append a user message to the session.
-
-        Args:
-            session_id: Target session UUID.
-            content: Query string submitted by user.
-
-        Returns:
-            Constructed ChatMessage instance.
-        """
-        session = self.get_or_create_session(session_id)
+    def add_user_message(
+        self,
+        session_id: str,
+        content: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> ChatMessage:
+        """Append a user message to the user-scoped session."""
+        uid = validate_user_id(user_id)
+        session = self.get_or_create_session(session_id, user_id=uid)
         msg_id = str(uuid.uuid4())
         now = datetime.now(UTC).isoformat()
 
-        # Update title from first user query if still default
         if session.title == "New Research Session" and content.strip():
-            # Truncate clean title
             cleaned = content.strip().replace("\n", " ")
             session.title = cleaned[:60] + "..." if len(cleaned) > 60 else cleaned
 
@@ -148,7 +166,7 @@ class ChatHistoryManager:
         )
         session.messages.append(msg)
         session.updated_at = now
-        self._persist_to_s3(session)
+        self._persist_to_s3(session, user_id=uid)
         return msg
 
     def add_assistant_message(
@@ -156,18 +174,11 @@ class ChatHistoryManager:
         session_id: str,
         content: str,
         metadata: dict[str, Any] | None = None,
+        user_id: str = DEFAULT_USER_ID,
     ) -> ChatMessage:
-        """Append an assistant response to the session.
-
-        Args:
-            session_id: Target session UUID.
-            content: Synthesized answer text.
-            metadata: Structured telemetry, citations, intent, or charts.
-
-        Returns:
-            Constructed ChatMessage instance.
-        """
-        session = self.get_or_create_session(session_id)
+        """Append an assistant response to the user-scoped session."""
+        uid = validate_user_id(user_id)
+        session = self.get_or_create_session(session_id, user_id=uid)
         msg_id = str(uuid.uuid4())
         now = datetime.now(UTC).isoformat()
 
@@ -180,60 +191,76 @@ class ChatHistoryManager:
         )
         session.messages.append(msg)
         session.updated_at = now
-        self._persist_to_s3(session)
+        self._persist_to_s3(session, user_id=uid)
         return msg
 
-    def get_session(self, session_id: str) -> ChatSession | None:
-        """Fetch session by ID with lazy loading from S3."""
+    def get_session(self, session_id: str, user_id: str = DEFAULT_USER_ID) -> ChatSession | None:
+        """Fetch user-scoped session by ID with lazy loading from S3."""
+        uid = validate_user_id(user_id)
         validate_session_id(session_id)
+        c_key = self._cache_key(uid, session_id)
         with self._lock:
-            if session_id in self._sessions:
-                self._sessions.move_to_end(session_id)
-                return self._sessions[session_id]
+            if c_key in self._sessions:
+                self._sessions.move_to_end(c_key)
+                return self._sessions[c_key]
 
         s3 = self._init_s3()
-        if s3 is not None:
-            persisted = self._load_from_s3(session_id)
+        if s3 is not None and not is_benchmark_session_id(session_id):
+            persisted = self._load_from_s3(session_id, user_id=uid)
             if persisted:
-                self._put_cached_session(session_id, persisted)
+                self._put_cached_session(uid, session_id, persisted)
                 return persisted
 
         return None
 
-    def list_sessions(self) -> list[ChatSessionSummary]:
-        """Return summaries of all available sessions ordered by recency.
+    def list_sessions(self, user_id: str = DEFAULT_USER_ID) -> list[ChatSessionSummary]:
+        """Return summaries of user-scoped sessions ordered by recency, excluding benchmark sessions."""
+        uid = validate_user_id(user_id)
+        prefix = f"{self.KEY_PREFIX}/{uid}/"
+        cache_prefix = f"{uid}:"
 
-        Reconciles memory cache with authoritative MinIO S3 Lakehouse state,
-        pruning empty or orphaned zombie files.
-        """
         s3 = self._init_s3()
         if self._s3_enabled and s3 is not None:
             try:
-                keys = s3.list_objects(self.BUCKET_NAME, f"{self.KEY_PREFIX}/")
-                active_s3_ids = set()
+                keys = s3.list_objects(self.BUCKET_NAME, prefix)
+                active_s3_ids: set[str] = set()
                 for key in keys:
                     if not key.endswith(".json"):
                         continue
                     sid = key.split("/")[-1].replace(".json", "")
+                    if is_benchmark_session_id(sid):
+                        continue
                     active_s3_ids.add(sid)
-                    if sid not in self._sessions:
-                        persisted = self._load_from_s3(sid)
+                    c_key = self._cache_key(uid, sid)
+                    if c_key not in self._sessions:
+                        persisted = self._load_from_s3(sid, user_id=uid)
                         if persisted:
-                            self._sessions[sid] = persisted
+                            self._put_cached_session(uid, sid, persisted)
 
-                # Reconcile: remove memory sessions that no longer exist in S3
-                for mem_id in list(self._sessions.keys()):
-                    if mem_id not in active_s3_ids and len(self._sessions[mem_id].messages) > 0:
-                        del self._sessions[mem_id]
+                with self._lock:
+                    for c_key in list(self._sessions.keys()):
+                        if not c_key.startswith(cache_prefix):
+                            continue
+                        sid = c_key[len(cache_prefix) :]
+                        if sid not in active_s3_ids and len(self._sessions[c_key].messages) > 0:
+                            del self._sessions[c_key]
             except Exception as exc:
                 logger.warning("Failed to sync chat sessions from MinIO S3: %s", exc)
 
         summaries: list[ChatSessionSummary] = []
-        for session in list(self._sessions.values()):
-            # Prune empty sessions from both storage and summaries
+        with self._lock:
+            user_entries = [
+                (c_key[len(cache_prefix) :], sess)
+                for c_key, sess in self._sessions.items()
+                if c_key.startswith(cache_prefix)
+            ]
+
+        for sid, session in user_entries:
+            if is_benchmark_session_id(sid):
+                continue
             if len(session.messages) == 0:
                 if self._s3_enabled and s3 is not None:
-                    self.delete_session(session.session_id)
+                    self.delete_session(session.session_id, user_id=uid)
                 continue
 
             summaries.append(
@@ -246,22 +273,23 @@ class ChatHistoryManager:
                 )
             )
 
-        # Sort descending by updated_at
         summaries.sort(key=lambda s: s.updated_at, reverse=True)
         return summaries
 
-    def delete_session(self, session_id: str) -> bool:
-        """Remove a session from memory and MinIO storage."""
+    def delete_session(self, session_id: str, user_id: str = DEFAULT_USER_ID) -> bool:
+        """Remove a user-scoped session from memory and MinIO storage."""
+        uid = validate_user_id(user_id)
         validate_session_id(session_id)
+        c_key = self._cache_key(uid, session_id)
         existed = False
         with self._lock:
-            if session_id in self._sessions:
-                del self._sessions[session_id]
+            if c_key in self._sessions:
+                del self._sessions[c_key]
                 existed = True
 
         s3 = self._init_s3()
         if s3 is not None:
-            key = f"{self.KEY_PREFIX}/{session_id}.json"
+            key = self._s3_key(uid, session_id)
             try:
                 if s3.object_exists(self.BUCKET_NAME, key):
                     s3.delete_object(self.BUCKET_NAME, key)
@@ -271,20 +299,19 @@ class ChatHistoryManager:
 
         return existed
 
-    def _persist_to_s3(self, session: ChatSession) -> None:
-        """Upload serialized session JSON to MinIO S3 bucket sec-silver."""
-        if not self._s3_enabled:
-            return
-        # Do not persist empty sessions
-        if not session.messages:
+    def _persist_to_s3(self, session: ChatSession, user_id: str = DEFAULT_USER_ID) -> None:
+        """Upload serialized session JSON to MinIO S3 bucket cfi-app-state."""
+        if not self._s3_enabled or not session.messages or is_benchmark_session_id(session.session_id):
             return
 
         s3 = self._init_s3()
         if s3 is None:
             return
 
-        key = f"{self.KEY_PREFIX}/{session.session_id}.json"
+        uid = validate_user_id(user_id)
+        key = self._s3_key(uid, session.session_id)
         try:
+            s3.ensure_buckets_exist([self.BUCKET_NAME])
             payload = session.model_dump_json(indent=2).encode("utf-8")
             # Sanitize metadata to pure ASCII to prevent S3 HTTP header validation failure on non-ASCII titles
             safe_title = session.title.encode("ascii", "ignore").decode("ascii").strip() or "Chat Session"
@@ -294,6 +321,7 @@ class ChatHistoryManager:
                 data=payload,
                 content_type="application/json",
                 metadata={
+                    "user_id": uid,
                     "session_id": session.session_id,
                     "title_ascii": safe_title[:50],
                     "message_count": str(len(session.messages)),
@@ -304,13 +332,13 @@ class ChatHistoryManager:
         except Exception as exc:
             logger.warning("Could not persist chat session %s to MinIO S3: %s", session.session_id, exc)
 
-    def _load_from_s3(self, session_id: str) -> ChatSession | None:
-        """Download and deserialize session JSON from MinIO S3 bucket sec-silver."""
+    def _load_from_s3(self, session_id: str, user_id: str = DEFAULT_USER_ID) -> ChatSession | None:
+        """Download and deserialize user-scoped session JSON from MinIO S3 bucket cfi-app-state."""
         s3 = self._init_s3()
         if s3 is None:
             return None
 
-        key = f"{self.KEY_PREFIX}/{session_id}.json"
+        key = self._s3_key(user_id, session_id)
         try:
             if not s3.object_exists(self.BUCKET_NAME, key):
                 return None
@@ -321,3 +349,23 @@ class ChatHistoryManager:
         except Exception as exc:
             logger.warning("Failed to retrieve chat session %s from S3: %s", session_id, exc)
             return None
+
+    def cleanup_legacy_benchmark_sessions(
+        self,
+        legacy_bucket: str = "sec-silver",
+        legacy_prefix: str = "chat_history/",
+    ) -> dict[str, int]:
+        """Delete benchmark/test junk session objects from legacy sec-silver/chat_history/."""
+        s3 = self._init_s3()
+        if s3 is None:
+            return {"scanned": 0, "deleted": 0}
+
+        deleted = 0
+        keys = s3.list_objects(legacy_bucket, legacy_prefix)
+        for key in keys:
+            filename = key.rsplit("/", 1)[-1]
+            sid = filename[:-5] if filename.endswith(".json") else filename
+            if is_benchmark_session_id(sid):
+                s3.delete_object(legacy_bucket, key)
+                deleted += 1
+        return {"scanned": len(keys), "deleted": deleted}

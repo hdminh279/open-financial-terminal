@@ -6,6 +6,7 @@ and houses the LangGraph workflow structure.
 
 import logging
 import re
+import threading
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -46,15 +47,20 @@ _SHARED_SQL_TOOL: FinancialSQLTool | None = None
 _SHARED_RETRIEVER: HybridRetriever | None = None
 _SHARED_WEB_TOOL: WebSearchTool | None = None
 _COMPANY_FORM_MAP: dict[str, str] | None = None
+_TOOL_INIT_LOCK = threading.Lock()
 
 
 def _load_company_form_map() -> dict[str, str]:
     """Load cached mapping of ticker -> annual filing form ('10-K', '20-F', etc.)."""
     global _COMPANY_FORM_MAP
     if _COMPANY_FORM_MAP is None:
-        _COMPANY_FORM_MAP = {
-            str(c["ticker"]).upper(): str(c.get("form_type", "10-K")) for c in load_company_catalog() if c.get("ticker")
-        }
+        with _TOOL_INIT_LOCK:
+            if _COMPANY_FORM_MAP is None:
+                _COMPANY_FORM_MAP = {
+                    str(c["ticker"]).upper(): str(c.get("form_type", "10-K"))
+                    for c in load_company_catalog()
+                    if c.get("ticker")
+                }
     return _COMPANY_FORM_MAP
 
 
@@ -144,7 +150,9 @@ def get_sql_tool() -> FinancialSQLTool:
     """Retrieve or lazily initialize the shared FinancialSQLTool instance."""
     global _SHARED_SQL_TOOL
     if _SHARED_SQL_TOOL is None:
-        _SHARED_SQL_TOOL = FinancialSQLTool()
+        with _TOOL_INIT_LOCK:
+            if _SHARED_SQL_TOOL is None:
+                _SHARED_SQL_TOOL = FinancialSQLTool()
     return _SHARED_SQL_TOOL
 
 
@@ -152,7 +160,9 @@ def get_retriever() -> HybridRetriever:
     """Retrieve or lazily initialize the shared HybridRetriever instance."""
     global _SHARED_RETRIEVER
     if _SHARED_RETRIEVER is None:
-        _SHARED_RETRIEVER = HybridRetriever()
+        with _TOOL_INIT_LOCK:
+            if _SHARED_RETRIEVER is None:
+                _SHARED_RETRIEVER = HybridRetriever()
     return _SHARED_RETRIEVER
 
 
@@ -160,12 +170,14 @@ def get_web_tool() -> WebSearchTool:
     """Retrieve or lazily initialize the shared WebSearchTool instance."""
     global _SHARED_WEB_TOOL
     if _SHARED_WEB_TOOL is None:
-        _SHARED_WEB_TOOL = WebSearchTool(
-            timeout=10,
-            max_retries=3,
-            cache_ttl_seconds=300,
-            enable_rss_fallback=True,
-        )
+        with _TOOL_INIT_LOCK:
+            if _SHARED_WEB_TOOL is None:
+                _SHARED_WEB_TOOL = WebSearchTool(
+                    timeout=10,
+                    max_retries=3,
+                    cache_ttl_seconds=300,
+                    enable_rss_fallback=True,
+                )
     return _SHARED_WEB_TOOL
 
 

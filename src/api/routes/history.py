@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from src.api.chat_history import ChatHistoryManager
 from src.api.contracts import ChatSession, ChatSessionListResponse
 from src.api.deps import get_chat_history
+from src.api.security import get_current_user_id
 
 router = APIRouter(prefix="/history", tags=["Chat History"])
 
@@ -22,9 +23,10 @@ router = APIRouter(prefix="/history", tags=["Chat History"])
 )
 def list_chat_sessions(
     history: ChatHistoryManager = Depends(get_chat_history),
+    user_id: str = Depends(get_current_user_id),
 ) -> ChatSessionListResponse:
-    """Return all conversation sessions."""
-    summaries = history.list_sessions()
+    """Return all conversation sessions for the active user."""
+    summaries = history.list_sessions(user_id=user_id)
     return ChatSessionListResponse(sessions=summaries)
 
 
@@ -38,10 +40,11 @@ def list_chat_sessions(
 def get_chat_session(
     session_id: str,
     history: ChatHistoryManager = Depends(get_chat_history),
+    user_id: str = Depends(get_current_user_id),
 ) -> ChatSession:
-    """Return specific session or 404 if not found."""
+    """Return specific user-scoped session or 404 if not found."""
     try:
-        session = history.get_session(session_id)
+        session = history.get_session(session_id, user_id=user_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -59,15 +62,16 @@ def get_chat_session(
     "/{session_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete conversation session",
-    description="Removes session from memory and deletes backing JSON object from MinIO S3 bucket sec-silver.",
+    description="Removes session from memory and deletes backing JSON object from MinIO S3 bucket cfi-app-state.",
 )
 def delete_chat_session(
     session_id: str,
     history: ChatHistoryManager = Depends(get_chat_history),
+    user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    """Remove conversation session."""
+    """Remove user-scoped conversation session."""
     try:
-        deleted = history.delete_session(session_id)
+        deleted = history.delete_session(session_id, user_id=user_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

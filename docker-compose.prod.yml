@@ -78,4 +78,5 @@ services:
 
 networks:
   cfi_internal:
+    name: cfi_internal
     driver: bridge

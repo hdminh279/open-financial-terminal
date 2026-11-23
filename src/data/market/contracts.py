@@ -77,7 +77,7 @@ class WatchlistItem(BaseModel):
 
 
 class WatchlistConfig(BaseModel):
-    """Persistent watchlist schema stored in Lakehouse (sec-silver/user_settings/watchlist.json)."""
+    """Persistent watchlist schema stored in MinIO (cfi-app-state/watchlist/{user_id}.json)."""
 
     version: str = Field("1.0", description="Configuration schema version")
     user_id: str = Field("default_user", description="Owner identifier (defaults to single user)")
@@ -86,10 +86,13 @@ class WatchlistConfig(BaseModel):
 
 
 class WatchlistResponse(BaseModel):
-    """Enriched watchlist response payload containing live quotes for the client."""
+    """Enriched watchlist response payload containing paginated live quotes for the client."""
 
     items: list[StockQuote] = Field(default_factory=list, description="Live quote snapshots for watched tickers")
-    total: int = Field(0, description="Total count of items in watchlist")
+    total: int = Field(0, description="Total count of items in watchlist (after optional market filter)")
+    page: int = Field(1, ge=1, description="Current 1-based page number")
+    page_size: int = Field(20, ge=1, description="Maximum items per page")
+    total_pages: int = Field(1, ge=1, description="Total number of pages")
     updated_at: str = Field(..., description="ISO 8601 UTC timestamp of generation")
 
 

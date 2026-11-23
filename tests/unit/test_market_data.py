@@ -313,3 +313,67 @@ class TestWatchlistAPI:
         tickers = {item["ticker"] for item in data}
         assert "AAPL" in tickers
         assert "FPT" in tickers
+
+    def test_get_watchlist_pagination_and_market_filter(self, test_client: TestClient) -> None:
+        """Verify GET /api/watchlist paginates items cleanly and filters by market."""
+        resp_p1 = test_client.get("/api/watchlist?page=1&page_size=10")
+        assert resp_p1.status_code == 200
+        d1 = resp_p1.json()
+        assert d1["page"] == 1
+        assert d1["page_size"] == 10
+        assert len(d1["items"]) == 10
+        assert d1["total_pages"] >= 10
+
+        resp_vn = test_client.get("/api/watchlist?page=1&page_size=20&market=VN")
+        assert resp_vn.status_code == 200
+        d_vn = resp_vn.json()
+        assert d_vn["total"] >= 3
+        assert all(item["market"] == "VN" for item in d_vn["items"])
+
+
+def test_quote_service_finnhub_limiter_and_no_429_cache() -> None:
+    """Verify QuoteService enforces <=0.9 req/s Finnhub limiter, skips caching ERROR, and serves stale quotes."""
+    mock_provider = MagicMock()
+    mock_provider.market = Market.US
+    factory = QuoteProviderFactory(us_provider=mock_provider, vn_provider=mock_provider)
+
+    svc = QuoteService(factory=factory, ttl_seconds=0.05)
+    assert svc.finnhub_rate_limiter.rate <= 0.9
+
+    # 1. Transient ERROR (e.g. HTTP 429) must NOT be cached
+    mock_provider.fetch_quote.return_value = StockQuote(
+        ticker="AAPL",
+        market=Market.US,
+        price=None,
+        as_of="2026-11-23T12:00:00Z",
+        status=QuoteStatus.ERROR,
+    )
+    err_q = svc.get_quote("AAPL")
+    assert err_q.status == QuoteStatus.ERROR
+    assert "AAPL" not in svc._cache
+
+    # 2. Successful fetch gets cached; when TTL expires and next fetch fails, stale valid price is served
+    mock_provider.fetch_quote.return_value = StockQuote(
+        ticker="AAPL",
+        market=Market.US,
+        price=225.0,
+        as_of="2026-11-23T12:00:01Z",
+        status=QuoteStatus.REAL_TIME,
+    )
+    ok_q = svc.get_quote("AAPL")
+    assert ok_q.price == 225.0
+
+    import time as _time
+
+    _time.sleep(0.06)
+    mock_provider.fetch_quote.return_value = StockQuote(
+        ticker="AAPL",
+        market=Market.US,
+        price=None,
+        as_of="2026-11-23T12:00:02Z",
+        status=QuoteStatus.ERROR,
+    )
+    stale_q = svc.get_quote("AAPL")
+    assert stale_q.price == 225.0
+    assert stale_q.status == QuoteStatus.DELAYED
+    assert stale_q.is_delayed is True

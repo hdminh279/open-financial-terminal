@@ -47,6 +47,7 @@ class DuckDBFinancialRepository:
         self.ratios_path = ratios_path or default_ratio
 
         self.conn = connection or duckdb.connect(":memory:")
+        self._is_real_duckdb = isinstance(self.conn, duckdb.DuckDBPyConnection)
         self._lock = threading.Lock()
         self._schema_cache: dict[str, set[str]] = {}
 
@@ -57,29 +58,54 @@ class DuckDBFinancialRepository:
                 # Lock runtime config so DuckDB S3 credentials/endpoints cannot be altered
                 self.conn.execute("SET lock_configuration = true;")
 
+    def _run_cursor_query(
+        self,
+        sql: str,
+        params: list[Any] | None = None,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Run a read-only query using a dedicated DuckDB cursor for concurrent thread safety."""
+        if self._is_real_duckdb:
+            cursor = self.conn.cursor()
+            try:
+                res = cursor.execute(sql, params) if params is not None else cursor.execute(sql)
+                columns = [desc[0] for desc in (res.description or [])]
+                rows = res.fetchall()
+                return columns, rows
+            finally:
+                cursor.close()
+
+        # Fallback for injected mock connections in unit tests
+        with self._lock:
+            res = self.conn.execute(sql, params) if params is not None else self.conn.execute(sql)
+            columns = [desc[0] for desc in (res.description or [])]
+            rows = res.fetchall()
+            return columns, rows
+
     def _has_column(self, parquet_path: str, column_name: str) -> bool:
         """Check whether a Parquet dataset contains a given column (cached per path)."""
         with self._lock:
-            if parquet_path not in self._schema_cache:
-                try:
-                    rows = self.conn.execute(
-                        "DESCRIBE SELECT * FROM read_parquet(?)",
-                        [parquet_path],
-                    ).fetchall()
-                    self._schema_cache[parquet_path] = {str(r[0]).lower() for r in rows}
-                except (duckdb.Error, OSError):
-                    self._schema_cache[parquet_path] = set()
-            return column_name.lower() in self._schema_cache[parquet_path]
+            cached = self._schema_cache.get(parquet_path)
+        if cached is None:
+            try:
+                _, rows = self._run_cursor_query(
+                    "DESCRIBE SELECT * FROM read_parquet(?)",
+                    [parquet_path],
+                )
+                cols = {str(r[0]).lower() for r in rows}
+            except (duckdb.Error, OSError):
+                cols = set()
+            with self._lock:
+                self._schema_cache[parquet_path] = cols
+                cached = cols
+        return column_name.lower() in cached
 
     def execute_fetchall(self, sql: str, params: list[Any] | None = None) -> list[tuple[Any, ...]]:
-        """Execute a parameterized read-only query safely under the repository lock."""
+        """Execute a parameterized read-only query concurrently via a per-query cursor."""
         stripped = (sql or "").strip()
         if not _READ_ONLY_SQL_RE.match(stripped) or _MUTATING_SQL_RE.search(stripped):
             raise DatabaseExecutionError("Write or multi-statement SQL operations are blocked in read-only mode.")
-        with self._lock:
-            if params is not None:
-                return self.conn.execute(sql, params).fetchall()
-            return self.conn.execute(sql).fetchall()
+        _, rows = self._run_cursor_query(sql, params)
+        return rows
 
     @staticmethod
     def resolve_default_paths() -> tuple[str, str]:
@@ -123,12 +149,16 @@ class DuckDBFinancialRepository:
         access_key = os.getenv("S3_ACCESS_KEY", "minioadmin")
         secret_key = os.getenv("S3_SECRET_KEY", "minioadmin")
 
-        self.conn.execute("INSTALL httpfs; LOAD httpfs;")
-        self.conn.execute(f"SET s3_endpoint='{s3_endpoint}';")
-        self.conn.execute(f"SET s3_access_key_id='{access_key}';")
-        self.conn.execute(f"SET s3_secret_access_key='{secret_key}';")
-        self.conn.execute("SET s3_use_ssl=false;")
-        self.conn.execute("SET s3_url_style='path';")
+        try:
+            self.conn.execute("LOAD httpfs;")
+        except duckdb.Error:
+            self.conn.execute("INSTALL httpfs; LOAD httpfs;")
+        # SET GLOBAL ensures spawned per-query cursors inherit S3 configuration
+        self.conn.execute(f"SET GLOBAL s3_endpoint='{s3_endpoint}';")
+        self.conn.execute(f"SET GLOBAL s3_access_key_id='{access_key}';")
+        self.conn.execute(f"SET GLOBAL s3_secret_access_key='{secret_key}';")
+        self.conn.execute("SET GLOBAL s3_use_ssl=false;")
+        self.conn.execute("SET GLOBAL s3_url_style='path';")
 
     def query_metric(self, query: FinancialQueryInput) -> list[dict[str, Any]]:
         """Execute parameterized query across multiple tickers, metrics, years, and periods.
@@ -261,10 +291,7 @@ class DuckDBFinancialRepository:
         )
 
         try:
-            with self._lock:
-                cursor = self.conn.execute(full_sql, params)
-                columns = [desc[0] for desc in cursor.description]
-                rows = cursor.fetchall()
+            columns, rows = self._run_cursor_query(full_sql, params)
         except (duckdb.Error, OSError) as exc:
             raise DatabaseExecutionError(f"Database query execution failed: {exc}") from exc
 

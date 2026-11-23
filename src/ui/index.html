@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Corporate Filing Intelligence | Open Financial Terminal</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261122_v8">
+  <link rel="stylesheet" href="/static/styles.css?v=20261123_v9">
   <!-- Chart.js for High-Fidelity Financial Canvas Visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <!-- Marked.js for Markdown Formatting & DOMPurify for XSS Sanitization -->
@@ -457,6 +457,11 @@
           <div class="spinner-ring"></div>
           <span>Đang tải thị giá thời gian thực...</span>
         </div>
+        <div class="stock-pagination-bar" id="stock-pagination-bar" style="display: none;">
+          <button type="button" class="btn-pagination" id="stock-prev-page" disabled>← Trang trước</button>
+          <span class="pagination-info" id="stock-page-info">Trang 1 / 1</span>
+          <button type="button" class="btn-pagination" id="stock-next-page" disabled>Trang sau →</button>
+        </div>
       </section>
     </main>
   </div>
@@ -564,6 +569,6 @@
   </aside>
 
   <!-- Application Controller Scripts -->
-  <script src="/static/app.js?v=20261122_v8"></script>
+  <script src="/static/app.js?v=20261123_v10"></script>
 </body>
 </html>

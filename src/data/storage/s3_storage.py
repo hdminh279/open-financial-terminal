@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class S3Storage:
     """Gateway adapter for local MinIO S3-compatible storage."""
 
-    DEFAULT_BUCKETS: tuple[str, ...] = ("sec-bronze", "sec-silver", "sec-gold")
+    DEFAULT_BUCKETS: tuple[str, ...] = ("sec-bronze", "sec-silver", "sec-gold", "cfi-app-state")
 
     def __init__(
         self,

@@ -1,12 +1,16 @@
-"""API security middleware: IP Token Bucket rate limiting, CORS config, and security headers."""
+"""API security middleware: IP Token Bucket rate limiting, CORS config, signed cookies, and security headers."""
 
+import hashlib
+import hmac
 import os
 import re
+import secrets
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 
-from fastapi import Request, status
+from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -188,6 +192,72 @@ def reset_rate_limiters() -> None:
     _general_limiter.reset()
 
 
+# ---------------------------------------------------------------------------
+# Signed HttpOnly Cookie User Isolation
+# ---------------------------------------------------------------------------
+
+USER_COOKIE_NAME = "cfi_uid"
+USER_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+_EPHEMERAL_COOKIE_SECRET = secrets.token_hex(32)
+_UUID_V4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_SAFE_USER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _get_cookie_secret() -> bytes:
+    """Resolve HMAC signing secret from env, falling back to a process-scoped CSPRNG secret."""
+    secret = os.getenv("SESSION_COOKIE_SECRET", "").strip() or _EPHEMERAL_COOKIE_SECRET
+    return secret.encode("utf-8")
+
+
+def validate_user_id(user_id: str) -> str:
+    """Validate user_id format to prevent S3 key path traversal."""
+    if not user_id or not _SAFE_USER_ID_RE.match(user_id):
+        raise ValueError("Invalid user_id: must be 1-64 alphanumeric, hyphen, or underscore characters.")
+    return user_id
+
+
+def sign_user_id(user_id: str) -> str:
+    """Sign a user_id using HMAC-SHA256 for tamper-proof cookie storage."""
+    uid = validate_user_id(user_id)
+    sig = hmac.new(_get_cookie_secret(), uid.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{uid}.{sig}"
+
+
+def verify_signed_user_id(cookie_value: str | None) -> str | None:
+    """Verify HMAC signature and UUIDv4 format of cfi_uid cookie; return user_id or None."""
+    if not cookie_value or "." not in cookie_value:
+        return None
+    uid, sig = cookie_value.rsplit(".", 1)
+    if not _UUID_V4_RE.match(uid) or len(sig) != 64:
+        return None
+    expected_sig = hmac.new(_get_cookie_secret(), uid.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        return None
+    return uid
+
+
+def get_current_user_id(request: Request, response: Response) -> str:
+    """FastAPI dependency resolving or issuing an isolated HMAC-signed HttpOnly user_id cookie."""
+    existing = verify_signed_user_id(request.cookies.get(USER_COOKIE_NAME))
+    if existing is not None:
+        return existing
+
+    new_uid = str(uuid.uuid4())
+    signed_val = sign_user_id(new_uid)
+    is_https = request.headers.get("x-forwarded-proto", "").lower() == "https"
+    is_prod = os.getenv("APP_ENV", "local").lower() in ("prod", "production")
+    response.set_cookie(
+        key=USER_COOKIE_NAME,
+        value=signed_val,
+        max_age=USER_COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=is_https or is_prod,
+        path="/",
+    )
+    return new_uid
+
+
 class SecurityHardeningMiddleware(BaseHTTPMiddleware):
     """Enforce per-IP rate limits on /api/* and attach HTTP security headers."""
 
@@ -208,7 +278,7 @@ class SecurityHardeningMiddleware(BaseHTTPMiddleware):
 
         if path.startswith("/api/") and path != "/api/health":
             client_ip = extract_client_ip(request)
-            limiter = _query_limiter if path == "/api/query" else _general_limiter
+            limiter = _query_limiter if path in ("/api/query", "/api/query/stream") else _general_limiter
             allowed, retry_after = limiter.allow(client_ip)
             if not allowed:
                 return JSONResponse(

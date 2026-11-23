@@ -62,5 +62,7 @@ class AgentState(TypedDict, total=False):
     report_sections: list[dict[str, Any]]
 
     # 6. Pipeline Execution Metrics
+    stream_mode: bool
+    llm_usage: Annotated[list[dict[str, Any]], timeline_reducer]
     execution_time_ms: float
     error: str | None

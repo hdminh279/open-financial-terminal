@@ -156,3 +156,56 @@ class TestCorpusSyncEngine:
             # Run again
             engine.sync()
             assert len(storage.scroll_all_ids()) == 1
+
+    def test_load_chunks_backward_compatible_legacy_and_hive(self, sync_test_setup) -> None:
+        """Verify CorpusSyncEngine reads legacy text_chunks.parquet, Hive partitions, and merges without duplicates."""
+        import io
+
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from src.data.pipelines.text_pipeline import CHUNK_PARQUET_SCHEMA
+
+        engine, _ = sync_test_setup
+
+        def _make_parquet(rows: list[dict]) -> bytes:
+            tbl = pa.Table.from_pylist(rows, schema=CHUNK_PARQUET_SCHEMA)
+            buf = io.BytesIO()
+            pq.write_table(tbl, buf)
+            return buf.getvalue()
+
+        def _row(cid: str, ticker: str) -> dict:
+            return {
+                "chunk_id": cid,
+                "cik": "0000320193",
+                "ticker": ticker,
+                "accession_number": "acc-1",
+                "form": "10-K",
+                "fiscal_year": 2024,
+                "filed_date": "2024-11-01",
+                "period_end": "2024-09-28",
+                "part": "PART I",
+                "item": "ITEM 1",
+                "subsection": None,
+                "content_type": "text",
+                "chunk_index": 0,
+                "token_count": 100,
+                "text": f"text for {ticker}",
+                "source_url": "https://sec.gov/sample",
+                "source_content_hash": f"hash_{cid}",
+            }
+
+        legacy_bytes = _make_parquet([_row("aapl_old", "AAPL"), _row("msft_legacy", "MSFT")])
+        hive_aapl_bytes = _make_parquet([_row("aapl_hive", "AAPL")])
+
+        engine.s3.list_objects.return_value = [
+            "chunks/text_chunks.parquet",
+            "chunks/ticker=AAPL/chunks.parquet",
+        ]
+        engine.s3.download_bytes.side_effect = lambda bucket, key: (
+            hive_aapl_bytes if key == "chunks/ticker=AAPL/chunks.parquet" else legacy_bytes
+        )
+
+        loaded = engine.load_chunks_from_parquet()
+        loaded_ids = {c["chunk_id"] for c in loaded}
+        assert loaded_ids == {"aapl_hive", "msft_legacy"}

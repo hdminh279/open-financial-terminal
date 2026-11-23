@@ -148,6 +148,8 @@ def test_query_persists_activity_timeline_and_ui_serves_task_18_1_components(
         execution_time_ms=155.4,
     )
 
+    from src.api.security import verify_signed_user_id
+
     app.dependency_overrides[get_chat_history] = lambda: mgr
     app.dependency_overrides[get_research_agent] = lambda: mock_agent
     try:
@@ -155,7 +157,9 @@ def test_query_persists_activity_timeline_and_ui_serves_task_18_1_components(
         resp = client.post("/api/query", json={"query": "Compare AAPL and MSFT", "session_id": "sess-18-1"})
         assert resp.status_code == 200
 
-        session = mgr.get_session("sess-18-1")
+        uid = verify_signed_user_id(resp.cookies.get("cfi_uid"))
+        assert uid is not None
+        session = mgr.get_session("sess-18-1", user_id=uid)
         assert session is not None
         meta = session.messages[1].metadata or {}
         assert meta["intent"] == "FINANCIAL_METRIC"

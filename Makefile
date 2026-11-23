@@ -25,7 +25,7 @@ prod-down: ## Stop production stack
 	docker compose -f docker-compose.prod.yml down
 
 dev: ## Run FastAPI backend locally with hot reload (requires MinIO & Qdrant running)
-	$(UV) run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+	$(UV) run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src --reload-dir configs
 
 dbt: ## Build DuckDB Gold financial marts & run dbt data quality tests (Laptop)
 	cd transform && $(UV) run dbt build --target local

@@ -500,14 +500,13 @@ def run_process(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Main CLI entrypoint."""
+    from src.core.observability.logging_config import configure_logging
+
     load_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    logging.basicConfig(
-        level=logging.DEBUG if args.debug else logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    configure_logging(level=logging.DEBUG if args.debug else logging.INFO)
 
     if args.command == "ingest":
         return run_ingest(args)

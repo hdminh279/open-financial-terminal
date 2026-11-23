@@ -1,16 +1,19 @@
 """Market Quote Service and Persistent Watchlist Repository Engine.
 
-Combines Token Bucket rate limiting, in-memory TTL caching, and MinIO S3 Lakehouse
-persistence (sec-silver/user_settings/watchlist.json) with fallback in-memory caching.
+Combines Token Bucket rate limiting, in-memory TTL caching, and MinIO S3 app-state
+persistence (cfi-app-state/watchlist/{user_id}.json) with fallback in-memory caching.
 """
 
 import concurrent.futures
 import json
 import logging
+import math
 import os
+import threading
 import time
 from datetime import UTC, datetime
 
+from src.api.security import validate_user_id
 from src.core.financial.company_registry import load_company_catalog
 from src.data.ingestion.rate_limiter import RateLimiter
 from src.data.market.contracts import (
@@ -30,39 +33,59 @@ logger = logging.getLogger(__name__)
 class QuoteService:
     """Service providing cached, rate-limited market quotes across multi-market providers."""
 
+    DEFAULT_FINNHUB_RPS = 0.9
+    DEFAULT_VN_RPS = 5.0
+    DEFAULT_STALE_TTL_SECONDS = 1800.0
+
     def __init__(
         self,
         factory: QuoteProviderFactory | None = None,
         ttl_seconds: float = 300.0,
         rate_limiter: RateLimiter | None = None,
+        finnhub_rate_limiter: RateLimiter | None = None,
+        stale_ttl_seconds: float | None = None,
     ) -> None:
         """Initialize QuoteService.
 
         Args:
             factory: Optional QuoteProviderFactory. Defaults to standard production factory.
-            ttl_seconds: Time-to-live for cached quotes in seconds (default 300s).
-            rate_limiter: Optional Token Bucket RateLimiter (default 5 req/sec burst for responsiveness).
+            ttl_seconds: Fresh TTL for cached quotes in seconds (default 300s).
+            rate_limiter: Optional shared Token Bucket RateLimiter for VN/custom callers.
+            finnhub_rate_limiter: Optional RateLimiter enforcing Finnhub free tier (<= 0.9 req/s).
+            stale_ttl_seconds: Extended stale-while-revalidate window in seconds (default 1800s).
         """
         self.factory = factory or QuoteProviderFactory()
         self.ttl_seconds = ttl_seconds
-        self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=5.0)
-        self._cache: dict[str, tuple[StockQuote, float]] = {}
+        self.stale_ttl_seconds = (
+            float(stale_ttl_seconds)
+            if stale_ttl_seconds is not None
+            else max(float(ttl_seconds) * 6.0, self.DEFAULT_STALE_TTL_SECONDS)
+        )
+        self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=self.DEFAULT_VN_RPS)
+        self.finnhub_rate_limiter = (
+            finnhub_rate_limiter or rate_limiter or RateLimiter(requests_per_second=self.DEFAULT_FINNHUB_RPS)
+        )
+        self._cache: dict[str, tuple[StockQuote, float, float]] = {}
+        self._cache_lock = threading.Lock()
 
     def get_quote(self, ticker: str, force_refresh: bool = False) -> StockQuote:
-        """Retrieve quote with in-memory TTL caching."""
+        """Retrieve quote with TTL caching, Stale-While-Revalidate, and no error caching."""
         symbol = ticker.strip().upper()
         now = time.time()
 
-        if not force_refresh and symbol in self._cache:
-            quote, expires_at = self._cache[symbol]
-            if now < expires_at:
-                logger.debug("Quote cache hit for %s (expires in %.1fs)", symbol, expires_at - now)
-                return quote
-
-        # Enforce rate limiter before upstream HTTP call
-        self.rate_limiter.acquire()
+        cached_entry: tuple[StockQuote, float, float] | None = None
+        with self._cache_lock:
+            cached_entry = self._cache.get(symbol)
+            if not force_refresh and cached_entry is not None:
+                quote, fresh_until, _stale_until = cached_entry
+                if now < fresh_until:
+                    logger.debug("Quote cache hit for %s (expires in %.1fs)", symbol, fresh_until - now)
+                    return quote
 
         provider = self.factory.get_provider(symbol)
+        limiter = self.finnhub_rate_limiter if provider.market == Market.US else self.rate_limiter
+        limiter.acquire()
+
         quote = provider.fetch_quote(symbol)
 
         if quote is None:
@@ -76,7 +99,17 @@ class QuoteService:
                 status=QuoteStatus.UNSUPPORTED,
             )
 
-        self._cache[symbol] = (quote, now + self.ttl_seconds)
+        # Never cache transient errors / HTTP 429 (price=None, status=ERROR) for 300s
+        if quote.status == QuoteStatus.ERROR:
+            if cached_entry is not None:
+                stale_quote, _fresh_until, stale_until = cached_entry
+                if stale_quote.price is not None and now < stale_until:
+                    logger.info("Serving stale-while-revalidate quote for %s after upstream error", symbol)
+                    return stale_quote.model_copy(update={"is_delayed": True, "status": QuoteStatus.DELAYED})
+            return quote
+
+        with self._cache_lock:
+            self._cache[symbol] = (quote, now + self.ttl_seconds, now + self.stale_ttl_seconds)
         return quote
 
     def get_quotes_batch(self, tickers: list[str], force_refresh: bool = False) -> list[StockQuote]:
@@ -136,10 +169,10 @@ def _load_default_watchlist_tickers() -> tuple[tuple[str, Market], ...]:
 
 
 class WatchlistRepository:
-    """Repository managing persistent user watchlists in MinIO S3 with local memory fallback."""
+    """Repository managing per-user persistent watchlists in MinIO S3 with memory fallback."""
 
-    BUCKET_NAME = "sec-silver"
-    STORAGE_KEY = "user_settings/watchlist.json"
+    BUCKET_NAME = "cfi-app-state"
+    KEY_PREFIX = "watchlist"
     MAX_ITEMS = 200
 
     DEFAULT_TICKERS: tuple[tuple[str, Market], ...] = _load_default_watchlist_tickers()
@@ -159,8 +192,14 @@ class WatchlistRepository:
         self._s3_enabled = (
             True if s3_storage is not None else os.getenv("ENABLE_S3_WATCHLIST", "true").lower() == "true"
         )
-        self._memory_cache: WatchlistConfig | None = None
+        self._memory_cache: dict[str, WatchlistConfig] = {}
+        self._lock = threading.Lock()
         self.quote_service = quote_service or QuoteService()
+
+    @classmethod
+    def _storage_key(cls, user_id: str) -> str:
+        uid = validate_user_id(user_id)
+        return f"{cls.KEY_PREFIX}/{uid}.json"
 
     def _init_s3(self) -> S3Storage | None:
         """Lazy-initialize S3Storage adapter."""
@@ -178,29 +217,31 @@ class WatchlistRepository:
 
     def _create_default_config(self, user_id: str = "default_user") -> WatchlistConfig:
         """Create a default populated watchlist configuration."""
+        uid = validate_user_id(user_id)
         now = datetime.now(UTC).isoformat()
         items = [WatchlistItem(ticker=ticker, market=market, added_at=now) for ticker, market in self.DEFAULT_TICKERS]
         return WatchlistConfig(
             version="1.0",
-            user_id=user_id,
+            user_id=uid,
             items=items,
             updated_at=now,
         )
 
-    def _load_from_s3(self) -> WatchlistConfig | None:
-        """Attempt to load watchlist JSON from MinIO S3 Lakehouse."""
+    def _load_from_s3(self, user_id: str = "default_user") -> WatchlistConfig | None:
+        """Attempt to load user-scoped watchlist JSON from MinIO S3 app-state bucket."""
         s3 = self._init_s3()
         if not s3:
             return None
 
+        key = self._storage_key(user_id)
         try:
-            if not s3.object_exists(self.BUCKET_NAME, self.STORAGE_KEY):
-                logger.info("Watchlist not found in S3 (%s/%s); creating default.", self.BUCKET_NAME, self.STORAGE_KEY)
-                default_cfg = self._create_default_config()
+            if not s3.object_exists(self.BUCKET_NAME, key):
+                logger.info("Watchlist not found in S3 (%s/%s); creating default.", self.BUCKET_NAME, key)
+                default_cfg = self._create_default_config(user_id=user_id)
                 self._save_to_s3(default_cfg)
                 return default_cfg
 
-            raw_bytes = s3.download_bytes(self.BUCKET_NAME, self.STORAGE_KEY)
+            raw_bytes = s3.download_bytes(self.BUCKET_NAME, key)
             data = json.loads(raw_bytes.decode("utf-8"))
             return WatchlistConfig(**data)
         except Exception as exc:
@@ -208,17 +249,18 @@ class WatchlistRepository:
             return None
 
     def _save_to_s3(self, config: WatchlistConfig) -> bool:
-        """Persist watchlist JSON to MinIO S3 Lakehouse."""
+        """Persist user-scoped watchlist JSON to MinIO S3 app-state bucket."""
         s3 = self._init_s3()
         if not s3:
             return False
 
+        key = self._storage_key(config.user_id)
         try:
             s3.ensure_buckets_exist([self.BUCKET_NAME])
             payload = config.model_dump_json(indent=2).encode("utf-8")
             s3.upload_bytes(
                 bucket=self.BUCKET_NAME,
-                key=self.STORAGE_KEY,
+                key=key,
                 data=payload,
                 content_type="application/json",
                 metadata={"user_id": config.user_id, "updated_at": config.updated_at},
@@ -229,17 +271,21 @@ class WatchlistRepository:
             return False
 
     def get_watchlist(self, user_id: str = "default_user") -> WatchlistConfig:
-        """Retrieve user watchlist configuration."""
-        if self._memory_cache is not None:
-            return self._memory_cache
+        """Retrieve user-scoped watchlist configuration."""
+        uid = validate_user_id(user_id)
+        with self._lock:
+            if uid in self._memory_cache:
+                return self._memory_cache[uid]
 
-        persisted = self._load_from_s3()
+        persisted = self._load_from_s3(user_id=uid)
         if persisted is not None:
-            self._memory_cache = persisted
+            with self._lock:
+                self._memory_cache[uid] = persisted
             return persisted
 
-        default_cfg = self._create_default_config(user_id=user_id)
-        self._memory_cache = default_cfg
+        default_cfg = self._create_default_config(user_id=uid)
+        with self._lock:
+            self._memory_cache[uid] = default_cfg
         return default_cfg
 
     def add_ticker(
@@ -249,11 +295,12 @@ class WatchlistRepository:
         user_id: str = "default_user",
     ) -> WatchlistConfig:
         """Add a ticker symbol to the user's watchlist."""
+        uid = validate_user_id(user_id)
         symbol = ticker.strip().upper()
         if not symbol:
             raise ValueError("Ticker symbol cannot be empty")
 
-        config = self.get_watchlist(user_id=user_id)
+        config = self.get_watchlist(user_id=uid)
 
         # Check if already present
         if any(item.ticker == symbol for item in config.items):
@@ -271,17 +318,19 @@ class WatchlistRepository:
 
         now = datetime.now(UTC).isoformat()
         new_item = WatchlistItem(ticker=symbol, market=market, added_at=now)
-        config.items.append(new_item)
+        config.items.insert(0, new_item)
         config.updated_at = now
 
-        self._memory_cache = config
+        with self._lock:
+            self._memory_cache[uid] = config
         self._save_to_s3(config)
         return config
 
     def remove_ticker(self, ticker: str, user_id: str = "default_user") -> WatchlistConfig:
         """Remove a ticker symbol from the user's watchlist."""
+        uid = validate_user_id(user_id)
         symbol = ticker.strip().upper()
-        config = self.get_watchlist(user_id=user_id)
+        config = self.get_watchlist(user_id=uid)
 
         initial_len = len(config.items)
         config.items = [item for item in config.items if item.ticker != symbol]
@@ -289,15 +338,18 @@ class WatchlistRepository:
         if len(config.items) != initial_len:
             now = datetime.now(UTC).isoformat()
             config.updated_at = now
-            self._memory_cache = config
+            with self._lock:
+                self._memory_cache[uid] = config
             self._save_to_s3(config)
 
         return config
 
     def reset_to_default(self, user_id: str = "default_user") -> WatchlistConfig:
-        """Reset watchlist to original default basket."""
-        default_cfg = self._create_default_config(user_id=user_id)
-        self._memory_cache = default_cfg
+        """Reset user watchlist to original default basket."""
+        uid = validate_user_id(user_id)
+        default_cfg = self._create_default_config(user_id=uid)
+        with self._lock:
+            self._memory_cache[uid] = default_cfg
         self._save_to_s3(default_cfg)
         return default_cfg
 
@@ -305,13 +357,36 @@ class WatchlistRepository:
         self,
         user_id: str = "default_user",
         force_refresh: bool = False,
+        page: int = 1,
+        page_size: int | None = None,
+        market: Market | None = None,
     ) -> WatchlistResponse:
-        """Retrieve watchlist enriched with real-time market quotes."""
+        """Retrieve paginated user watchlist enriched with real-time market quotes."""
         config = self.get_watchlist(user_id=user_id)
-        ticker_list = [item.ticker for item in config.items]
+        items = config.items
+        if market is not None:
+            items = [item for item in items if item.market == market]
+
+        total = len(items)
+        if page_size is not None:
+            eff_page_size = max(1, int(page_size))
+            total_pages = max(1, math.ceil(total / eff_page_size))
+            current_page = min(max(1, int(page)), total_pages)
+            start = (current_page - 1) * eff_page_size
+            page_items = items[start : start + eff_page_size]
+        else:
+            eff_page_size = max(1, total)
+            total_pages = 1
+            current_page = 1
+            page_items = items
+
+        ticker_list = [item.ticker for item in page_items]
         quotes = self.quote_service.get_quotes_batch(ticker_list, force_refresh=force_refresh)
         return WatchlistResponse(
             items=quotes,
-            total=len(quotes),
+            total=total,
+            page=current_page,
+            page_size=eff_page_size,
+            total_pages=total_pages,
             updated_at=datetime.now(UTC).isoformat(),
         )

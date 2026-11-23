@@ -247,6 +247,10 @@ class RoutingDecision(BaseModel):
         default=None,
         description="Structured analytical query plan with Metric Registry routing",
     )
+    token_usage: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional LLM token usage reported by the router call",
+    )
 
 
 class ToolExecutionResult(BaseModel):
@@ -358,6 +362,18 @@ class ActivityTimelineStep(BaseModel):
     )
 
 
+class AgentTokenUsage(BaseModel):
+    """Aggregated LLM token usage and estimated USD cost across an agent query turn."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prompt_tokens: int = Field(default=0, description="Total prompt tokens across LLM calls")
+    completion_tokens: int = Field(default=0, description="Total completion tokens across LLM calls")
+    cache_hit_tokens: int = Field(default=0, description="Prompt tokens served from context cache")
+    total_tokens: int = Field(default=0, description="Combined prompt + completion tokens")
+    estimated_cost_usd: float = Field(default=0.0, description="Estimated inference cost in USD")
+
+
 class AgentRequest(BaseModel):
     """Input query request payload for the Research Agent."""
 
@@ -401,6 +417,10 @@ class AgentResponse(BaseModel):
         description="Execution query plan with tool routing and comparison semantics",
     )
     execution_time_ms: float = Field(default=0.0, description="Total pipeline latency in ms")
+    token_usage: AgentTokenUsage | None = Field(
+        default=None,
+        description="Aggregated token usage and estimated USD inference cost",
+    )
     activity_timeline: list[ActivityTimelineStep] = Field(
         default_factory=list,
         description="Ordered sequence of executed pipeline steps with latencies and statuses",
