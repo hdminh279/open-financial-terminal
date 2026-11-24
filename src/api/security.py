@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import ipaddress
 import os
 import re
 import secrets
@@ -150,15 +151,47 @@ class IPTokenBucketRateLimiter:
             del self._buckets[oldest_ip]
 
 
+def is_production_env() -> bool:
+    """Return True when APP_ENV indicates a production deployment."""
+    return os.getenv("APP_ENV", "local").lower() in ("prod", "production")
+
+
+def _trust_proxy_headers() -> bool:
+    """Return True only when explicitly configured behind a trusted reverse proxy."""
+    return os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in ("1", "true", "yes")
+
+
+def _parse_valid_ip(raw: str | None) -> str | None:
+    """Validate and canonicalize an IPv4/IPv6 string; return None on malformed input."""
+    if not raw:
+        return None
+    candidate = raw.strip()
+    if not candidate:
+        return None
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
 def extract_client_ip(request: Request) -> str:
-    """Resolve real client IP behind Cloudflare Tunnel or reverse proxies."""
-    cf_ip = request.headers.get("cf-connecting-ip")
-    if cf_ip:
-        return cf_ip.strip()
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Resolve client IP safely, trusting forwarded headers only when TRUST_PROXY_HEADERS=true."""
+    if _trust_proxy_headers():
+        cf_ip = _parse_valid_ip(request.headers.get("cf-connecting-ip"))
+        if cf_ip:
+            return cf_ip
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            # Prefer rightmost valid IP appended by the trusted edge proxy to resist header spoofing
+            for part in reversed(xff.split(",")):
+                parsed = _parse_valid_ip(part)
+                if parsed:
+                    return parsed
+
+    host = request.client.host if request.client else None
+    if not host:
+        return "unknown"
+    return _parse_valid_ip(host) or host.strip()
 
 
 def get_allowed_origins() -> list[str]:
@@ -167,8 +200,7 @@ def get_allowed_origins() -> list[str]:
     if raw:
         return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
 
-    app_env = os.getenv("APP_ENV", "local").lower()
-    if app_env in ("prod", "production"):
+    if is_production_env():
         return []
     return ["http://localhost:8000", "http://127.0.0.1:8000"]
 
@@ -205,9 +237,18 @@ _SAFE_USER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _get_cookie_secret() -> bytes:
-    """Resolve HMAC signing secret from env, falling back to a process-scoped CSPRNG secret."""
-    secret = os.getenv("SESSION_COOKIE_SECRET", "").strip() or _EPHEMERAL_COOKIE_SECRET
-    return secret.encode("utf-8")
+    """Resolve HMAC signing secret from env; fail fast in production if unset."""
+    secret = os.getenv("SESSION_COOKIE_SECRET", "").strip()
+    if secret:
+        return secret.encode("utf-8")
+    if is_production_env():
+        raise ValueError("SESSION_COOKIE_SECRET is required when APP_ENV is production.")
+    return _EPHEMERAL_COOKIE_SECRET.encode("utf-8")
+
+
+def validate_security_config() -> None:
+    """Validate mandatory production security settings at application startup."""
+    _get_cookie_secret()
 
 
 def validate_user_id(user_id: str) -> str:

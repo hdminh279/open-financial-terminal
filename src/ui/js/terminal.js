@@ -72,10 +72,6 @@ function translateIntentName(intent) {
 function translateStepName(stepName) {
   if (!stepName) return "";
   const map = {
-    "Step 1: Intent Routing": "Bước 1: Phân loại ý định",
-    "Step 2: DuckDB SQL Marts": "Bước 2: Truy vấn DuckDB SQL",
-    "Step 3: FastEmbed Hybrid RAG": "Bước 3: Tìm kiếm ngữ nghĩa Hybrid RAG",
-    "Step 4: Verification": "Bước 4: Đối soát & Kiểm chứng",
     "Understanding question": "Hiểu câu hỏi & Lập kế hoạch",
     "Resolving metrics": "Xác định chỉ tiêu tài chính",
     "Querying DuckDB": "Truy vấn DuckDB Lakehouse",
@@ -957,7 +953,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Boot sequence
   applyTheme(localStorage.getItem("terminal_theme") || "dark");
-  applyUserName(localStorage.getItem("app_user_name") || "Minh");
+  applyUserName(localStorage.getItem("app_user_name") || "User");
   chartController.init();
 
   initWatchlistController({

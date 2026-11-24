@@ -460,33 +460,26 @@ class ChartEngine:
         cls,
         sql_data: dict[str, Any] | None,
         chart_preference: str | None = "none",
-        ticker: str | None = None,
         query_plan: dict[str, Any] | None = None,
-        **kwargs: Any,
     ) -> list[ChartData]:
         """Convenience classmethod for extracting financial charts without manual instantiation."""
         return cls().extract_financial_charts(
             sql_data=sql_data,
             chart_preference=chart_preference,
-            ticker=ticker,
             query_plan=query_plan,
-            **kwargs,
         )
 
     def extract_financial_charts(
         self,
         sql_data: dict[str, Any] | None,
         chart_preference: str | None = "none",
-        ticker: str | None = None,
         query_plan: dict[str, Any] | None = None,
-        **kwargs: Any,
     ) -> list[ChartData]:
         """Extract validated time series and construct Plotly-ready ChartData objects.
 
         Args:
             sql_data: FinancialQueryResponse dictionary from state.
             chart_preference: LLM-determined preference ('line', 'bar', 'scatter', 'area', 'none').
-            ticker: Optional ticker header string.
             query_plan: Optional structured plan dictionary from Router.
 
         Returns:

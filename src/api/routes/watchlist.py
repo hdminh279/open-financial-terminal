@@ -24,16 +24,6 @@ _quote_service: QuoteService | None = None
 _WATCHLIST_LOCK = threading.Lock()
 
 
-def get_watchlist_repository() -> WatchlistRepository:
-    """Dependency injector for WatchlistRepository."""
-    global _watchlist_repo
-    if _watchlist_repo is None:
-        with _WATCHLIST_LOCK:
-            if _watchlist_repo is None:
-                _watchlist_repo = WatchlistRepository()
-    return _watchlist_repo
-
-
 def get_quote_service() -> QuoteService:
     """Dependency injector for QuoteService."""
     global _quote_service
@@ -42,6 +32,27 @@ def get_quote_service() -> QuoteService:
             if _quote_service is None:
                 _quote_service = QuoteService()
     return _quote_service
+
+
+def get_watchlist_repository() -> WatchlistRepository:
+    """Dependency injector for WatchlistRepository sharing the pooled QuoteService."""
+    global _watchlist_repo
+    if _watchlist_repo is None:
+        quote_svc = get_quote_service()
+        with _WATCHLIST_LOCK:
+            if _watchlist_repo is None:
+                _watchlist_repo = WatchlistRepository(quote_service=quote_svc)
+    return _watchlist_repo
+
+
+def close_market_services() -> None:
+    """Close pooled HTTP clients held by market data singletons on app shutdown."""
+    global _watchlist_repo, _quote_service
+    with _WATCHLIST_LOCK:
+        if _watchlist_repo is not None:
+            _watchlist_repo.close()
+        if _quote_service is not None:
+            _quote_service.close()
 
 
 @router.get(

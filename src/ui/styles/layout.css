@@ -460,7 +460,7 @@ html, body {
   font-weight: 600;
 }
 
-/* User Profile Footer (Clean Minh in unified card box, no top divider) */
+/* User Profile Footer (Unified card box, no top divider) */
 .sidebar-footer {
   margin-top: auto;
   flex-shrink: 0;

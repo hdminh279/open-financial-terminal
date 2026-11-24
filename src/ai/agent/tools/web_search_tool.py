@@ -105,6 +105,9 @@ class WebSearchTool:
             return cleaned[:max_length].rstrip() + "..."
         return cleaned
 
+    MAX_RSS_RESPONSE_BYTES = 2 * 1024 * 1024
+    _UNSAFE_XML_RE = re.compile(r"<!(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
     def _search_google_news_rss(self, query_str: str, max_results: int) -> list[WebSearchResultItem]:
         """Fallback live news lookup via Google News RSS (zero-cost, no API key)."""
         has_vi = bool(re.search(r"[\u00C0-\u1EF9]", query_str))
@@ -120,7 +123,18 @@ class WebSearchTool:
             follow_redirects=True,
         )
         resp.raise_for_status()
-        root = ET.fromstring(resp.text)
+        if len(resp.content) > self.MAX_RSS_RESPONSE_BYTES:
+            logger.warning("Google News RSS payload exceeded %d bytes; aborting parse.", self.MAX_RSS_RESPONSE_BYTES)
+            return []
+        xml_text = resp.text
+        if self._UNSAFE_XML_RE.search(xml_text):
+            logger.warning("Rejected Google News RSS payload containing DTD/ENTITY declarations.")
+            return []
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError as exc:
+            logger.warning("Failed to parse Google News RSS XML: %s", exc)
+            return []
         items: list[WebSearchResultItem] = []
         for item_el in root.findall(".//item")[:max_results]:
             title = (item_el.findtext("title") or "").strip()

@@ -26,8 +26,9 @@ from src.api.routes.health import telemetry_router
 from src.api.routes.history import router as history_router
 from src.api.routes.metrics import router as metrics_router
 from src.api.routes.query import router as query_router
+from src.api.routes.watchlist import close_market_services
 from src.api.routes.watchlist import router as watchlist_router
-from src.api.security import SecurityHardeningMiddleware, get_allowed_origins
+from src.api.security import SecurityHardeningMiddleware, get_allowed_origins, validate_security_config
 from src.core.observability.logging_config import configure_logging
 
 configure_logging()
@@ -38,7 +39,9 @@ IS_PROD = os.getenv("APP_ENV", "local").lower() in ("prod", "production")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Warm up DuckDB repository and S3 buckets on startup to avoid first-request cold starts."""
+    """Validate security config, warm up DuckDB/S3 on startup, and release HTTP pools on shutdown."""
+    validate_security_config()
+
     try:
         repo = get_duckdb_repository()
         repo.execute_fetchall("SELECT 1")
@@ -52,7 +55,10 @@ async def lifespan(_app: FastAPI):
     except Exception as exc:
         logger.warning("MinIO bucket warmup skipped: %s", exc)
 
-    yield
+    try:
+        yield
+    finally:
+        close_market_services()
 
 
 app = FastAPI(

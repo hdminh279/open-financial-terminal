@@ -18,6 +18,7 @@ from src.ai.agent.tools.financial_sql_tool import (
     RATIO_METRICS,
     FinancialQueryInput,
     FinancialSQLTool,
+    generate_edgar_url,
 )
 from src.core.financial.company_registry import load_company_catalog, resolve_filing_form
 from src.core.financial.metric_registry import get_metric_registry
@@ -215,10 +216,10 @@ def sql_node(
                     f"{record.ticker} {record.fiscal_period} {record.fiscal_year}{date_span} "
                     f"{record.metric_name}: {record.metric_value}{unit_suffix}"
                 )
-                fallback_url = (
-                    f"https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{record.ticker}"
-                    if record.cik.strip().upper().startswith("VN:")
-                    else "https://www.sec.gov/edgar/searchedgar/companysearch"
+                source_url = (
+                    record.provenance_url
+                    or generate_edgar_url(record.cik, record.source_accession_number)
+                    or "https://www.sec.gov/edgar/searchedgar/companysearch"
                 )
                 evidence = EvidenceItem(
                     citation_id=idx + 1,
@@ -229,7 +230,7 @@ def sql_node(
                     fiscal_period=record.fiscal_period,
                     item_or_metric=record.metric_name,
                     content_summary=summary,
-                    source_url=record.provenance_url or fallback_url,
+                    source_url=source_url,
                     accession_number=record.source_accession_number,
                 )
                 evidence_items.append(evidence.model_dump())

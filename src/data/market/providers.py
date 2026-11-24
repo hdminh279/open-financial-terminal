@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -45,6 +46,10 @@ class BaseQuoteProvider(ABC):
         """
         pass
 
+    def close(self) -> None:
+        """Release any underlying network connections owned by this provider."""
+        return None
+
 
 class FinnhubQuoteProvider(BaseQuoteProvider):
     """US Equities live quote provider using the official Finnhub Stock API ($0 Free Tier)."""
@@ -67,6 +72,8 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         self.api_key = api_key or os.getenv("FINNHUB_API_KEY", "")
         self.timeout = timeout
         self._client = client
+        self._owns_client = client is None
+        self._client_lock = threading.Lock()
         self._name_cache: dict[str, str] = {}
         self._load_catalog_names()
 
@@ -113,10 +120,23 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
         return Market.US
 
     def _get_client(self) -> httpx.Client:
-        """Obtain active HTTP client."""
+        """Obtain or lazily initialize a pooled HTTP client."""
         if self._client is not None:
             return self._client
-        return httpx.Client(timeout=self.timeout)
+        with self._client_lock:
+            if self._client is None:
+                self._client = httpx.Client(
+                    timeout=self.timeout,
+                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                )
+        return self._client
+
+    def close(self) -> None:
+        """Close the pooled HTTP client if owned by this provider."""
+        with self._client_lock:
+            if self._owns_client and self._client is not None:
+                self._client.close()
+                self._client = None
 
     @retry(
         retry=retry_if_exception(_is_retryable_http_error),
@@ -152,7 +172,6 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
             )
 
         client = self._get_client()
-        should_close = self._client is None
         try:
             data = self._execute_request(client, ticker)
             current_price = data.get("c")
@@ -213,9 +232,6 @@ class FinnhubQuoteProvider(BaseQuoteProvider):
                 as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.ERROR,
             )
-        finally:
-            if should_close:
-                client.close()
 
 
 class SSIQuoteProvider(BaseQuoteProvider):
@@ -231,6 +247,8 @@ class SSIQuoteProvider(BaseQuoteProvider):
         """Initialize SSI quote provider."""
         self.timeout = timeout
         self._client = client
+        self._owns_client = client is None
+        self._client_lock = threading.Lock()
         self._name_cache: dict[str, str] = {}
         for company in load_company_catalog("configs/companies_vn.yaml", include_vn=False):
             sym = str(company.get("ticker", "")).strip().upper()
@@ -244,14 +262,28 @@ class SSIQuoteProvider(BaseQuoteProvider):
         return Market.VN
 
     def _get_client(self) -> httpx.Client:
-        """Obtain active HTTP client."""
+        """Obtain or lazily initialize a pooled HTTP client."""
         if self._client is not None:
             return self._client
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
-            "Accept": "application/json, text/plain, */*",
-        }
-        return httpx.Client(timeout=self.timeout, headers=headers)
+        with self._client_lock:
+            if self._client is None:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+                    "Accept": "application/json, text/plain, */*",
+                }
+                self._client = httpx.Client(
+                    timeout=self.timeout,
+                    headers=headers,
+                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                )
+        return self._client
+
+    def close(self) -> None:
+        """Close the pooled HTTP client if owned by this provider."""
+        with self._client_lock:
+            if self._owns_client and self._client is not None:
+                self._client.close()
+                self._client = None
 
     @retry(
         retry=retry_if_exception(_is_retryable_http_error),
@@ -269,7 +301,6 @@ class SSIQuoteProvider(BaseQuoteProvider):
     def fetch_quote(self, ticker: str) -> StockQuote | None:
         """Fetch quote from SSI iBoard API."""
         client = self._get_client()
-        should_close = self._client is None
         try:
             payload = self._execute_request(client, ticker)
             data = payload.get("data")
@@ -328,9 +359,6 @@ class SSIQuoteProvider(BaseQuoteProvider):
                 as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.ERROR,
             )
-        finally:
-            if should_close:
-                client.close()
 
 
 class MockQuoteProvider(BaseQuoteProvider):
@@ -410,3 +438,10 @@ class QuoteProviderFactory:
         if self._us_provider is None:
             self._us_provider = FinnhubQuoteProvider()
         return self._us_provider
+
+    def close(self) -> None:
+        """Close pooled HTTP clients on any initialized providers."""
+        if self._us_provider is not None:
+            self._us_provider.close()
+        if self._vn_provider is not None:
+            self._vn_provider.close()

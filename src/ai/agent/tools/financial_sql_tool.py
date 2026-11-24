@@ -189,7 +189,7 @@ def generate_edgar_url(cik: str, accession_number: str | None) -> str | None:
     Returns:
         Canonical URL string, or None if accession_number is missing.
     """
-    if not accession_number or not cik:
+    if not cik:
         return None
 
     cik_stripped = cik.strip()
@@ -198,6 +198,9 @@ def generate_edgar_url(cik: str, accession_number: str | None) -> str | None:
         if not vn_ticker:
             return None
         return f"https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{vn_ticker}"
+
+    if not accession_number:
+        return None
 
     try:
         cik_clean = str(int(cik_stripped))

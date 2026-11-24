@@ -193,7 +193,6 @@ def test_annual_fy_chart_and_chronological_order() -> None:
     charts = engine.extract_financial_charts(
         sql_data=shuffled_data,
         chart_preference="line",
-        ticker="AAPL",
     )
 
     assert len(charts) == 1
@@ -254,7 +253,6 @@ def test_quarterly_chart_chronological_order() -> None:
     charts = engine.extract_financial_charts(
         sql_data=shuffled_quarters,
         chart_preference="bar",
-        ticker="MSFT",
         query_plan={"fiscal_periods": ["Q1", "Q2", "Q3", "Q4"]},
     )
 
@@ -303,7 +301,6 @@ def test_missing_values_preserved_not_zero() -> None:
     charts = engine.extract_financial_charts(
         sql_data=data_with_missing,
         chart_preference="line",
-        ticker="GOOGL",
     )
 
     assert len(charts) == 1

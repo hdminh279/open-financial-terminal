@@ -259,3 +259,66 @@ def test_benchmark_sessions_filtered_and_legacy_cleanup() -> None:
     cleanup = mgr.cleanup_legacy_benchmark_sessions()
     assert cleanup == {"scanned": 5, "deleted": 4}
     assert mock_s3.delete_object.call_count == 4
+
+
+def test_production_requires_session_cookie_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify production fails fast when SESSION_COOKIE_SECRET is missing."""
+    from src.api.security import validate_security_config
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("SESSION_COOKIE_SECRET", raising=False)
+    with pytest.raises(ValueError, match="SESSION_COOKIE_SECRET"):
+        validate_security_config()
+
+    monkeypatch.setenv("SESSION_COOKIE_SECRET", "prod-shared-secret-value")
+    validate_security_config()
+
+
+def test_extract_client_ip_blocks_header_spoofing_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify spoofed proxy headers cannot bypass rate limiting unless TRUST_PROXY_HEADERS=true."""
+    from types import SimpleNamespace
+
+    from src.api.security import extract_client_ip
+
+    def _make_req(headers: dict[str, str], host: str = "198.51.100.10"):
+        return SimpleNamespace(headers=headers, client=SimpleNamespace(host=host))
+
+    monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+    req_spoofed = _make_req({"cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "1.2.3.4"})
+    assert extract_client_ip(req_spoofed) == "198.51.100.10"
+
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    assert extract_client_ip(req_spoofed) == "203.0.113.9"
+
+    # Rightmost valid XFF entry wins over attacker-prepended spoofed leftmost IP
+    req_xff = _make_req({"x-forwarded-for": "9.9.9.9, 203.0.113.77"})
+    assert extract_client_ip(req_xff) == "203.0.113.77"
+
+    # Malformed header falls back safely to peer host
+    req_bad = _make_req({"cf-connecting-ip": "not-an-ip\r\nEvil"})
+    assert extract_client_ip(req_bad) == "198.51.100.10"
+
+
+def test_rss_xml_parser_rejects_dtd_and_oversized_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify Google News RSS fallback blocks DTD/ENTITY payloads and oversized XML responses."""
+    from unittest.mock import patch
+
+    from src.ai.agent.tools.web_search_tool import WebSearchTool
+
+    tool = WebSearchTool()
+
+    dtd_resp = MagicMock()
+    dtd_resp.content = b"<!DOCTYPE lolz [<!ENTITY lol 'lol'>]><rss><channel></channel></rss>"
+    dtd_resp.text = dtd_resp.content.decode("utf-8")
+    dtd_resp.raise_for_status.return_value = None
+
+    with patch("src.ai.agent.tools.web_search_tool.httpx.get", return_value=dtd_resp):
+        assert tool._search_google_news_rss("Apple news", max_results=3) == []
+
+    big_resp = MagicMock()
+    big_resp.content = b"x" * (WebSearchTool.MAX_RSS_RESPONSE_BYTES + 1)
+    big_resp.text = ""
+    big_resp.raise_for_status.return_value = None
+
+    with patch("src.ai.agent.tools.web_search_tool.httpx.get", return_value=big_resp):
+        assert tool._search_google_news_rss("Apple news", max_results=3) == []

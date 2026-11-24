@@ -443,3 +443,38 @@ def test_quote_service_non_blocking_rate_limit_and_lru_bound() -> None:
     lru_svc.get_quote("AAPL")
     lru_svc.get_quote("NVDA")
     assert list(lru_svc._cache.keys()) == ["AAPL", "NVDA"]
+
+
+def test_watchlist_repository_bounds_memory_cache_lru(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify WatchlistRepository bounds per-user memory cache with LRU eviction."""
+    monkeypatch.setenv("ENABLE_S3_WATCHLIST", "false")
+    repo = WatchlistRepository(s3_storage=None, max_cache_size=2)
+
+    repo.get_watchlist("user_1")
+    repo.get_watchlist("user_2")
+    # Touch user_1 so user_2 becomes least-recently-used
+    repo.get_watchlist("user_1")
+    repo.get_watchlist("user_3")
+
+    assert list(repo._memory_cache.keys()) == ["user_1", "user_3"]
+
+
+def test_quote_providers_reuse_pooled_http_client_and_close_cleanly() -> None:
+    """Verify FinnhubQuoteProvider and SSIQuoteProvider reuse one pooled httpx.Client until closed."""
+    finnhub = FinnhubQuoteProvider(api_key="dummy")
+    c1 = finnhub._get_client()
+    c2 = finnhub._get_client()
+    assert c1 is c2
+    assert not c1.is_closed
+    finnhub.close()
+    assert c1.is_closed
+    assert finnhub._client is None
+
+    ssi = SSIQuoteProvider()
+    s1 = ssi._get_client()
+    s2 = ssi._get_client()
+    assert s1 is s2
+    assert not s1.is_closed
+    ssi.close()
+    assert s1.is_closed
+    assert ssi._client is None

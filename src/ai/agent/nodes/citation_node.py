@@ -87,10 +87,6 @@ def citation_node(state: AgentState) -> dict[str, Any]:
     evidence_dicts = state.get("evidence_items", [])
     sql_data = state.get("sql_data")
     routing_decision = state.get("routing_decision") or {}
-    tickers = list(routing_decision.get("tickers") or [])
-    if not tickers and routing_decision.get("ticker"):
-        tickers = [routing_decision.get("ticker")]
-    ticker_label = " vs ".join(tickers) if tickers else None
     intent_str = state.get("intent", "")
     query = state.get("query", "")
 
@@ -102,7 +98,6 @@ def citation_node(state: AgentState) -> dict[str, Any]:
     charts = chart_engine.extract_financial_charts(
         sql_data=sql_data,
         chart_preference=chart_pref,
-        ticker=ticker_label,
         query_plan=query_plan,
     )
 

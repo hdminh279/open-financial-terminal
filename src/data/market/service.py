@@ -203,6 +203,10 @@ class QuoteService:
             # Preserve the original order of requested tickers
             return [results[t] for t in tickers if t in results]
 
+    def close(self) -> None:
+        """Release pooled HTTP clients owned by underlying market quote providers."""
+        self.factory.close()
+
 
 def _load_default_watchlist_tickers() -> tuple[tuple[str, Market], ...]:
     """Build default multi-market watchlist from all configured US SEC and Vietnam HOSE issuers."""
@@ -240,6 +244,7 @@ class WatchlistRepository:
     BUCKET_NAME = "cfi-app-state"
     KEY_PREFIX = "watchlist"
     MAX_ITEMS = 200
+    DEFAULT_MAX_CACHE_SIZE = 500
 
     DEFAULT_TICKERS: tuple[tuple[str, Market], ...] = _load_default_watchlist_tickers()
 
@@ -247,20 +252,35 @@ class WatchlistRepository:
         self,
         s3_storage: S3Storage | None = None,
         quote_service: QuoteService | None = None,
+        max_cache_size: int = DEFAULT_MAX_CACHE_SIZE,
     ) -> None:
         """Initialize repository.
 
         Args:
             s3_storage: Optional S3Storage adapter.
             quote_service: Optional QuoteService for quote enrichment.
+            max_cache_size: Maximum number of per-user watchlists retained in the in-memory LRU cache.
         """
         self._s3 = s3_storage
         self._s3_enabled = (
             True if s3_storage is not None else os.getenv("ENABLE_S3_WATCHLIST", "true").lower() == "true"
         )
-        self._memory_cache: dict[str, WatchlistConfig] = {}
+        self._max_cache_size = max(1, int(max_cache_size))
+        self._memory_cache: OrderedDict[str, WatchlistConfig] = OrderedDict()
         self._lock = threading.Lock()
         self.quote_service = quote_service or QuoteService()
+
+    def _put_memory_cache(self, user_id: str, config: WatchlistConfig) -> None:
+        """Store user watchlist in bounded LRU cache under lock."""
+        with self._lock:
+            self._memory_cache[user_id] = config
+            self._memory_cache.move_to_end(user_id)
+            while len(self._memory_cache) > self._max_cache_size:
+                self._memory_cache.popitem(last=False)
+
+    def close(self) -> None:
+        """Release underlying quote service network resources."""
+        self.quote_service.close()
 
     @classmethod
     def _storage_key(cls, user_id: str) -> str:
@@ -355,18 +375,18 @@ class WatchlistRepository:
         """Retrieve user-scoped watchlist configuration."""
         uid = validate_user_id(user_id)
         with self._lock:
-            if uid in self._memory_cache:
-                return self._memory_cache[uid]
+            cached = self._memory_cache.get(uid)
+            if cached is not None:
+                self._memory_cache.move_to_end(uid)
+                return cached
 
         persisted = self._load_from_s3(user_id=uid)
         if persisted is not None:
-            with self._lock:
-                self._memory_cache[uid] = persisted
+            self._put_memory_cache(uid, persisted)
             return persisted
 
         default_cfg = self._create_default_config(user_id=uid)
-        with self._lock:
-            self._memory_cache[uid] = default_cfg
+        self._put_memory_cache(uid, default_cfg)
         return default_cfg
 
     def add_ticker(
@@ -402,8 +422,7 @@ class WatchlistRepository:
         config.items.insert(0, new_item)
         config.updated_at = now
 
-        with self._lock:
-            self._memory_cache[uid] = config
+        self._put_memory_cache(uid, config)
         self._save_to_s3(config)
         return config
 
@@ -419,8 +438,7 @@ class WatchlistRepository:
         if len(config.items) != initial_len:
             now = datetime.now(UTC).isoformat()
             config.updated_at = now
-            with self._lock:
-                self._memory_cache[uid] = config
+            self._put_memory_cache(uid, config)
             self._save_to_s3(config)
 
         return config
@@ -429,8 +447,7 @@ class WatchlistRepository:
         """Reset user watchlist to original default basket."""
         uid = validate_user_id(user_id)
         default_cfg = self._create_default_config(user_id=uid)
-        with self._lock:
-            self._memory_cache[uid] = default_cfg
+        self._put_memory_cache(uid, default_cfg)
         self._save_to_s3(default_cfg)
         return default_cfg
 
