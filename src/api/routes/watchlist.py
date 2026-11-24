@@ -51,7 +51,7 @@ def get_quote_service() -> QuoteService:
 )
 def get_user_watchlist(
     page: int = Query(1, ge=1, description="1-based page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Number of tickers per page"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of tickers per page"),
     market: Market | None = Query(None, description="Optional market filter (US or VN)"),
     refresh: bool = Query(False, description="Force refresh bypassing TTL cache"),
     user_id: str = Depends(get_current_user_id),
@@ -81,7 +81,7 @@ def add_ticker_to_watchlist(
     repo = get_watchlist_repository()
     try:
         repo.add_ticker(ticker=request.ticker, market=request.market, user_id=user_id)
-        return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=20)
+        return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=10)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -101,7 +101,7 @@ def remove_ticker_from_watchlist(
     """Remove a ticker from the persistent watchlist and return first page of refreshed list."""
     repo = get_watchlist_repository()
     repo.remove_ticker(ticker=ticker, user_id=user_id)
-    return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=20)
+    return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=10)
 
 
 @router.post(
@@ -112,10 +112,10 @@ def remove_ticker_from_watchlist(
 def reset_watchlist(
     user_id: str = Depends(get_current_user_id),
 ) -> WatchlistResponse:
-    """Reset watchlist back to default multi-market basket (100 SEC issuers plus VN benchmark tickers)."""
+    """Reset watchlist back to default multi-market basket (100 SEC issuers plus 50 VN issuers)."""
     repo = get_watchlist_repository()
     repo.reset_to_default(user_id=user_id)
-    return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=20)
+    return repo.get_enriched_watchlist(user_id=user_id, page=1, page_size=10)
 
 
 @router.get(

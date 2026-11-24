@@ -60,7 +60,7 @@ export function initWatchlistController({ onAskAi }) {
   const stockNextPageBtn = document.getElementById("stock-next-page");
   const stockPageInfo = document.getElementById("stock-page-info");
 
-  const WATCHLIST_PAGE_SIZE = 20;
+  const WATCHLIST_PAGE_SIZE = 10;
   let currentWatchlistQuotes = [];
   let currentMarketFilter = "ALL";
   let currentWatchlistPage = 1;
@@ -306,7 +306,7 @@ export function initWatchlistController({ onAskAi }) {
 
   if (stockResetBtn) {
     stockResetBtn.addEventListener("click", async () => {
-      if (confirm("Khôi phục danh mục theo dõi về danh sách mặc định AAPL, MSFT, GOOGL, NVDA, FPT, VNM, HPG?")) {
+      if (confirm("Khôi phục danh mục theo dõi về toàn bộ 150 doanh nghiệp mặc định (100 US + 50 VN)?")) {
         try {
           if (stockLoadingSpinner) stockLoadingSpinner.style.display = "flex";
           const resp = await resetWatchlistApi();
@@ -370,9 +370,6 @@ export function initWatchlistController({ onAskAi }) {
       fetchWatchlistQuotes(false, 1);
     });
   });
-
-  // Initial background fetch for watchlist data
-  fetchWatchlistQuotes(false);
 
   return { openStockTerminal, closeStockTerminal, fetchWatchlistQuotes };
 }

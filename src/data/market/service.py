@@ -31,12 +31,24 @@ from src.data.storage.s3_storage import S3Storage
 logger = logging.getLogger(__name__)
 
 
+def _build_company_name_map() -> dict[str, str]:
+    """Build uppercase ticker -> display company name map across US and VN catalogs."""
+    name_map: dict[str, str] = {}
+    for company in load_company_catalog("configs/companies.yaml", include_vn=True):
+        ticker = str(company.get("ticker", "")).strip().upper()
+        name = company.get("english_name") or company.get("name")
+        if ticker and isinstance(name, str) and name.strip():
+            name_map[ticker] = name.strip()
+    return name_map
+
+
 class QuoteService:
     """Service providing cached, rate-limited market quotes across multi-market providers."""
 
     DEFAULT_FINNHUB_RPS = 0.9
-    DEFAULT_FINNHUB_BURST = 5.0
+    DEFAULT_FINNHUB_BURST = 20.0
     DEFAULT_VN_RPS = 5.0
+    DEFAULT_VN_BURST = 20.0
     DEFAULT_STALE_TTL_SECONDS = 1800.0
     DEFAULT_MAX_CACHE_SIZE = 500
 
@@ -67,7 +79,10 @@ class QuoteService:
             else max(float(ttl_seconds) * 6.0, self.DEFAULT_STALE_TTL_SECONDS)
         )
         self.max_cache_size = max(1, int(max_cache_size))
-        self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=self.DEFAULT_VN_RPS)
+        self.rate_limiter = rate_limiter or RateLimiter(
+            requests_per_second=self.DEFAULT_VN_RPS,
+            capacity=self.DEFAULT_VN_BURST,
+        )
         self.finnhub_rate_limiter = (
             finnhub_rate_limiter
             or rate_limiter
@@ -75,6 +90,10 @@ class QuoteService:
         )
         self._cache: OrderedDict[str, tuple[StockQuote, float, float]] = OrderedDict()
         self._cache_lock = threading.Lock()
+        self._catalog_names: dict[str, str] = _build_company_name_map()
+
+    def _resolve_company_name(self, symbol: str) -> str | None:
+        return self._catalog_names.get(symbol.strip().upper())
 
     @staticmethod
     def _stale_fallback(
@@ -107,6 +126,8 @@ class QuoteService:
 
         provider = self.factory.get_provider(symbol)
         limiter = self.finnhub_rate_limiter if provider.market == Market.US else self.rate_limiter
+        fallback_name = self._resolve_company_name(symbol)
+
         if not limiter.try_acquire():
             stale = self._stale_fallback(cached_entry, now)
             if stale is not None:
@@ -115,6 +136,7 @@ class QuoteService:
             logger.warning("Quote rate limiter exhausted for %s; returning non-blocking error", symbol)
             return StockQuote(
                 ticker=symbol,
+                company_name=fallback_name,
                 market=provider.market,
                 price=None,
                 change=None,
@@ -128,6 +150,7 @@ class QuoteService:
         if quote is None:
             quote = StockQuote(
                 ticker=symbol,
+                company_name=fallback_name,
                 market=provider.market,
                 price=None,
                 change=None,
@@ -135,6 +158,8 @@ class QuoteService:
                 as_of=datetime.now(UTC).isoformat(),
                 status=QuoteStatus.UNSUPPORTED,
             )
+        elif not quote.company_name and fallback_name:
+            quote = quote.model_copy(update={"company_name": fallback_name})
 
         # Never cache transient errors / HTTP 429 (price=None, status=ERROR) for 300s
         if quote.status == QuoteStatus.ERROR:
@@ -168,6 +193,7 @@ class QuoteService:
                     logger.error("Failed to fetch quote for %s in batch: %s", t, exc)
                     results[t] = StockQuote(
                         ticker=t,
+                        company_name=self._resolve_company_name(t),
                         market=Market.US,
                         price=None,
                         as_of=datetime.now(UTC).isoformat(),
@@ -179,7 +205,7 @@ class QuoteService:
 
 
 def _load_default_watchlist_tickers() -> tuple[tuple[str, Market], ...]:
-    """Build default multi-market watchlist from all configured SEC issuers plus VN benchmark tickers."""
+    """Build default multi-market watchlist from all configured US SEC and Vietnam HOSE issuers."""
     seen: set[str] = set()
     entries: list[tuple[str, Market]] = []
 
@@ -189,10 +215,11 @@ def _load_default_watchlist_tickers() -> tuple[tuple[str, Market], ...]:
             seen.add(ticker)
             entries.append((ticker, Market.US))
 
-    for vn_ticker in ("FPT", "VNM", "HPG"):
-        if vn_ticker not in seen:
-            seen.add(vn_ticker)
-            entries.append((vn_ticker, Market.VN))
+    for company in load_company_catalog("configs/companies_vn.yaml", include_vn=False):
+        ticker = str(company.get("ticker", "")).strip().upper()
+        if ticker and ticker not in seen:
+            seen.add(ticker)
+            entries.append((ticker, Market.VN))
 
     if entries:
         return tuple(entries)
@@ -260,7 +287,7 @@ class WatchlistRepository:
         now = datetime.now(UTC).isoformat()
         items = [WatchlistItem(ticker=ticker, market=market, added_at=now) for ticker, market in self.DEFAULT_TICKERS]
         return WatchlistConfig(
-            version="1.0",
+            version="2.0",
             user_id=uid,
             items=items,
             updated_at=now,
@@ -282,7 +309,22 @@ class WatchlistRepository:
 
             raw_bytes = s3.download_bytes(self.BUCKET_NAME, key)
             data = json.loads(raw_bytes.decode("utf-8"))
-            return WatchlistConfig(**data)
+            cfg = WatchlistConfig(**data)
+            # Migrate legacy 1.0 default watchlists (103 items) to include all configured VN issuers
+            if cfg.version == "1.0" and len(cfg.items) >= 100:
+                existing = {item.ticker for item in cfg.items}
+                now = datetime.now(UTC).isoformat()
+                missing = [
+                    WatchlistItem(ticker=ticker, market=market, added_at=now)
+                    for ticker, market in self.DEFAULT_TICKERS
+                    if ticker not in existing
+                ]
+                if missing:
+                    cfg.items.extend(missing)
+                    cfg.version = "2.0"
+                    cfg.updated_at = now
+                    self._save_to_s3(cfg)
+            return cfg
         except Exception as exc:
             logger.error("Failed to load watchlist from MinIO S3: %s", exc)
             return None

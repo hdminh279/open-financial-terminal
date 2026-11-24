@@ -219,23 +219,23 @@ class TestQuoteServiceAndRepository:
         repo = WatchlistRepository(s3_storage=mock_s3, quote_service=mock_quote_svc)
         initial_cfg = repo.get_watchlist()
         default_count = len(repo.DEFAULT_TICKERS)
-        assert default_count == 103
+        assert default_count == 150
         assert len(initial_cfg.items) == default_count
         tickers_in_default = {item.ticker for item in initial_cfg.items}
-        assert {"AAPL", "MSFT", "NVDA", "TSM", "INFY", "FPT", "VNM", "HPG"}.issubset(tickers_in_default)
+        assert {"AAPL", "MSFT", "NVDA", "TSM", "INFY", "FPT", "VNM", "HPG", "VCB", "TCB"}.issubset(tickers_in_default)
 
-        # Add new ticker
-        updated = repo.add_ticker("VIC")
-        assert any(item.ticker == "VIC" for item in updated.items)
+        # Add new ticker outside default 150 catalog
+        updated = repo.add_ticker("NEWCO")
+        assert any(item.ticker == "NEWCO" for item in updated.items)
         assert len(updated.items) == default_count + 1
 
         # Adding duplicate does not increase count
-        dup = repo.add_ticker("VIC")
+        dup = repo.add_ticker("NEWCO")
         assert len(dup.items) == default_count + 1
 
         # Remove ticker
-        removed = repo.remove_ticker("VIC")
-        assert not any(item.ticker == "VIC" for item in removed.items)
+        removed = repo.remove_ticker("NEWCO")
+        assert not any(item.ticker == "NEWCO" for item in removed.items)
         assert len(removed.items) == default_count
 
         # Enriched response contains live quotes
@@ -252,16 +252,22 @@ class TestWatchlistAPI:
     def mock_backend_services(self) -> None:
         """Inject mock providers for lightning fast deterministic API tests."""
         from src.api.routes import watchlist as wl_module
+        from src.core.financial.company_registry import load_company_catalog
 
+        vn_tickers = {
+            str(c["ticker"]).upper()
+            for c in load_company_catalog("configs/companies_vn.yaml", include_vn=False)
+            if c.get("ticker")
+        }
         mock_quote_svc = MagicMock()
         mock_quote_svc.get_quote.side_effect = lambda sym, **kwargs: StockQuote(
             ticker=sym,
             company_name=f"{sym} Corp",
-            market=Market.VN if sym in ("FPT", "VNM", "HPG", "VIC") else Market.US,
+            market=Market.VN if sym in vn_tickers else Market.US,
             price=150.0,
             change=2.5,
             percent_change=1.69,
-            currency="VND" if sym in ("FPT", "VNM", "HPG", "VIC") else "USD",
+            currency="VND" if sym in vn_tickers else "USD",
             as_of="2026-11-20T12:00:00Z",
             status=QuoteStatus.REAL_TIME,
         )
@@ -324,10 +330,11 @@ class TestWatchlistAPI:
         assert len(d1["items"]) == 10
         assert d1["total_pages"] >= 10
 
-        resp_vn = test_client.get("/api/watchlist?page=1&page_size=20&market=VN")
+        resp_vn = test_client.get("/api/watchlist?page=1&page_size=10&market=VN")
         assert resp_vn.status_code == 200
         d_vn = resp_vn.json()
-        assert d_vn["total"] >= 3
+        assert d_vn["total"] == 50
+        assert len(d_vn["items"]) == 10
         assert all(item["market"] == "VN" for item in d_vn["items"])
 
 
@@ -407,6 +414,7 @@ def test_quote_service_non_blocking_rate_limit_and_lru_bound() -> None:
     assert elapsed < 0.05, f"QuoteService must not block worker threads, took {elapsed:.4f}s"
     assert limited_q.status == QuoteStatus.ERROR
     assert limited_q.price is None
+    assert limited_q.company_name == "Microsoft Corporation"
     assert "MSFT" not in svc._cache
     assert mock_provider.fetch_quote.call_count == 1
 

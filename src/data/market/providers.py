@@ -231,6 +231,12 @@ class SSIQuoteProvider(BaseQuoteProvider):
         """Initialize SSI quote provider."""
         self.timeout = timeout
         self._client = client
+        self._name_cache: dict[str, str] = {}
+        for company in load_company_catalog("configs/companies_vn.yaml", include_vn=False):
+            sym = str(company.get("ticker", "")).strip().upper()
+            name = company.get("english_name") or company.get("name")
+            if sym and isinstance(name, str) and name.strip():
+                self._name_cache[sym] = name.strip()
 
     @property
     def market(self) -> Market:
@@ -271,6 +277,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
                 logger.info("SSI returned empty data object for ticker %s", ticker)
                 return StockQuote(
                     ticker=ticker,
+                    company_name=self._name_cache.get(ticker.upper()),
                     market=self.market,
                     price=None,
                     change=None,
@@ -284,13 +291,12 @@ class SSIQuoteProvider(BaseQuoteProvider):
             ref_price = data.get("refPrice")
             price_change = data.get("priceChange") or data.get("expectedPriceChange")
             pct_change = data.get("priceChangePercent") or data.get("expectedPriceChangePercent")
-            company_name = data.get("clientNameEn") or data.get("clientName") or data.get("companyNameEn")
-            if not company_name:
-                catalog = load_company_catalog("configs/companies_vn.yaml")
-                for c in catalog:
-                    if str(c.get("ticker", "")).upper() == ticker.upper():
-                        company_name = c.get("english_name") or c.get("name")
-                        break
+            company_name = (
+                data.get("clientNameEn")
+                or data.get("clientName")
+                or data.get("companyNameEn")
+                or self._name_cache.get(ticker.upper())
+            )
 
             return StockQuote(
                 ticker=ticker,
@@ -313,6 +319,7 @@ class SSIQuoteProvider(BaseQuoteProvider):
             logger.error("Failed to fetch quote for %s from SSI: %s", ticker, exc)
             return StockQuote(
                 ticker=ticker,
+                company_name=self._name_cache.get(ticker.upper()),
                 market=self.market,
                 price=None,
                 change=None,
