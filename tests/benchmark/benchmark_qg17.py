@@ -597,10 +597,10 @@ def run_qg17_benchmark(mode: str = "offline", write_report: bool = True) -> list
                 t0 = time.perf_counter()
                 with (
                     patch("src.ai.agent.router.LLMFactory.get_adapter", return_value=fake_llm),
-                    patch("src.ai.agent.citation.LLMFactory.get_adapter", return_value=fake_llm),
-                    patch("src.ai.agent.graph.get_sql_tool", return_value=sql_tool),
-                    patch("src.ai.agent.graph.get_retriever", return_value=mock_retriever),
-                    patch("src.ai.agent.graph.get_web_tool", return_value=mock_web),
+                    patch("src.ai.agent.nodes.citation_node.LLMFactory.get_adapter", return_value=fake_llm),
+                    patch("src.ai.agent.nodes.sql_node.get_sql_tool", return_value=sql_tool),
+                    patch("src.ai.agent.nodes.rag_node.get_retriever", return_value=mock_retriever),
+                    patch("src.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web),
                 ):
                     final_state = graph.invoke(
                         {
@@ -621,7 +621,7 @@ def run_qg17_benchmark(mode: str = "offline", write_report: bool = True) -> list
             if case.get("mock_web_mode") == "empty":
                 mock_web = MagicMock(spec=WebSearchTool)
                 mock_web.search.return_value = WebSearchResponse(query=case["query"], total_found=0, results=[])
-                with patch("src.ai.agent.graph.get_web_tool", return_value=mock_web):
+                with patch("src.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web):
                     final_state = graph.invoke(
                         {
                             "query": case["query"],

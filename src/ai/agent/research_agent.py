@@ -7,14 +7,12 @@ end-to-end telemetry.
 
 import logging
 import os
-import re
-import threading
 import time
-from collections import OrderedDict
 from collections.abc import Iterator
 from typing import Any
 
-from src.ai.agent.citation import build_synthesis_messages, citation_node
+from src.ai.agent.cache import TTLQueryCache, normalize_cache_key
+from src.ai.agent.citation import build_synthesis_messages
 from src.ai.agent.contracts import (
     AbstentionInfo,
     AbstentionReason,
@@ -31,6 +29,7 @@ from src.ai.agent.contracts import (
     ToolExecutionStatus,
 )
 from src.ai.agent.graph import build_agent_graph
+from src.ai.agent.nodes.citation_node import citation_node
 from src.ai.agent.state import AgentState
 from src.ai.llm.base import BaseLLMAdapter
 from src.ai.llm.factory import LLMFactory
@@ -39,58 +38,7 @@ from src.core.observability.telemetry import estimate_deepseek_cost_usd
 
 logger = logging.getLogger(__name__)
 
-
-def _normalize_cache_key(query: str) -> str:
-    """Normalize a standalone query string into a canonical cache key."""
-    return re.sub(r"\s+", " ", query.strip().lower())
-
-
-class TTLQueryCache:
-    """Thread-safe, bounded LRU in-memory TTL cache for standalone AgentResponse objects."""
-
-    def __init__(self, ttl_seconds: float = 300.0, max_size: int = 256) -> None:
-        self.ttl_seconds = max(0.0, float(ttl_seconds))
-        self.max_size = max(1, int(max_size))
-        self._store: OrderedDict[str, tuple[float, AgentResponse]] = OrderedDict()
-        self._lock = threading.Lock()
-
-    def get(self, key: str) -> AgentResponse | None:
-        """Retrieve a non-expired cached response or None on miss."""
-        if self.ttl_seconds <= 0:
-            return None
-        now = time.monotonic()
-        with self._lock:
-            entry = self._store.get(key)
-            if entry is None:
-                return None
-            expires_at, response = entry
-            if now >= expires_at:
-                del self._store[key]
-                return None
-            self._store.move_to_end(key)
-            return response
-
-    def set(self, key: str, response: AgentResponse) -> None:
-        """Store a response in the bounded LRU cache with TTL."""
-        if self.ttl_seconds <= 0:
-            return
-        expires_at = time.monotonic() + self.ttl_seconds
-        with self._lock:
-            self._store[key] = (expires_at, response)
-            self._store.move_to_end(key)
-            while len(self._store) > self.max_size:
-                self._store.popitem(last=False)
-
-    def clear(self) -> None:
-        """Remove all cached entries."""
-        with self._lock:
-            self._store.clear()
-
-    @property
-    def size(self) -> int:
-        """Return current number of entries stored in cache."""
-        with self._lock:
-            return len(self._store)
+_normalize_cache_key = normalize_cache_key
 
 
 CANONICAL_TIMELINE_STEPS = [

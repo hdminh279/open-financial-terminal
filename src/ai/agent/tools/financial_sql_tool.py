@@ -12,36 +12,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.financial.company_registry import get_supported_tickers
+from src.core.financial.metric_registry import get_metric_registry
 
-STATEMENT_METRICS = {
-    "revenues",
-    "operating_income",
-    "net_income",
-    "gross_profit",
-    "eps_diluted",
-    "net_interest_income",
-    "total_operating_income",
-    "operating_cash_flow",
-    "cash_and_cash_equivalents",
-    "current_assets",
-    "current_liabilities",
-    "total_assets",
-    "total_liabilities",
-    "stockholders_equity_parent",
-    "stockholders_equity_total",
-}
-
-RATIO_METRICS = {
-    "operating_margin",
-    "net_margin",
-    "gross_margin",
-    "current_ratio",
-    "debt_to_equity",
-    "revenue_growth_yoy",
-}
-
-SUPPORTED_METRICS = STATEMENT_METRICS | RATIO_METRICS
-SUPPORTED_TICKERS = get_supported_tickers()
+_REGISTRY = get_metric_registry()
+STATEMENT_METRICS: set[str] = set(_REGISTRY.list_metrics(gold_table="statements"))
+RATIO_METRICS: set[str] = set(_REGISTRY.list_metrics(gold_table="ratios"))
+SUPPORTED_METRICS: set[str] = STATEMENT_METRICS | RATIO_METRICS
 
 
 class FinancialQueryInput(BaseModel):

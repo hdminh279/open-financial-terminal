@@ -81,6 +81,7 @@ class _Bucket:
     last_seen: float
 
 
+# shortcut: in-memory per-process bucket; move to Redis/KeyDB before multi-worker scaling
 class IPTokenBucketRateLimiter:
     """Thread-safe, non-blocking per-IP Token Bucket rate limiter."""
 

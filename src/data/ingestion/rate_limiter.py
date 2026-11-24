@@ -18,21 +18,30 @@ class RateLimiter:
         self.last_check = time.monotonic()
         self._lock = threading.Lock()
 
+    def _refill_locked(self) -> None:
+        """Refill available tokens based on elapsed monotonic time (caller must hold self._lock)."""
+        now = time.monotonic()
+        elapsed = max(0.0, now - self.last_check)
+        self.last_check = now
+        self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+
+    def try_acquire(self) -> bool:
+        """Attempt to consume one token immediately without blocking the calling thread."""
+        with self._lock:
+            self._refill_locked()
+            if self.tokens >= 1.0:
+                self.tokens -= 1.0
+                return True
+            return False
+
     def acquire(self) -> None:
-        """Blocks the calling thread until at least one token is available"""
+        """Block the calling thread until at least one token is available."""
         with self._lock:
             while True:
-                now = time.monotonic()
-                elapsed = now - self.last_check
-                self.last_check = now
-
-                # Refill tokens based on elapsed time
-                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
-
+                self._refill_locked()
                 if self.tokens >= 1.0:
                     self.tokens -= 1.0
                     return
 
-                # Caculate remaning sleep time required to accumulate one toknes
                 sleep_needed = (1.0 - self.tokens) / self.rate
                 time.sleep(sleep_needed)

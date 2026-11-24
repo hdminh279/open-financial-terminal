@@ -87,18 +87,35 @@ def client() -> TestClient:
 
 
 def test_serve_static_ui(client: TestClient) -> None:
-    """Validate root endpoint serves UI index.html and static files are mounted."""
+    """Validate root endpoint serves UI index.html and modular CSS/JS assets are mounted."""
     root_resp = client.get("/")
     assert root_resp.status_code == 200
     assert "<title>Corporate Filing Intelligence" in root_resp.text
+    assert '<script type="module" src="/static/js/terminal.js"></script>' in root_resp.text
 
     css_resp = client.get("/static/styles.css")
     assert css_resp.status_code == 200
-    assert "--bg-app" in css_resp.text
+    assert '@import url("./styles/theme.css")' in css_resp.text
 
-    js_resp = client.get("/static/app.js")
-    assert js_resp.status_code == 200
-    assert "Corporate Filing Intelligence" in js_resp.text
+    for css_mod, expected_token in (
+        ("/static/styles/theme.css", "--bg-app"),
+        ("/static/styles/layout.css", ".workstation-container"),
+        ("/static/styles/terminal.css", ".chat-pane"),
+        ("/static/styles/watchlist.css", ".stock-terminal-fullscreen"),
+    ):
+        mod_resp = client.get(css_mod)
+        assert mod_resp.status_code == 200
+        assert expected_token in mod_resp.text
+
+    for js_mod in (
+        "/static/js/api.js",
+        "/static/js/chart.js",
+        "/static/js/watchlist.js",
+        "/static/js/terminal.js",
+    ):
+        js_resp = client.get(js_mod)
+        assert js_resp.status_code == 200
+        assert "Corporate Filing Intelligence" in js_resp.text
 
 
 def test_get_companies(client: TestClient) -> None:

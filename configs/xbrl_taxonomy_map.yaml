@@ -69,6 +69,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Total recognized consolidated revenue from sales of goods and services."
     synonyms:
@@ -140,6 +141,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Operating income or loss before interest, taxes, and non-operating items (EBIT equivalent)."
     synonyms:
@@ -180,6 +182,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Consolidated bottom-line net profit or loss attributable to the parent entity shareholders."
     synonyms:
@@ -215,6 +218,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Revenues minus Cost of Goods Sold. Nullable: not reported by Alphabet (GOOGL)."
     synonyms:
@@ -238,6 +242,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: null
     is_dimensional: false
     description: "Costs incurred to develop new products, services, or software features prior to commercial availability."
     synonyms:
@@ -266,6 +271,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: null
     is_dimensional: false
     description: "Aggregate selling, marketing, customer support, legal, administrative, and executive overhead expenses."
     synonyms:
@@ -291,6 +297,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: null
     is_dimensional: false
     description: "Total direct and indirect operating costs incurred in running business operations (excluding COGS)."
     synonyms:
@@ -316,6 +323,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD/shares"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Net income per share assuming all dilutive convertible securities, stock options, and warrants are exercised."
     synonyms:
@@ -344,6 +352,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Total economic resources owned or controlled by the enterprise at the reporting balance sheet date."
     synonyms:
@@ -367,6 +376,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Total aggregate financial obligations, debts, and payables owed to creditors and vendors."
     synonyms:
@@ -392,6 +402,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Total consolidated residual interest in assets after deducting liabilities, including noncontrolling interest."
     synonyms:
@@ -425,6 +436,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Equity interest attributable solely to parent company stockholders (excludes noncontrolling interests)."
     synonyms:
@@ -454,6 +466,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Currency on hand, demand deposits, and highly liquid short-term marketable investments."
     synonyms:
@@ -485,6 +498,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Liquid resources expected to be converted to cash, sold, or consumed within one fiscal year."
     synonyms:
@@ -507,6 +521,7 @@ metrics:
     period_type: "instant"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Financial obligations and debts due to be settled within one fiscal year."
     synonyms:
@@ -532,6 +547,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Net cash generated from or used in normal core operational business activities."
     synonyms:
@@ -557,6 +573,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: null
     is_dimensional: false
     description: "Funds used by an enterprise to acquire, upgrade, and maintain physical assets such as property, plant, and equipment."
     synonyms:
@@ -585,6 +602,7 @@ metrics:
     period_type: "duration"
     default_unit: "%"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Percentage ratio of operating income to total revenues: (Operating Income / Total Revenues) * 100."
     synonyms:
@@ -603,6 +621,7 @@ metrics:
     period_type: "duration"
     default_unit: "%"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Percentage ratio of gross profit to total revenues: (Gross Profit / Total Revenues) * 100."
     synonyms:
@@ -620,6 +639,7 @@ metrics:
     period_type: "duration"
     default_unit: "%"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Percentage ratio of net income to total revenues: (Net Income / Total Revenues) * 100."
     synonyms:
@@ -639,6 +659,7 @@ metrics:
     period_type: "duration"
     default_unit: "%"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Percentage change in total revenue compared to the exact same period of the prior year."
     synonyms:
@@ -657,6 +678,7 @@ metrics:
     period_type: "instant"
     default_unit: "ratio"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Liquidity metric measuring ability to cover short-term debt: Total Current Assets / Total Current Liabilities."
     synonyms:
@@ -673,6 +695,7 @@ metrics:
     period_type: "instant"
     default_unit: "ratio"
     storage_layer: "sql_gold"
+    gold_table: "ratios"
     is_dimensional: false
     description: "Leverage ratio evaluating financial risk: Total Liabilities / Total Stockholders' Equity."
     synonyms:
@@ -690,6 +713,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "sql_gold"
+    gold_table: null
     is_dimensional: false
     description: "Cash available for discretionary deployment: Operating Cash Flow minus Capital Expenditures."
     synonyms:
@@ -708,6 +732,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Apple product line revenue generated exclusively from iPhone hardware and related accessories."
     synonyms:
@@ -727,6 +752,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Apple product line revenue generated from Mac personal computer hardware (MacBook, iMac, Mac Pro)."
     synonyms:
@@ -745,6 +771,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Apple product line revenue generated from iPad tablet devices and related keyboards/pencils."
     synonyms:
@@ -762,6 +789,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Apple product line revenue comprising AirPods, Apple Watch, HomePod, Beats, and branded accessories."
     synonyms:
@@ -780,6 +808,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Apple services segment revenue comprising App Store commissions, advertising, AppleCare, iCloud, and Apple Pay."
     synonyms:
@@ -797,6 +826,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Microsoft reportable segment encompassing public, private, and hybrid server products and cloud services."
     synonyms:
@@ -813,6 +843,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Microsoft reportable segment comprising Office commercial/consumer, LinkedIn, and Dynamics business solutions."
     synonyms:
@@ -829,6 +860,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Microsoft reportable segment comprising Windows OEM, Surface devices, Xbox gaming hardware, and search ads."
     synonyms:
@@ -845,6 +877,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Microsoft Azure cloud computing infrastructure platform and enterprise AI cloud services disclosures."
     synonyms:
@@ -864,6 +897,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Alphabet segment comprising Android, Chrome, Google Maps, Google Play, Search, YouTube, and hardware."
     synonyms:
@@ -880,6 +914,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Alphabet enterprise cloud segment encompassing Google Cloud Platform (GCP) and Google Workspace productivity apps."
     synonyms:
@@ -897,6 +932,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Alphabet revenue generated directly from sponsored search queries on Google.com properties."
     synonyms:
@@ -914,6 +950,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Alphabet revenue generated from video advertisements displayed on the YouTube platform."
     synonyms:
@@ -934,6 +971,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Geographic reportable operating segment encompassing North and South America operations."
     synonyms:
@@ -950,6 +988,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Geographic reportable operating segment encompassing continental Europe, UK, and Middle East operations."
     synonyms:
@@ -966,6 +1005,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Geographic reportable operating segment encompassing China mainland, Hong Kong, and Taiwan."
     synonyms:
@@ -982,6 +1022,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Geographic reportable operating segment comprising Japanese domestic commercial operations."
     synonyms:
@@ -998,6 +1039,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: true
     description: "Geographic reportable segment comprising Australia, Southeast Asia, India, and other Asia-Pacific territories."
     synonyms:
@@ -1018,6 +1060,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: false
     description: "Non-GAAP operating income adjusted for stock-based compensation, restructuring charges, or litigation costs."
     synonyms:
@@ -1034,6 +1077,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: false
     description: "Non-GAAP bottom-line profit excluding non-recurring amortization of intangibles, impairment, and tax effects."
     synonyms:
@@ -1050,6 +1094,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD/shares"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: false
     description: "Non-GAAP diluted earnings per share adjusted for non-cash and non-operating accounting items."
     synonyms:
@@ -1067,6 +1112,7 @@ metrics:
     period_type: "duration"
     default_unit: "%"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: false
     description: "Non-GAAP gross profit margin adjusting for supply chain disruptions, amortization of acquired tech, or tariffs."
     synonyms:
@@ -1082,6 +1128,7 @@ metrics:
     period_type: "duration"
     default_unit: "USD"
     storage_layer: "rag_textual"
+    gold_table: null
     is_dimensional: false
     description: "Earnings before interest, taxes, depreciation, and amortization, further adjusted for share-based compensation."
     synonyms:
@@ -1100,6 +1147,7 @@ metrics:
     period_type: "duration"
     default_unit: "VND"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Interest income minus interest expense for commercial banks under VAS-BANK."
     synonyms:
@@ -1116,6 +1164,7 @@ metrics:
     period_type: "duration"
     default_unit: "VND"
     storage_layer: "sql_gold"
+    gold_table: "statements"
     is_dimensional: false
     description: "Total banking operating income (net interest income plus non-interest income) under VAS-BANK."
     synonyms:

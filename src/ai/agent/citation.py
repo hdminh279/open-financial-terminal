@@ -9,23 +9,32 @@ import logging
 import re
 from typing import Any
 
-from src.ai.agent.chart_engine import ChartEngine
 from src.ai.agent.contracts import (
-    AbstentionInfo,
-    AbstentionReason,
     Citation,
     EvidenceSourceType,
     IntentType,
-    ReportSection,
 )
+from src.ai.agent.nodes.citation_node import citation_node, synthesis_node
+from src.ai.agent.prompts import load_prompt
 from src.ai.agent.state import AgentState
-from src.ai.llm.base import BaseLLMAdapter
 from src.ai.llm.contracts import ChatMessage
 from src.ai.llm.factory import LLMFactory
 from src.core.financial.company_registry import load_company_catalog
 from src.core.financial.response_templates import detect_query_language, render_template
 from src.core.financial.semantic_guardrails import FinancialOntology
 from src.core.financial.year_utils import is_shifted_fiscal_period
+
+__all__ = [
+    "SYNTHESIS_SYSTEM_PROMPT",
+    "CitationEngine",
+    "LLMFactory",
+    "build_fiscal_period_notes",
+    "build_synthesis_messages",
+    "citation_node",
+    "detect_insufficient_evidence",
+    "sanitize_answer_formatting",
+    "synthesis_node",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -39,70 +48,7 @@ def _get_financial_ontology() -> FinancialOntology:
     return _financial_ontology
 
 
-SYNTHESIS_SYSTEM_PROMPT = """You are a senior financial research analyst and corporate intelligence specialist.
-Your mission is to synthesize a factual, clear, and comprehensive answer to the user's question,
-grounded strictly and objectively in the provided verified evidence (including official SEC EDGAR filings, VAS financial statements, and live web sources).
-
-### Financial Semantic Guardrails:
-1. Layer 1 (GAAP / VAS vs Non-GAAP):
-   - Clearly distinguish official GAAP/VAS reported metrics (Revenues, Net Income, Operating Income) versus segment, non-GAAP, or news disclosures.
-2. Layer 2 (Financial Ontology - Geographic vs Product Lines):
-   - Strictly separate Geographic Segments (e.g. Americas, Europe, Greater China) from Product Categories (e.g. iPhone, Mac, Services, Azure).
-   - NEVER confuse, mix, or aggregate Geographic revenue with Product Line revenue.
-3. Layer 3 (Two-Tier Structured Organization):
-   Your answer should be well-organized into two clear sections:
-   - `### Official Disclosures`:
-     * Core factual figures, standard Markdown tables with pipes (|), and inline citations [1], [2].
-   - `### Analysis & Commentary`:
-     * Growth rates, margins, business dynamics, and strategic commentary directly backed by the evidence.
-4. Layer 4 (Mathematical Consistency):
-   - Operating Margin = Operating Income / Revenues.
-   - Net Margin = Net Income / Revenues.
-   - Never hallucinate margins or figures that contradict the raw evidence.
-5. Layer 5 (Multi-Currency & Fiscal Calendar Integrity):
-   - Always label the exact reporting currency (e.g. USD, VND, TWD, EUR, INR, JPY) alongside monetary figures.
-   - NEVER compare raw monetary figures across different currencies as if they shared the same unit, and NEVER invent exchange rates not present in the evidence.
-   - When evidence includes exact period dates (start_date to end_date), state the exact fiscal period and date coverage clearly to avoid calendar-year vs fiscal-year confusion.
-   - Clearly separate audited filing facts from unaudited live web news sources when both are present.
-
-### Language Enforcement:
-- If the user's inquiry is in Vietnamese (or another language), synthesize the entire answer fluently in that language, translating the two-tier section headers naturally without square brackets (e.g. `### Công bố Chính thức & Bằng chứng`, `### Phân tích & Bình luận`).
-- For English queries, use:
-  * `### Official Disclosures`
-  * `### Analysis & Commentary`
-
-### Markdown Table Formatting Rule:
-- When presenting multiple fiscal periods, product categories, or metric comparisons, format the data as a clean, standard GitHub Flavored Markdown Table with pipe syntax:
-  | Fiscal Period / Product Line | Value | Citation Source |
-  | :--- | :---: | :---: |
-  | <Period_or_Segment_1> | <Amount_1> | [1] |
-  | <Period_or_Segment_2> | <Amount_2> | [2] |
-- NEVER output unformatted text blocks where column names and values are separated by spaces, tabs, or lone newlines. Always use markdown table pipes (|).
-
-### Clean Content Rules:
-- Do NOT output raw Mermaid `xychart-beta` blocks or raw `### Sources & References` footnote sections in the body. The UI automatically displays interactive charts and collapsible references from structured state.
-- NEVER insert horizontal divider lines (`---`, `***`, `___`) between sections.
-- NEVER wrap section headings in square brackets `[...]`.
-- Minimize parentheses `(...)` as much as possible across prose, bullet points, and table cells. Write years, currencies, and clarifications naturally inline using colons, commas, or prepositions (e.g. `từ 60,9 tỷ USD năm FY2024 lên 215,9 tỷ USD năm FY2026`, `khoảng 15–18%/năm`, `478,8 tỷ USD trong FY2026`) rather than wrapping them in parentheses.
-- Use consistent decimal and thousand separators matching the response language across all figures in the same answer (e.g. in Vietnamese, consistently use `.` for thousands and `,` for decimals; never mix `201.183 tỷ` with `245,122 tỷ`).
-- Keep the analytical answer focused, clear, and easy to read. Do not use graphical emojis.
-
-### Grounding & Citation Rules:
-1. Strict Grounding: Rely ONLY on the facts, numerical metrics, and text excerpts in the provided evidence.
-   Do not speculate, extrapolate, or inject outside knowledge. If the retrieved filing excerpts contain NO disclosure supporting the requested topic or claim, start your response with the exact tag `[INSUFFICIENT_EVIDENCE]` on the first line followed by a transparent explanation of what is missing. If a Yes/No question asks about a missing breakdown (e.g. geographic revenue split when only consolidated revenue exists), NEVER answer 'Yes' or 'No'; state transparently that it cannot be confirmed from the provided evidence.
-2. Inline Citations: Every statement containing numbers, dates, strategic claims, or risk disclosures
-   MUST cite the corresponding evidence index using square brackets (e.g. [1], [2], or [1][2]).
-3. Partial Evidence Handling: If the user asked for both metrics and explanations, but only one type of
-   evidence was found, answer the supported part thoroughly and state transparently.
-4. Professional Structure: Use clear headings (H2/H3), bullet points, and bold metric highlights.
-
-### Deep Research Report Mode:
-If the user requested a full report, multi-year overview, or deep dive, organize your response into standard sections:
-# Executive Summary
-## Financial Performance & Statement Analysis
-## Business Strategy & Operational Disclosures
-## Risk Factors & Regulatory Disclosures
-"""
+SYNTHESIS_SYSTEM_PROMPT = load_prompt("synthesis_prompt.txt")
 
 
 class CitationEngine:
@@ -412,196 +358,3 @@ def build_synthesis_messages(state: AgentState) -> list[ChatMessage]:
         ChatMessage(role="system", content=SYNTHESIS_SYSTEM_PROMPT),
         ChatMessage(role="user", content=user_prompt),
     ]
-
-
-# ---------------------------------------------------------------------------
-# LangGraph Node Functions
-# ---------------------------------------------------------------------------
-
-
-def synthesis_node(
-    state: AgentState,
-    llm_adapter: BaseLLMAdapter | None = None,
-) -> dict[str, Any]:
-    """LangGraph node synthesizing a fully grounded response with [1], [2] citation tags.
-
-    Args:
-        state: Current AgentState.
-        llm_adapter: Injected or default DeepSeekAdapter instance.
-
-    Returns:
-        State dictionary update containing 'draft_answer'.
-    """
-    is_abstaining = state.get("is_abstaining", False)
-    is_partial = state.get("is_partial", False)
-
-    # Full abstention short-circuit: answer already formulated by abstention_node
-    if is_abstaining and not is_partial:
-        return {"draft_answer": state.get("final_answer", "")}
-
-    # Streaming mode defers token generation to ResearchAgent.stream_query()
-    if state.get("stream_mode"):
-        return {"draft_answer": ""}
-
-    evidence_dicts = state.get("evidence_items", [])
-    adapter = llm_adapter or LLMFactory.get_adapter(profile="chat")
-    messages = build_synthesis_messages(state)
-
-    try:
-        response = adapter.generate(
-            messages=messages,
-            temperature=0.0,
-        )
-        result: dict[str, Any] = {"draft_answer": response.content}
-        if response.usage is not None:
-            result["llm_usage"] = [response.usage.model_dump() | {"model": response.model}]
-        return result
-    except Exception as exc:
-        logger.error("Synthesis node failed: %s", exc, exc_info=True)
-        return {
-            "draft_answer": (
-                f"Error synthesizing response: {exc}. Raw evidence collected: {len(evidence_dicts)} items."
-            )
-        }
-
-
-def citation_node(state: AgentState) -> dict[str, Any]:
-    """LangGraph node appending verified references, generating visual charts, and parsing report sections.
-
-    Args:
-        state: Current AgentState.
-
-    Returns:
-        State dictionary update containing 'citations', 'final_answer', 'charts', and 'report_sections'.
-    """
-    is_abstaining = state.get("is_abstaining", False)
-    is_partial = state.get("is_partial", False)
-    draft_answer = state.get("draft_answer") or state.get("final_answer") or ""
-
-    # In streaming mode, defer citation finalization until stream_query() finishes streaming tokens
-    if state.get("stream_mode") and not draft_answer and not (is_abstaining and not is_partial):
-        return {}
-
-    # Full abstention short-circuit: no citations or charts to attach
-    if is_abstaining and not is_partial:
-        return {
-            "citations": [],
-            "charts": [],
-            "report_sections": [],
-            "final_answer": draft_answer,
-        }
-
-    evidence_dicts = state.get("evidence_items", [])
-    sql_data = state.get("sql_data")
-    routing_decision = state.get("routing_decision") or {}
-    tickers = list(routing_decision.get("tickers") or [])
-    if not tickers and routing_decision.get("ticker"):
-        tickers = [routing_decision.get("ticker")]
-    ticker_label = " vs ".join(tickers) if tickers else None
-    intent_str = state.get("intent", "")
-
-    query = state.get("query", "")
-
-    # 1. Build Citations
-    citations = CitationEngine.build_citations(evidence_dicts)
-
-    # 2. Extract & Build Charts with Router preference
-    query_plan = state.get("query_plan") or {}
-    chart_pref = query_plan.get("chart_preference") or routing_decision.get("chart_preference") or "none"
-    chart_engine = ChartEngine()
-    charts = chart_engine.extract_financial_charts(
-        sql_data=sql_data,
-        chart_preference=chart_pref,
-        ticker=ticker_label,
-        query_plan=query_plan,
-    )
-
-    if charts:
-        c_type = charts[0].chart_type.value if hasattr(charts[0], "chart_type") else "chart"
-        vis_step = {
-            "step": "Preparing visualization",
-            "status": "completed",
-            "description": f"Generated {len(charts)} financial chart(s) ({c_type})",
-            "duration_ms": None,
-        }
-    else:
-        vis_step = {
-            "step": "Preparing visualization",
-            "status": "skipped",
-            "description": "No visualization requested or insufficient data points",
-            "duration_ms": None,
-        }
-
-    # 3. Clean final answer: keep analytical text pristine, avoiding raw markdown code blocks
-    clean_draft = re.sub(
-        r"\n+(?:#{1,3}\s+)?(Financial Visualizations|Visualizations|Sources & References)[\s\S]*$",
-        "",
-        draft_answer,
-        flags=re.IGNORECASE,
-    ).strip()
-    clean_draft = re.sub(r"```(?:mermaid)?\s*xychart-beta[\s\S]*?```", "", clean_draft).strip()
-    clean_draft = re.sub(r"\bxychart-beta\s+title[\s\S]*?(?=\n\n|\Z)", "", clean_draft).strip()
-    raw_clean = clean_draft if clean_draft else draft_answer.strip()
-
-    has_sql_success = any(
-        r.get("tool_name") == "financial_sql_tool" and r.get("status") == "success"
-        for r in (state.get("tool_results") or [])
-        if isinstance(r, dict)
-    )
-    synthesis_abstained, stripped_answer = detect_insufficient_evidence(
-        raw_clean,
-        is_already_abstaining=is_abstaining,
-        is_partial=is_partial,
-        has_sql_success=has_sql_success,
-    )
-    final_answer = sanitize_answer_formatting(stripped_answer)
-
-    if synthesis_abstained:
-        abstention_payload = AbstentionInfo(
-            is_abstaining=True,
-            is_partial=False,
-            reason=AbstentionReason.INSUFFICIENT_EVIDENCE,
-            explanation=final_answer,
-        ).model_dump()
-        return {
-            "citations": [],
-            "charts": [],
-            "report_sections": [],
-            "final_answer": final_answer,
-            "is_abstaining": True,
-            "abstention_info": abstention_payload,
-            "activity_timeline": [vis_step],
-        }
-
-    # 3b. Deterministically append localized fiscal-calendar footnotes when periods are shifted
-    fiscal_notes = build_fiscal_period_notes(sql_data=sql_data, query=query)
-    if fiscal_notes:
-        missing_notes = [n for n in fiscal_notes if n not in final_answer]
-        if missing_notes:
-            final_answer = f"{final_answer}\n\n" + "\n".join(missing_notes)
-
-    # 4. Parse Report Sections if DEEP_RESEARCH_REPORT
-    report_sections: list[dict[str, Any]] = []
-    if intent_str == IntentType.DEEP_RESEARCH_REPORT.value:
-        raw_sections = re.split(r"\n(?=#{1,2}\s+)", draft_answer)
-        for idx, sec in enumerate(raw_sections):
-            lines = sec.strip().split("\n", 1)
-            header = lines[0].replace("#", "").strip() if lines else f"Section {idx + 1}"
-            body = lines[1].strip() if len(lines) > 1 else sec.strip()
-
-            matching_chart = charts[0] if (idx == 1 and charts) else None
-            report_section = ReportSection(
-                section_id=f"sec_{idx + 1}",
-                title=header,
-                content=body,
-                chart=matching_chart,
-            )
-            report_sections.append(report_section.model_dump())
-
-    return {
-        "citations": [c.model_dump() for c in citations],
-        "charts": [c.model_dump() for c in charts],
-        "report_sections": report_sections,
-        "final_answer": final_answer,
-        "activity_timeline": [vis_step],
-    }

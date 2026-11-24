@@ -110,7 +110,7 @@ def test_citation_node_sanitizes_draft_answer() -> None:
     assert result["citations"][0]["excerpt"] == "NVDA FY2026 revenues = 215.9B USD"
 
 
-def test_query_persists_activity_timeline_and_ui_serves_task_18_1_components(
+def test_query_persists_activity_timeline_and_ui_serves_terminal_components(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verify query metadata persists activity_timeline and UI exposes drawer, chips, and exports."""
@@ -173,11 +173,12 @@ def test_query_persists_activity_timeline_and_ui_serves_task_18_1_components(
         assert "export-canvas-csv-btn" in html
         assert "export-canvas-json-btn" in html
 
-        js = client.get("/static/app.js").text
-        assert "openCitationDrawer" in js
-        assert "exportTableData" in js
+        terminal_js = client.get("/static/js/terminal.js").text
+        chart_js = client.get("/static/js/chart.js").text
+        assert "openCitationDrawer" in terminal_js
+        assert "exportTableData" in chart_js
 
-        css = client.get("/static/styles.css").text
+        css = client.get("/static/styles/terminal.css").text
         assert ".assistant-response-text hr" in css
     finally:
         app.dependency_overrides.pop(get_chat_history, None)

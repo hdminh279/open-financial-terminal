@@ -15,20 +15,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.ai.agent.contracts import ChartData, ChartType
-from src.core.financial.metric_registry import MetricRegistry
+from src.core.financial.metric_registry import MetricRegistry, get_metric_registry
 
 logger = logging.getLogger(__name__)
 
-# Point-in-time instant metrics that MUST NOT undergo duration subtraction
-POINT_IN_TIME_METRICS: set[str] = {
-    "total_assets",
-    "current_assets",
-    "cash_and_cash_equivalents",
-    "total_liabilities",
-    "current_liabilities",
-    "stockholders_equity_parent",
-    "stockholders_equity_total",
-}
+# Point-in-time instant metrics derived from the MetricRegistry SSOT (must not undergo YTD subtraction)
+POINT_IN_TIME_METRICS: set[str] = set(get_metric_registry().list_metrics(period_type="instant"))
 
 QUARTER_ORDER = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
 
@@ -63,7 +55,7 @@ class TimeSeriesNormalizer:
     """Normalizes raw SQL financial records into ordered, arithmetically sound time series."""
 
     def __init__(self, metric_registry: MetricRegistry | None = None) -> None:
-        self.metric_registry = metric_registry or MetricRegistry()
+        self.metric_registry = metric_registry or get_metric_registry()
 
     def is_point_in_time_metric(self, metric_name: str) -> bool:
         """Check whether a metric represents an instant balance sheet snapshot."""
@@ -437,8 +429,6 @@ class ChartEngine:
 
     def __init__(self, metric_registry: MetricRegistry | None = None) -> None:
         """Initialize ChartEngine with in-memory MetricRegistry SSOT."""
-        from src.core.financial.metric_registry import get_metric_registry
-
         self.metric_registry = metric_registry or get_metric_registry()
         self.normalizer = TimeSeriesNormalizer(self.metric_registry)
 

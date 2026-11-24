@@ -36,3 +36,20 @@ def test_rate_limiter_throttling():
 
     # Expected: 5 throttled requests require at least 5 * 0.1s = 0.5s (allow small tolerance 0.4s)
     assert elapsed >= 0.4, f"Rate limiter failed to throttle requests, took only {elapsed:.4f}s"
+
+
+def test_rate_limiter_try_acquire_non_blocking():
+    """Verify try_acquire consumes tokens immediately and returns False without sleeping when exhausted."""
+    limiter = RateLimiter(requests_per_second=10.0, capacity=2.0)
+
+    assert limiter.try_acquire() is True
+    assert limiter.try_acquire() is True
+
+    start = time.monotonic()
+    assert limiter.try_acquire() is False
+    elapsed = time.monotonic() - start
+    assert elapsed < 0.05, f"try_acquire must not block, but took {elapsed:.4f}s"
+
+    # Wait for one token refill (0.1s at 10 req/s) and verify acquisition succeeds again
+    time.sleep(0.12)
+    assert limiter.try_acquire() is True

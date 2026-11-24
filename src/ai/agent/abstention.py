@@ -16,9 +16,16 @@ from src.ai.agent.contracts import (
     IntentType,
     ToolExecutionStatus,
 )
+from src.ai.agent.nodes.abstention_node import abstention_node, decide_after_abstention
 from src.ai.agent.state import AgentState
 from src.core.financial.company_registry import get_supported_tickers
 from src.core.financial.response_templates import detect_query_language, render_template
+
+__all__ = [
+    "AbstentionGate",
+    "abstention_node",
+    "decide_after_abstention",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -234,68 +241,3 @@ class AbstentionGate:
             return AbstentionInfo(is_abstaining=False, is_partial=False)
 
         return AbstentionInfo(is_abstaining=False, is_partial=False)
-
-
-# ---------------------------------------------------------------------------
-# LangGraph Node and Conditional Edge Functions
-# ---------------------------------------------------------------------------
-
-
-def abstention_node(
-    state: AgentState,
-    gate: AbstentionGate | None = None,
-) -> dict[str, Any]:
-    """LangGraph node assessing evidence sufficiency and partial abstention.
-
-    Args:
-        state: Current AgentState.
-        gate: Injected or default AbstentionGate instance.
-
-    Returns:
-        State dictionary update for LangGraph.
-    """
-    evaluator = gate or AbstentionGate()
-    abstention_info = evaluator.evaluate(state)
-
-    final_answer = ""
-    if abstention_info.is_abstaining and not abstention_info.is_partial:
-        final_answer = abstention_info.explanation
-
-    validation_desc = (
-        "Abstention triggered: " + (abstention_info.explanation[:60] + "...")
-        if abstention_info.is_abstaining
-        else "Sufficient evidence verified"
-    )
-
-    timeline_step = {
-        "step": "Validating evidence",
-        "status": "completed",
-        "description": validation_desc,
-        "duration_ms": None,
-    }
-
-    return {
-        "abstention_info": abstention_info.model_dump(),
-        "is_abstaining": abstention_info.is_abstaining,
-        "is_partial": abstention_info.is_partial,
-        "final_answer": final_answer,
-        "activity_timeline": [timeline_step],
-    }
-
-
-def decide_after_abstention(state: AgentState) -> str:
-    """LangGraph conditional edge deciding whether to synthesize answer or terminate.
-
-    Args:
-        state: Current AgentState containing 'is_abstaining' and 'is_partial'.
-
-    Returns:
-        Target node name: 'synthesis_node' or 'citation_node'.
-    """
-    is_abstaining = state.get("is_abstaining", False)
-    is_partial = state.get("is_partial", False)
-
-    if is_abstaining and not is_partial:
-        return "citation_node"
-
-    return "synthesis_node"

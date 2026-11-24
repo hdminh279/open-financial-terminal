@@ -38,6 +38,8 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
     monkeypatch.setenv("APP_ENV", "prod")
     monkeypatch.setenv("S3_ENDPOINT_URL", "http://minio:9000")
     monkeypatch.setenv("S3_ENDPOINT_URL_LOCAL", "http://localhost:9000")
+    monkeypatch.setenv("S3_ACCESS_KEY", "prod_access")
+    monkeypatch.setenv("S3_SECRET_KEY", "prod'secret")
     monkeypatch.setenv("QDRANT_URL", "http://qdrant:6333")
     monkeypatch.setenv("QDRANT_HOST_LOCAL", "localhost")
 
@@ -53,12 +55,77 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
         connection=mock_conn,
     )
     executed_sql = " ".join(str(call.args[0]) for call in mock_conn.execute.call_args_list)
-    assert "SET GLOBAL s3_endpoint='minio:9000';" in executed_sql
+    assert "CREATE OR REPLACE SECRET s3_lakehouse" in executed_sql
+    assert "ENDPOINT 'minio:9000'" in executed_sql
+    assert "SECRET 'prod''secret'" in executed_sql
+    assert "SET GLOBAL s3_" not in executed_sql
 
     with patch("src.ai.vectordb.qdrant_client.QdrantClient") as mock_qdrant:
         QdrantStorage()
         assert mock_qdrant.call_args.kwargs["host"] == "qdrant"
         assert mock_qdrant.call_args.kwargs["port"] == 6333
+
+
+def test_duckdb_prod_s3_requires_credentials_and_rejects_unsafe_literals(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify DuckDB fails fast in prod without S3 credentials and rejects control characters in SQL literals."""
+    from src.ai.agent.tools.duckdb_repository import _sql_literal
+
+    assert _sql_literal("a'b") == "'a''b'"
+    for bad in ("abc\x00def", "abc\ndef", "abc\rdef"):
+        with pytest.raises(ValueError, match="NUL or newline"):
+            _sql_literal(bad)
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("S3_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("S3_SECRET_KEY", raising=False)
+    with pytest.raises(ValueError, match="S3_ACCESS_KEY and S3_SECRET_KEY are required"):
+        DuckDBFinancialRepository(
+            statements_path="s3://sec-gold/marts/fct_financial_statements.parquet",
+            ratios_path="s3://sec-gold/marts/fct_financial_ratios.parquet",
+            connection=MagicMock(),
+        )
+
+
+def test_metrics_route_reflects_dynamic_ticker_catalog_changes() -> None:
+    """Verify /api/metrics validates tickers dynamically via get_supported_tickers() instead of import-time state."""
+    mock_repo = MagicMock(spec=DuckDBFinancialRepository)
+    app.dependency_overrides[get_duckdb_repository] = lambda: mock_repo
+    try:
+        client = TestClient(app)
+        with (
+            patch("src.api.routes.metrics.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
+            patch("src.ai.agent.tools.financial_sql_tool.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
+        ):
+            sample_resp = FinancialQueryResponse(
+                query=FinancialQueryInput(tickers=["DYNCO"], metrics=["revenues"]),
+                record_count=1,
+                data=[
+                    FinancialMetricRecord(
+                        record_key="k-dyn",
+                        ticker="DYNCO",
+                        cik="0009999999",
+                        currency="USD",
+                        fiscal_year=2025,
+                        fiscal_period="FY",
+                        period_type="annual",
+                        metric_name="revenues",
+                        metric_value=Decimal("1000.00"),
+                    )
+                ],
+                execution_time_ms=1.5,
+            )
+            with patch("src.api.routes.metrics.FinancialSQLTool.execute", return_value=sample_resp):
+                resp = client.get("/api/metrics?ticker=DYNCO&metric=revenues")
+        assert resp.status_code == 200
+        assert resp.json()["tickers"] == ["DYNCO"]
+
+        # Once removed from the catalog, the same ticker must be rejected immediately
+        with patch("src.api.routes.metrics.get_supported_tickers", return_value={"AAPL"}):
+            rejected = client.get("/api/metrics?ticker=DYNCO&metric=revenues")
+        assert rejected.status_code == 400
+        assert "Unsupported ticker" in rejected.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_duckdb_repository, None)
 
 
 def test_watchlist_loads_persisted_s3_config_using_object_exists() -> None:

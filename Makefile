@@ -57,7 +57,7 @@ verify-s3: ## Verify SHA-256 integrity of objects in MinIO Bronze
 lint: ## Run Ruff lint & format checks
 	$(UV) run ruff check src tests
 	$(UV) run ruff format --check src tests
-	node --check src/ui/app.js
+	@for f in src/ui/js/*.js; do node --input-type=module --check < "$$f" || exit 1; done
 
 format: ## Auto-format Python code with Ruff
 	$(UV) run ruff format src tests

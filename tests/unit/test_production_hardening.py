@@ -1,4 +1,4 @@
-"""Unit tests for Day 20 production hardening, Hive text pipeline, modular logging, and cost telemetry."""
+"""Unit tests for production hardening, Hive text pipeline, modular logging, and cost telemetry."""
 
 import io
 import json

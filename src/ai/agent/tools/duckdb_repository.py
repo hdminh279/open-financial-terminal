@@ -23,6 +23,14 @@ _MUTATING_SQL_RE = re.compile(
 )
 
 
+def _sql_literal(value: str) -> str:
+    """Validate and quote a SQL string literal for DuckDB DDL statements."""
+    if "\x00" in value or "\n" in value or "\r" in value:
+        raise ValueError("SQL configuration literal must not contain NUL or newline characters.")
+    escaped = value.replace("'", "''")
+    return f"'{escaped}'"
+
+
 class DatabaseExecutionError(Exception):
     """Raised when an underlying database query or storage connection fails."""
 
@@ -50,7 +58,6 @@ class DuckDBFinancialRepository:
         self.ratios_path = ratios_path or default_ratio
 
         self.conn = connection or duckdb.connect(":memory:")
-        self._is_real_duckdb = isinstance(self.conn, duckdb.DuckDBPyConnection)
         self._lock = threading.Lock()
         self._schema_cache: dict[str, set[str]] = {}
 
@@ -61,28 +68,33 @@ class DuckDBFinancialRepository:
                 # Lock runtime config so DuckDB S3 credentials/endpoints cannot be altered
                 self.conn.execute("SET lock_configuration = true;")
 
+    @staticmethod
+    def _execute_and_fetch(
+        executor: Any,
+        sql: str,
+        params: list[Any] | None,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Execute SQL on a connection or cursor and materialize columns and rows."""
+        res = executor.execute(sql, params) if params is not None else executor.execute(sql)
+        columns = [desc[0] for desc in (res.description or [])]
+        return columns, res.fetchall()
+
     def _run_cursor_query(
         self,
         sql: str,
         params: list[Any] | None = None,
     ) -> tuple[list[str], list[tuple[Any, ...]]]:
         """Run a read-only query using a dedicated DuckDB cursor for concurrent thread safety."""
-        if self._is_real_duckdb:
+        if isinstance(self.conn, duckdb.DuckDBPyConnection):
             cursor = self.conn.cursor()
             try:
-                res = cursor.execute(sql, params) if params is not None else cursor.execute(sql)
-                columns = [desc[0] for desc in (res.description or [])]
-                rows = res.fetchall()
-                return columns, rows
+                return self._execute_and_fetch(cursor, sql, params)
             finally:
                 cursor.close()
 
-        # Fallback for injected mock connections in unit tests
+        # Injected mock connections in unit tests stub execute() directly on the connection
         with self._lock:
-            res = self.conn.execute(sql, params) if params is not None else self.conn.execute(sql)
-            columns = [desc[0] for desc in (res.description or [])]
-            rows = res.fetchall()
-            return columns, rows
+            return self._execute_and_fetch(self.conn, sql, params)
 
     def _has_column(self, parquet_path: str, column_name: str) -> bool:
         """Check whether a Parquet dataset contains a given column (cached per path)."""
@@ -167,23 +179,34 @@ class DuckDBFinancialRepository:
             raw_endpoint = "http://localhost:9000"
 
         use_ssl = raw_endpoint.startswith("https://") or os.getenv("S3_USE_SSL", "").lower() in ("true", "1")
-        s3_endpoint = raw_endpoint.replace("http://", "").replace("https://", "")
-        access_key = os.getenv("S3_ACCESS_KEY", "minioadmin")
-        secret_key = os.getenv("S3_SECRET_KEY", "minioadmin")
-        s3_region = os.getenv("S3_REGION", "")
+        s3_endpoint = raw_endpoint.replace("http://", "").replace("https://", "").rstrip("/")
+        if app_env in ("prod", "production"):
+            access_key = (os.getenv("S3_ACCESS_KEY") or "").strip()
+            secret_key = (os.getenv("S3_SECRET_KEY") or "").strip()
+            if not access_key or not secret_key:
+                raise ValueError("S3_ACCESS_KEY and S3_SECRET_KEY are required when APP_ENV is production.")
+        else:
+            access_key = os.getenv("S3_ACCESS_KEY") or "minioadmin"
+            secret_key = os.getenv("S3_SECRET_KEY") or "minioadmin"
+        s3_region = (os.getenv("S3_REGION") or "").strip()
 
         try:
             self.conn.execute("LOAD httpfs;")
         except duckdb.Error:
             self.conn.execute("INSTALL httpfs; LOAD httpfs;")
-        # SET GLOBAL ensures spawned per-query cursors inherit S3 configuration
-        self.conn.execute(f"SET GLOBAL s3_endpoint='{s3_endpoint}';")
-        self.conn.execute(f"SET GLOBAL s3_access_key_id='{access_key}';")
-        self.conn.execute(f"SET GLOBAL s3_secret_access_key='{secret_key}';")
-        self.conn.execute(f"SET GLOBAL s3_use_ssl={'true' if use_ssl else 'false'};")
+
+        # DuckDB DDL rejects '?' placeholders; quote all string options via _sql_literal().
+        secret_options = [
+            "TYPE S3",
+            f"KEY_ID {_sql_literal(access_key)}",
+            f"SECRET {_sql_literal(secret_key)}",
+            f"ENDPOINT {_sql_literal(s3_endpoint)}",
+            "URL_STYLE 'path'",
+            f"USE_SSL {'true' if use_ssl else 'false'}",
+        ]
         if s3_region:
-            self.conn.execute(f"SET GLOBAL s3_region='{s3_region}';")
-        self.conn.execute("SET GLOBAL s3_url_style='path';")
+            secret_options.append(f"REGION {_sql_literal(s3_region)}")
+        self.conn.execute(f"CREATE OR REPLACE SECRET s3_lakehouse ({', '.join(secret_options)});")
 
     def query_metric(self, query: FinancialQueryInput) -> list[dict[str, Any]]:
         """Execute parameterized query across multiple tickers, metrics, years, and periods.

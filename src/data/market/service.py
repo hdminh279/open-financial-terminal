@@ -11,6 +11,7 @@ import math
 import os
 import threading
 import time
+from collections import OrderedDict
 from datetime import UTC, datetime
 
 from src.api.security import validate_user_id
@@ -34,8 +35,10 @@ class QuoteService:
     """Service providing cached, rate-limited market quotes across multi-market providers."""
 
     DEFAULT_FINNHUB_RPS = 0.9
+    DEFAULT_FINNHUB_BURST = 5.0
     DEFAULT_VN_RPS = 5.0
     DEFAULT_STALE_TTL_SECONDS = 1800.0
+    DEFAULT_MAX_CACHE_SIZE = 500
 
     def __init__(
         self,
@@ -44,6 +47,7 @@ class QuoteService:
         rate_limiter: RateLimiter | None = None,
         finnhub_rate_limiter: RateLimiter | None = None,
         stale_ttl_seconds: float | None = None,
+        max_cache_size: int = DEFAULT_MAX_CACHE_SIZE,
     ) -> None:
         """Initialize QuoteService.
 
@@ -53,6 +57,7 @@ class QuoteService:
             rate_limiter: Optional shared Token Bucket RateLimiter for VN/custom callers.
             finnhub_rate_limiter: Optional RateLimiter enforcing Finnhub free tier (<= 0.9 req/s).
             stale_ttl_seconds: Extended stale-while-revalidate window in seconds (default 1800s).
+            max_cache_size: Maximum number of cached tickers kept in the LRU cache (default 500).
         """
         self.factory = factory or QuoteProviderFactory()
         self.ttl_seconds = ttl_seconds
@@ -61,21 +66,39 @@ class QuoteService:
             if stale_ttl_seconds is not None
             else max(float(ttl_seconds) * 6.0, self.DEFAULT_STALE_TTL_SECONDS)
         )
+        self.max_cache_size = max(1, int(max_cache_size))
         self.rate_limiter = rate_limiter or RateLimiter(requests_per_second=self.DEFAULT_VN_RPS)
         self.finnhub_rate_limiter = (
-            finnhub_rate_limiter or rate_limiter or RateLimiter(requests_per_second=self.DEFAULT_FINNHUB_RPS)
+            finnhub_rate_limiter
+            or rate_limiter
+            or RateLimiter(requests_per_second=self.DEFAULT_FINNHUB_RPS, capacity=self.DEFAULT_FINNHUB_BURST)
         )
-        self._cache: dict[str, tuple[StockQuote, float, float]] = {}
+        self._cache: OrderedDict[str, tuple[StockQuote, float, float]] = OrderedDict()
         self._cache_lock = threading.Lock()
 
+    @staticmethod
+    def _stale_fallback(
+        cached_entry: tuple[StockQuote, float, float] | None,
+        now: float,
+    ) -> StockQuote | None:
+        """Return a delayed stale-while-revalidate quote if a valid cached price is within stale TTL."""
+        if cached_entry is None:
+            return None
+        stale_quote, _fresh_until, stale_until = cached_entry
+        if stale_quote.price is not None and now < stale_until:
+            return stale_quote.model_copy(update={"is_delayed": True, "status": QuoteStatus.DELAYED})
+        return None
+
     def get_quote(self, ticker: str, force_refresh: bool = False) -> StockQuote:
-        """Retrieve quote with TTL caching, Stale-While-Revalidate, and no error caching."""
+        """Retrieve quote with bounded LRU TTL caching, non-blocking rate limiting, and SWR fallback."""
         symbol = ticker.strip().upper()
         now = time.time()
 
         cached_entry: tuple[StockQuote, float, float] | None = None
         with self._cache_lock:
             cached_entry = self._cache.get(symbol)
+            if cached_entry is not None:
+                self._cache.move_to_end(symbol)
             if not force_refresh and cached_entry is not None:
                 quote, fresh_until, _stale_until = cached_entry
                 if now < fresh_until:
@@ -84,7 +107,21 @@ class QuoteService:
 
         provider = self.factory.get_provider(symbol)
         limiter = self.finnhub_rate_limiter if provider.market == Market.US else self.rate_limiter
-        limiter.acquire()
+        if not limiter.try_acquire():
+            stale = self._stale_fallback(cached_entry, now)
+            if stale is not None:
+                logger.info("Serving stale-while-revalidate quote for %s (rate limiter exhausted)", symbol)
+                return stale
+            logger.warning("Quote rate limiter exhausted for %s; returning non-blocking error", symbol)
+            return StockQuote(
+                ticker=symbol,
+                market=provider.market,
+                price=None,
+                change=None,
+                percent_change=None,
+                as_of=datetime.now(UTC).isoformat(),
+                status=QuoteStatus.ERROR,
+            )
 
         quote = provider.fetch_quote(symbol)
 
@@ -101,15 +138,17 @@ class QuoteService:
 
         # Never cache transient errors / HTTP 429 (price=None, status=ERROR) for 300s
         if quote.status == QuoteStatus.ERROR:
-            if cached_entry is not None:
-                stale_quote, _fresh_until, stale_until = cached_entry
-                if stale_quote.price is not None and now < stale_until:
-                    logger.info("Serving stale-while-revalidate quote for %s after upstream error", symbol)
-                    return stale_quote.model_copy(update={"is_delayed": True, "status": QuoteStatus.DELAYED})
+            stale = self._stale_fallback(cached_entry, now)
+            if stale is not None:
+                logger.info("Serving stale-while-revalidate quote for %s after upstream error", symbol)
+                return stale
             return quote
 
         with self._cache_lock:
             self._cache[symbol] = (quote, now + self.ttl_seconds, now + self.stale_ttl_seconds)
+            self._cache.move_to_end(symbol)
+            while len(self._cache) > self.max_cache_size:
+                self._cache.popitem(last=False)
         return quote
 
     def get_quotes_batch(self, tickers: list[str], force_refresh: bool = False) -> list[StockQuote]:

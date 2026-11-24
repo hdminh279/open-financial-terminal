@@ -1,0 +1,99 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cd-cloudrun-production
+  cancel-in-progress: false
+
+env:
+  GCP_REGION: us-central1
+  CLOUD_RUN_SERVICE: cfi-app
+
+jobs:
+  deploy-cloudrun:
+    name: Build, Push & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve deployment metadata
+        id: meta
+        env:
+          WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SA_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          AR_REPO: ${{ vars.GCP_AR_REPOSITORY || 'cfi-repo' }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$SA_EMAIL" ] || [ -z "$PROJECT_ID" ]; then
+            echo "::error::Missing required GCP deployment secrets (GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT, GCP_PROJECT_ID)."
+            exit 1
+          fi
+          IMAGE_BASE="${GCP_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${CLOUD_RUN_SERVICE}"
+          echo "image_sha=${IMAGE_BASE}:${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_latest=${IMAGE_BASE}:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud via WIF
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Build and push Docker image to Artifact Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.image_sha }}
+            ${{ steps.meta.outputs.image_latest }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy container to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ env.CLOUD_RUN_SERVICE }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ steps.meta.outputs.image_sha }}
+
+      - name: Run /api/health smoke check
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if [ -z "$SERVICE_URL" ]; then
+            echo "::error::Cloud Run deployment did not return a service URL."
+            exit 1
+          fi
+          echo "Checking ${SERVICE_URL}/api/health"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --max-time 15 "${SERVICE_URL}/api/health"
+          echo ""

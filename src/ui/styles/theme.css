@@ -1,0 +1,133 @@
+/* Corporate Filing Intelligence - Modern Institutional AI Financial Terminal UI */
+/* Strict adherence to WCAG 2.1 AA Contrast, High Legibility & Professional Financial Typography */
+
+:root, [data-theme="dark"] {
+  /* Color Palette - Obsidian Dark */
+  --bg-app: #06090F;
+  --bg-desktop: #06090F;
+  --bg-window: #0A0D15;
+  --bg-sidebar: #0D111A;
+  --bg-chat-pane: #0F1420;
+  --bg-canvas-pane: #0C1019;
+
+  --bg-card: #131926;
+  --bg-card-hover: #182030;
+  --bg-elevated: #161D2C;
+  --bg-input: rgba(255, 255, 255, 0.04);
+  --bg-input-focus: rgba(255, 255, 255, 0.07);
+
+  --border-color: rgba(255, 255, 255, 0.16);
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-hover: rgba(255, 255, 255, 0.35);
+  --border-focus: #38BDF8;
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-dim: #475569;
+
+  /* Table Grid Colors - Dark (Modern Institutional Grid) */
+  --table-border: rgba(255, 255, 255, 0.12);
+  --table-cell-border: rgba(255, 255, 255, 0.12);
+  --table-th-bg: #0C101B;
+  --table-th-color: #94A3B8;
+  --table-tr-hover: rgba(56, 189, 248, 0.04);
+  --table-tr-stripe: rgba(255, 255, 255, 0.012);
+
+  /* Financial Semantic Accents */
+  --accent-sky-blue: #00A3FF;       /* Apple Series, Primary Actions, SEC Citation Tags */
+  --accent-emerald: #00E599;        /* Microsoft Series, Positive YoY Growth, Online Pulses */
+  --accent-amber: #F5A623;          /* Operating Margin % Line, Caution Audits */
+  --accent-crimson: #EF4444;        /* Negative Margin, Debt, Drop Variance */
+  --accent-purple: #8B5CF6;
+
+  /* User Bubble */
+  --user-bubble-bg: #1D4ED8;
+  --user-bubble-text: #FFFFFF;
+
+  /* Watchlist Tint Badges */
+  --bullish-bg: rgba(0, 229, 153, 0.08);
+  --bullish-border: rgba(0, 229, 153, 0.22);
+  --bullish-text: #00E599;
+
+  --bearish-bg: rgba(239, 68, 68, 0.08);
+  --bearish-border: rgba(239, 68, 68, 0.22);
+  --bearish-text: #EF4444;
+
+  /* Chart Colors */
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-text: #94A3B8;
+  --chart-border: rgba(255, 255, 255, 0.1);
+
+  --shadow-window: 0 30px 80px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="light"] {
+  /* Color Palette - Arctic Light with Crisp Financial Contrast */
+  --bg-app: #E2E8F0;
+  --bg-desktop: #E2E8F0;
+  --bg-window: #F8FAFC;
+  --bg-sidebar: #FFFFFF;
+  --bg-chat-pane: #F8FAFC;
+  --bg-canvas-pane: #FFFFFF;
+
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
+  --bg-elevated: #F8FAFC;
+  --bg-input: #FFFFFF;
+  --bg-input-focus: #FFFFFF;
+
+  --border-color: #94A3B8;         /* Crisp visible border */
+  --border-subtle: #CBD5E1;
+  --border-hover: #334155;          /* Darker, bolder border on hover per user request */
+  --border-focus: #0284C7;
+
+  --text-primary: #0F172A;
+  --text-secondary: #334155;        /* High-contrast readable typography */
+  --text-muted: #64748B;
+  --text-dim: #94A3B8;
+
+  /* Table Grid Colors - Light (Modern Institutional Grid) */
+  --table-border: #E2E8F0;
+  --table-cell-border: #E2E8F0;
+  --table-th-bg: #F8FAFC;
+  --table-th-color: #475569;
+  --table-tr-hover: rgba(2, 132, 199, 0.035);
+  --table-tr-stripe: rgba(248, 250, 252, 0.5);
+
+  /* Financial Semantic Accents */
+  --accent-sky-blue: #0284C7;       /* Royal Sky Blue */
+  --accent-emerald: #059669;        /* Forest Emerald Green */
+  --accent-amber: #D97706;          /* Deep Amber Gold */
+  --accent-crimson: #DC2626;        /* Crisp Red */
+  --accent-purple: #7C3AED;
+
+  /* User Bubble */
+  --user-bubble-bg: #2563EB;
+  --user-bubble-text: #FFFFFF;
+
+  /* Watchlist Tint Badges */
+  --bullish-bg: rgba(5, 150, 105, 0.08);
+  --bullish-border: rgba(5, 150, 105, 0.35);
+  --bullish-text: #059669;
+
+  --bearish-bg: rgba(220, 38, 38, 0.08);
+  --bearish-border: rgba(220, 38, 38, 0.35);
+  --bearish-text: #DC2626;
+
+  /* Chart Colors */
+  --chart-grid: rgba(15, 23, 42, 0.09);
+  --chart-text: #334155;
+  --chart-border: #94A3B8;
+
+  --shadow-window: 0 24px 70px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.12);
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.06);
+
+  --scrollbar-thumb: rgba(15, 23, 42, 0.22);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.4);
+}
+

@@ -40,7 +40,10 @@ jobs:
         run: uv run ruff format --check src tests
 
       - name: Frontend JavaScript syntax check
-        run: node --check src/ui/app.js
+        run: |
+          for f in src/ui/js/*.js; do
+            node --input-type=module --check < "$f"
+          done
 
       - name: Run offline unit tests
         env:

@@ -1,4 +1,4 @@
-"""Unit tests for Day 21: Airflow config/DAGs, SSE streaming, and rag_negative abstention fixes."""
+"""Unit tests for Airflow orchestration config/DAGs, SSE streaming, and negative-RAG abstention."""
 
 import json
 import py_compile

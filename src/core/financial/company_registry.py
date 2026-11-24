@@ -40,3 +40,23 @@ def get_supported_tickers(config_path: str = DEFAULT_COMPANIES_PATH) -> set[str]
     """Retrieve set of uppercase canonical company ticker symbols from configuration."""
     companies = _load_company_catalog_cached(config_path)
     return {str(c["ticker"]).upper() for c in companies if "ticker" in c}
+
+
+def get_company_form_map(config_path: str = DEFAULT_COMPANIES_PATH) -> dict[str, str]:
+    """Return mapping of uppercase ticker to annual filing form ('10-K', '20-F', etc.)."""
+    return {
+        str(c["ticker"]).upper(): str(c.get("form_type", "10-K"))
+        for c in _load_company_catalog_cached(config_path)
+        if c.get("ticker")
+    }
+
+
+def resolve_filing_form(ticker: str, cik: str, fiscal_period: str) -> str:
+    """Resolve authoritative filing form label (BCTC, 20-F, 10-K, 10-Q, 6-K) for a record."""
+    if cik.strip().upper().startswith("VN:"):
+        return "BCTC"
+    annual_form = get_company_form_map().get(ticker.upper(), "10-K")
+    # SEC Q4 figures are derived from annual 10-K / 20-F filings (no separate Q4 10-Q exists)
+    if annual_form == "20-F":
+        return "20-F" if fiscal_period in ("FY", "Q4") else "6-K"
+    return "10-K" if fiscal_period in ("FY", "Q4") else "10-Q"

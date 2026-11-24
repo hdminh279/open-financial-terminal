@@ -377,3 +377,61 @@ def test_quote_service_finnhub_limiter_and_no_429_cache() -> None:
     assert stale_q.price == 225.0
     assert stale_q.status == QuoteStatus.DELAYED
     assert stale_q.is_delayed is True
+
+
+def test_quote_service_non_blocking_rate_limit_and_lru_bound() -> None:
+    """Verify QuoteService never blocks on exhausted tokens (returns SWR or ERROR) and bounds LRU cache."""
+    import time as _time
+
+    from src.data.ingestion.rate_limiter import RateLimiter
+
+    mock_provider = MagicMock()
+    mock_provider.market = Market.US
+    mock_provider.fetch_quote.side_effect = lambda sym: StockQuote(
+        ticker=sym,
+        market=Market.US,
+        price=100.0,
+        as_of="2026-11-24T00:00:00Z",
+        status=QuoteStatus.REAL_TIME,
+    )
+    factory = QuoteProviderFactory(us_provider=mock_provider, vn_provider=mock_provider)
+
+    # 1. Exhausted limiter with no stale cache returns ERROR immediately without calling provider
+    tight_limiter = RateLimiter(requests_per_second=0.5, capacity=1.0)
+    svc = QuoteService(factory=factory, ttl_seconds=0.05, finnhub_rate_limiter=tight_limiter)
+    assert svc.get_quote("AAPL").status == QuoteStatus.REAL_TIME
+
+    start = _time.monotonic()
+    limited_q = svc.get_quote("MSFT")
+    elapsed = _time.monotonic() - start
+    assert elapsed < 0.05, f"QuoteService must not block worker threads, took {elapsed:.4f}s"
+    assert limited_q.status == QuoteStatus.ERROR
+    assert limited_q.price is None
+    assert "MSFT" not in svc._cache
+    assert mock_provider.fetch_quote.call_count == 1
+
+    # 2. Exhausted limiter with expired fresh TTL but valid stale cache returns DELAYED quote immediately
+    _time.sleep(0.06)
+    start = _time.monotonic()
+    swr_q = svc.get_quote("AAPL")
+    elapsed = _time.monotonic() - start
+    assert elapsed < 0.05
+    assert swr_q.price == 100.0
+    assert swr_q.status == QuoteStatus.DELAYED
+    assert swr_q.is_delayed is True
+    assert mock_provider.fetch_quote.call_count == 1
+
+    # 3. LRU OrderedDict bounds cache size and evicts least-recently-used entries
+    lru_svc = QuoteService(
+        factory=factory,
+        ttl_seconds=60.0,
+        finnhub_rate_limiter=RateLimiter(requests_per_second=100.0, capacity=10.0),
+        max_cache_size=2,
+    )
+    assert QuoteService.DEFAULT_MAX_CACHE_SIZE == 500
+    lru_svc.get_quote("AAPL")
+    lru_svc.get_quote("MSFT")
+    # Touch AAPL so MSFT becomes least-recently-used
+    lru_svc.get_quote("AAPL")
+    lru_svc.get_quote("NVDA")
+    assert list(lru_svc._cache.keys()) == ["AAPL", "NVDA"]

@@ -10,17 +10,16 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.ai.agent.graph import _resolve_filing_form
 from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
 from src.ai.agent.tools.financial_sql_tool import (
     RATIO_METRICS,
     SUPPORTED_METRICS,
-    SUPPORTED_TICKERS,
     FinancialQueryInput,
     FinancialSQLTool,
 )
 from src.api.contracts import MetricRecordResponse, MetricResponse
 from src.api.deps import get_duckdb_repository
+from src.core.financial.company_registry import get_supported_tickers, resolve_filing_form
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +65,12 @@ def get_financial_metric(
             detail="At least one ticker must be specified.",
         )
 
+    supported_tickers = get_supported_tickers()
     for t in normalized_tickers:
-        if t not in SUPPORTED_TICKERS:
+        if t not in supported_tickers:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported ticker '{t}'. Supported tickers are: {sorted(list(SUPPORTED_TICKERS))}",
+                detail=f"Unsupported ticker '{t}'. Supported tickers are: {sorted(supported_tickers)}",
             )
 
     if not normalized_metrics:
@@ -119,7 +119,7 @@ def get_financial_metric(
                     value=val_float,
                     unit=unit_label,
                     filed_date=str(r.source_filed_date) if r.source_filed_date else None,
-                    form=_resolve_filing_form(r.ticker, r.cik, r.fiscal_period),
+                    form=resolve_filing_form(r.ticker, r.cik, r.fiscal_period),
                     provenance_url=r.provenance_url,
                 )
             )

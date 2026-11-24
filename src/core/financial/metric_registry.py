@@ -3,6 +3,7 @@
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Literal
 
 import yaml
 
@@ -20,6 +21,7 @@ class MetricDefinition:
     storage_layer: str
     is_dimensional: bool
     description: str
+    gold_table: Literal["statements", "ratios"] | None = None
     synonyms: list[str] = field(default_factory=list)
 
 
@@ -47,6 +49,10 @@ class MetricRegistry:
                 continue
 
             synonyms = [s.strip().lower() for s in info.get("synonyms", []) if isinstance(s, str)]
+            raw_gold_table = info.get("gold_table")
+            if raw_gold_table not in (None, "statements", "ratios"):
+                raise ValueError(f"Invalid gold_table '{raw_gold_table}' for metric '{metric_key}'")
+
             definition = MetricDefinition(
                 key=metric_key,
                 display_name=info.get("display_name", metric_key),
@@ -57,6 +63,7 @@ class MetricRegistry:
                 storage_layer=info.get("storage_layer", "sql_gold"),
                 is_dimensional=bool(info.get("is_dimensional", False)),
                 description=info.get("description", ""),
+                gold_table=raw_gold_table,
                 synonyms=synonyms,
             )
             self._metrics[metric_key] = definition
@@ -100,13 +107,19 @@ class MetricRegistry:
         self,
         category: str | None = None,
         storage_layer: str | None = None,
+        gold_table: Literal["statements", "ratios"] | None = None,
+        period_type: str | None = None,
     ) -> list[str]:
-        """List canonical keys filtered optionally by category or storage layer."""
+        """List canonical keys filtered optionally by category, storage layer, gold table, or period type."""
         results = []
         for key, m in self._metrics.items():
             if category and m.category != category:
                 continue
             if storage_layer and m.storage_layer != storage_layer:
+                continue
+            if gold_table and m.gold_table != gold_table:
+                continue
+            if period_type and m.period_type != period_type:
                 continue
             results.append(key)
         return results
