@@ -6,7 +6,7 @@ ARG APP_GID=1000
 WORKDIR /app
 
 # PYTHONUNBUFFERED=1 -> unbuffered stdout/stderr logs
-# PYTHONDONTWRITEBYECODE=1 -> avoid writing .pyc files into read-only /app/src
+# PYTHONDONTWRITEBYECODE=1 -> avoid writing .pyc files into read-only /app/backend
 # UV_SYSTEM_PYTHON=0 -> isolate dependencies inside /app/.venv
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYECODE=1 \
@@ -16,18 +16,17 @@ ENV PYTHONUNBUFFERED=1 \
     FASTEMBED_CACHE_PATH=/app/models/fastembed \
     HF_HOME=/app/models/huggingface
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid ${APP_GID} appuser \
+RUN groupadd --gid ${APP_GID} appuser \
     && useradd --uid ${APP_UID} --gid ${APP_GID} --create-home --shell /usr/sbin/nologin appuser
 
 COPY --chown=root:root pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Application code and configs stay root-owned (read-only for appuser)
-COPY --chown=root:root . .
+# Copy strictly runtime code, static UI, and configs (read-only for appuser)
+COPY --chown=root:root backend ./backend
+COPY --chown=root:root frontend ./frontend
+COPY --chown=root:root configs ./configs
 
 # Grant write access strictly to runtime, data, log, model, and cache directories
 RUN mkdir -p /app/data /app/logs /app/models/fastembed /app/models/huggingface /home/appuser/.cache /home/appuser/.duckdb \
@@ -48,4 +47,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import os, urllib.request; port = os.getenv('PORT', '8000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=3)"]
 
-CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

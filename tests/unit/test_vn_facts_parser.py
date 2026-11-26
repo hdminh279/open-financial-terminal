@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.data.processing.vn_facts_parser import (
+from pipelines.processing.vn_facts_parser import (
     ALLOWED_UNITS,
     VNFactsParser,
 )

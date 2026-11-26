@@ -31,17 +31,17 @@ jobs:
         run: uv python install 3.11
 
       - name: Install frozen dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra pipeline
 
       - name: Ruff lint check
-        run: uv run ruff check src tests
+        run: uv run ruff check backend pipelines tests dags
 
       - name: Ruff format check
-        run: uv run ruff format --check src tests
+        run: uv run ruff format --check backend pipelines tests dags
 
       - name: Frontend JavaScript syntax check
         run: |
-          for f in src/ui/js/*.js; do
+          for f in frontend/js/*.js; do
             node --input-type=module --check < "$f"
           done
 

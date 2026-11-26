@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.data.ingestion.fetch_filings import FilingsIngestionPipeline
-from src.data.ingestion.filing_resolver import ResolvedFiling
+from pipelines.ingestion.fetch_filings import FilingsIngestionPipeline
+from pipelines.ingestion.filing_resolver import ResolvedFiling
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ import pytest
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-from src.ai.vectordb.qdrant_client import QdrantStorage
-from src.ai.vectordb.sync_engine import CorpusSyncEngine
+from backend.ai.vectordb.qdrant_client import QdrantStorage
+from backend.ai.vectordb.sync_engine import CorpusSyncEngine
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ class TestCorpusSyncEngine:
         import pyarrow as pa
         import pyarrow.parquet as pq
 
-        from src.data.pipelines.text_pipeline import CHUNK_PARQUET_SCHEMA
+        from pipelines.jobs.text_pipeline import CHUNK_PARQUET_SCHEMA
 
         engine, _ = sync_test_setup
 

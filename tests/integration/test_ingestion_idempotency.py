@@ -7,8 +7,8 @@ and pipeline idempotency across MinIO Bronze storage.
 import pytest
 from dotenv import load_dotenv
 
-from src.cli import main
-from src.data.storage.s3_storage import S3Storage
+from backend.core.storage.s3_storage import S3Storage
+from pipelines.cli import main
 
 load_dotenv()
 

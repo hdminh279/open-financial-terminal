@@ -10,19 +10,19 @@ from unittest.mock import MagicMock
 import pyarrow.parquet as pq
 import pytest
 
-from src.ai.agent.contracts import AgentRequest, IntentType
-from src.ai.agent.research_agent import ResearchAgent
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.llm.contracts import LLMResponse, TokenUsage
-from src.ai.llm.deepseek_adapter import DeepSeekAdapter
-from src.core.observability.logging_config import configure_logging
-from src.core.observability.telemetry import (
+from backend.ai.agent.contracts import AgentRequest, IntentType
+from backend.ai.agent.research_agent import ResearchAgent
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.llm.contracts import LLMResponse, TokenUsage
+from backend.ai.llm.deepseek_adapter import DeepSeekAdapter
+from backend.core.observability.logging_config import configure_logging
+from backend.core.observability.telemetry import (
     TelemetryLogger,
     estimate_deepseek_cost_usd,
     summarize_traffic_telemetry,
 )
-from src.data.chunking.chunking_engine import TextChunk
-from src.data.pipelines.text_pipeline import FilingsTextPipeline
+from pipelines.chunking.chunking_engine import TextChunk
+from pipelines.jobs.text_pipeline import FilingsTextPipeline
 
 
 def test_duckdb_concurrent_cursor_queries() -> None:
@@ -124,20 +124,66 @@ def test_modular_rotating_file_logging(tmp_path: Path) -> None:
     paths = configure_logging(log_dir=tmp_path, level=logging.INFO, max_bytes=1024 * 1024, backup_count=2, force=True)
     assert set(paths.keys()) == {"api.log", "agent.log", "pipeline.log"}
 
-    logging.getLogger("src.api.test").info("api log entry")
-    logging.getLogger("src.ai.test").info("agent log entry")
-    logging.getLogger("src.data.test").info("pipeline log entry")
+    logging.getLogger("backend.routes.test").info("api log entry")
+    logging.getLogger("backend.ai.test").info("agent log entry")
+    logging.getLogger("pipelines.test").info("pipeline log entry")
 
     for h in (
-        logging.getLogger("src.api").handlers
-        + logging.getLogger("src.ai").handlers
-        + logging.getLogger("src.data").handlers
+        logging.getLogger("backend.routes").handlers
+        + logging.getLogger("backend.ai").handlers
+        + logging.getLogger("pipelines").handlers
     ):
         h.flush()
 
+    assert logging.getLogger("backend.routes").handlers[0] is logging.getLogger("backend.services").handlers[0]
+    assert logging.getLogger("pipelines").handlers[0] is logging.getLogger("corporate_filing_cli").handlers[0]
     assert "api log entry" in (tmp_path / "api.log").read_text(encoding="utf-8")
     assert "agent log entry" in (tmp_path / "agent.log").read_text(encoding="utf-8")
     assert "pipeline log entry" in (tmp_path / "pipeline.log").read_text(encoding="utf-8")
+
+
+def test_concurrent_availability_validator_history_and_watchlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify thread safety of FinancialAvailabilityValidator, ChatHistoryManager, WatchlistRepository, and TelemetryLogger rotation."""
+    from backend.core.financial.availability_validator import FinancialAvailabilityValidator
+    from backend.services.chat_history import ChatHistoryManager
+    from backend.services.market.service import WatchlistRepository
+
+    repo = DuckDBFinancialRepository(
+        statements_path="tests/fixtures/gold/fct_financial_statements.parquet",
+        ratios_path="tests/fixtures/gold/fct_financial_ratios.parquet",
+    )
+    validator = FinancialAvailabilityValidator(repository=repo)
+
+    def _validate(_i: int) -> bool:
+        years, _ = validator.validate_periods(
+            ["AAPL"], [2024], ["FY"], conn=repo.conn, statements_path=repo.statements_path
+        )
+        return 2024 in years
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert all(pool.map(_validate, range(12)))
+
+    monkeypatch.setenv("ENABLE_S3_CHAT_HISTORY", "false")
+    monkeypatch.setenv("ENABLE_S3_WATCHLIST", "false")
+    mgr = ChatHistoryManager(s3_storage=None)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(lambda i: mgr.add_user_message("concurrent-sess", f"msg-{i}"), range(12)))
+    sess = mgr.get_session("concurrent-sess")
+    assert sess is not None and len(sess.messages) == 12
+
+    wl = WatchlistRepository(s3_storage=None)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(lambda i: wl.add_ticker(f"T{i}", user_id="concurrent-u"), range(10)))
+    cfg = wl.get_watchlist("concurrent-u")
+    assert {f"T{i}" for i in range(10)}.issubset({item.ticker for item in cfg.items})
+
+    run_log = tmp_path / "run_telemetry.jsonl"
+    tlogger = TelemetryLogger(log_path=str(run_log), max_bytes=1024)
+    for i in range(12):
+        tlogger.log_run(request_id=f"r-{i}", query="A" * 200, intent="FINANCIAL_METRIC", latency_ms=1.0)
+    assert run_log.with_suffix(".jsonl.1").exists()
 
 
 def test_token_usage_and_cost_telemetry_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

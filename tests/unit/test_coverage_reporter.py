@@ -2,11 +2,11 @@
 
 from bs4 import BeautifulSoup
 
-from src.data.processing.coverage_reporter import (
+from pipelines.processing.coverage_reporter import (
     CoverageReporter,
     ItemClassification,
 )
-from src.data.processing.section_extractor import (
+from pipelines.processing.section_extractor import (
     ExtractedSection,
     ExtractionReport,
     HTMLSectionExtractor,

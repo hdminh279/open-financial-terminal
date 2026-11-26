@@ -4,7 +4,7 @@ import pytest
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-from src.ai.vectordb.qdrant_client import QdrantStorage
+from backend.ai.vectordb.qdrant_client import QdrantStorage
 
 
 @pytest.fixture

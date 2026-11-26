@@ -19,7 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from src.data.processing.facts_parser import FactsParser
+from pipelines.processing.facts_parser import FactsParser
 
 
 class TestFactsParserKeys:

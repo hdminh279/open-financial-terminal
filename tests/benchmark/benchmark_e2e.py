@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from src.api.main import app
+from backend.main import app
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("benchmark_e2e")

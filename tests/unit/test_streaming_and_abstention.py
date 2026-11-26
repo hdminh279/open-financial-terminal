@@ -9,15 +9,15 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from src.ai.agent.citation import citation_node, detect_insufficient_evidence
-from src.ai.agent.contracts import IntentType
-from src.ai.agent.research_agent import ResearchAgent
-from src.ai.agent.router import IntentRouter
-from src.ai.llm.contracts import LLMStreamChunk, TokenUsage
-from src.ai.llm.deepseek_adapter import DeepSeekAdapter
-from src.api.chat_history import ChatHistoryManager
-from src.api.deps import get_chat_history, get_research_agent
-from src.api.main import app
+from backend.ai.agent.citation import citation_node, detect_insufficient_evidence
+from backend.ai.agent.contracts import IntentType
+from backend.ai.agent.research_agent import ResearchAgent
+from backend.ai.agent.router import IntentRouter
+from backend.ai.llm.contracts import LLMStreamChunk, TokenUsage
+from backend.ai.llm.deepseek_adapter import DeepSeekAdapter
+from backend.deps import get_chat_history, get_research_agent
+from backend.main import app
+from backend.services.chat_history import ChatHistoryManager
 
 
 def test_airflow_compose_and_dags_syntax() -> None:
@@ -133,7 +133,7 @@ def test_sse_stream_endpoint_and_agent_streaming(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("ENABLE_S3_CHAT_HISTORY", "false")
 
     def _fake_generate(self: DeepSeekAdapter, messages: list, json_mode: bool = False, **kwargs: object):
-        from src.ai.llm.contracts import LLMResponse
+        from backend.ai.llm.contracts import LLMResponse
 
         return LLMResponse(
             content=json.dumps(
@@ -189,6 +189,7 @@ def test_sse_stream_endpoint_and_agent_streaming(monkeypatch: pytest.MonkeyPatch
         assert "event: done" in body
         assert "Apple FY2024 " in body
         assert "revenue was $391.04B [1]." in body
+        assert "cfi_uid=" in resp.headers.get("set-cookie", "")
     finally:
         app.dependency_overrides.pop(get_research_agent, None)
         app.dependency_overrides.pop(get_chat_history, None)

@@ -29,7 +29,7 @@ from openai import (
     UnprocessableEntityError,
 )
 
-from src.ai.llm.contracts import (
+from backend.ai.llm.contracts import (
     ChatMessage,
     LLMAuthError,
     LLMError,
@@ -39,8 +39,8 @@ from src.ai.llm.contracts import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
-from src.ai.llm.deepseek_adapter import DeepSeekAdapter
-from src.ai.llm.factory import LLMFactory
+from backend.ai.llm.deepseek_adapter import DeepSeekAdapter
+from backend.ai.llm.factory import LLMFactory
 
 
 @pytest.fixture(autouse=True)
@@ -607,3 +607,14 @@ class TestLLMFactory:
         assert "Unknown profile 'fast_pro'" in msg
         assert "'chat'" in msg
         assert "'reasoner'" in msg
+
+    def test_factory_pools_default_adapters_and_clears(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-pooling-key")
+        LLMFactory.clear_cache()
+        a1 = LLMFactory.get_adapter("chat")
+        a2 = LLMFactory.get_adapter("chat")
+        assert a1 is a2
+        LLMFactory.close_all()
+        a3 = LLMFactory.get_adapter("chat")
+        assert a3 is not a1
+        LLMFactory.close_all()

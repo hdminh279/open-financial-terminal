@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.ai.agent.contracts import (
+from backend.ai.agent.contracts import (
     AgentResponse,
     ChartData,
     ChartType,
@@ -18,13 +18,13 @@ from src.ai.agent.contracts import (
     ToolExecutionResult,
     ToolExecutionStatus,
 )
-from src.api.chat_history import ChatHistoryManager
-from src.api.deps import (
+from backend.deps import (
     get_chat_history,
     get_research_agent,
 )
-from src.api.main import app
-from src.api.security import get_current_user_id
+from backend.main import app
+from backend.security import get_current_user_id
+from backend.services.chat_history import ChatHistoryManager
 
 
 @pytest.fixture
@@ -139,6 +139,22 @@ def test_get_health(client: TestClient) -> None:
     assert "minio_connected" in data
     assert "qdrant_connected" in data
     assert "duckdb_ready" in data
+
+
+def test_get_health_returns_503_when_unhealthy(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validate GET /api/health returns HTTP 503 when core DuckDB lakehouse probe fails."""
+    from backend.routes import health as health_mod
+
+    broken_repo = MagicMock()
+    broken_repo.execute_fetchall.side_effect = RuntimeError("duckdb unavailable")
+    monkeypatch.setattr(health_mod, "get_duckdb_repository", lambda: broken_repo)
+    monkeypatch.setattr(health_mod, "get_s3_storage", lambda: None)
+    monkeypatch.setattr(health_mod, "get_qdrant_storage", lambda: None)
+
+    resp = client.get("/api/health")
+    assert resp.status_code == 503
+    assert resp.json()["status"] == "unhealthy"
+    assert resp.json()["duckdb_ready"] is False
 
 
 def test_get_metrics_valid(client: TestClient) -> None:
@@ -263,6 +279,25 @@ def test_post_query_agent_failure(
     assert session is not None
     assert len(session.messages) == 2
     assert "error occurred" in session.messages[1].content.lower()
+
+
+def test_post_query_sanitizes_persisted_error_in_prod(
+    client: TestClient,
+    mock_agent: MagicMock,
+    memory_chat_history: ChatHistoryManager,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify production mode omits raw exception details from persisted chat history metadata."""
+    monkeypatch.setenv("APP_ENV", "prod")
+    mock_agent.query.side_effect = RuntimeError("internal_s3_secret_host:9000")
+    resp = client.post("/api/query", json={"query": "Apple revenue", "session_id": "test-prod-err"})
+    assert resp.status_code == 500
+    session = memory_chat_history.get_session("test-prod-err")
+    assert session is not None
+    meta = session.messages[1].metadata or {}
+    assert meta.get("error_code") == "INTERNAL_SERVER_ERROR"
+    assert "error" not in meta
+    assert "internal_s3_secret_host" not in str(meta)
 
 
 def test_chat_history_s3_persistence() -> None:

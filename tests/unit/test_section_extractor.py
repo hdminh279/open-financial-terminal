@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.data.processing.section_extractor import (
+from pipelines.processing.section_extractor import (
     HTMLSectionExtractor,
     SectionStatus,
 )

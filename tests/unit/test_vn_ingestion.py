@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from src.data.ingestion.vn_ingestion import (
+from pipelines.ingestion.vn_ingestion import (
     VNFinancialClient,
     VNIngestionPipeline,
     _is_retryable_error,
@@ -38,7 +38,7 @@ class TestVNFinancialClientRetry:
         assert _is_retryable_error(httpx.ConnectError("Connection refused")) is True
         assert _is_retryable_error(httpx.TimeoutException("Read timed out")) is True
 
-    @patch("src.data.ingestion.rate_limiter.RateLimiter.acquire")
+    @patch("backend.core.rate_limiter.RateLimiter.acquire")
     def test_tenacity_retries_on_transient_503(self, mock_rate_limit):
         """Verify Tenacity actually executes retries on transient HTTP 503 until success."""
         client = VNFinancialClient()
@@ -63,7 +63,7 @@ class TestVNFinancialClientRetry:
         assert result["ticker"] == "FPT"
         assert len(result["data"]) == 1
 
-    @patch("src.data.ingestion.rate_limiter.RateLimiter.acquire")
+    @patch("backend.core.rate_limiter.RateLimiter.acquire")
     def test_tenacity_fails_fast_on_404(self, mock_rate_limit):
         """Verify client errors (404) fail fast without retrying 5 times."""
         client = VNFinancialClient()
@@ -98,8 +98,8 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         }
 
         with (
-            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
-            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+            patch("pipelines.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("pipelines.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
         ):
             stats = pipeline.ingest_ticker("FPT")
 
@@ -114,8 +114,8 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         )
 
         with (
-            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
-            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+            patch("pipelines.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("pipelines.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
         ):
             stats_fail = pipeline.ingest_ticker("FPT")
 
@@ -145,8 +145,8 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         ]
 
         with (
-            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
-            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+            patch("pipelines.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("pipelines.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
         ):
             stats = pipeline.ingest_ticker("FPT")
 
@@ -175,8 +175,8 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         # Case 1: Raw exists, but meta does NOT exist -> Must NOT skip, must upload
         mock_storage.object_exists.side_effect = lambda bucket, key: "_metadata.json" not in key
         with (
-            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
-            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+            patch("pipelines.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("pipelines.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
         ):
             stats = pipeline.ingest_ticker("FPT")
 
@@ -194,8 +194,8 @@ class TestVNIngestionPipelineAtomicityAndClassification:
         mock_storage.get_metadata.return_value = {"metadata": {"sha256": calc_sha}}
 
         with (
-            patch("src.data.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
-            patch("src.data.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
+            patch("pipelines.ingestion.vn_ingestion.REPORT_TYPES", ["incomestatement"]),
+            patch("pipelines.ingestion.vn_ingestion.PERIOD_TYPES", ["yearly"]),
         ):
             stats_skip = pipeline.ingest_ticker("FPT")
 

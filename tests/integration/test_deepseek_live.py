@@ -12,8 +12,8 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from src.ai.llm.contracts import ChatMessage
-from src.ai.llm.factory import LLMFactory
+from backend.ai.llm.contracts import ChatMessage
+from backend.ai.llm.factory import LLMFactory
 
 load_dotenv()
 

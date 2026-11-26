@@ -6,17 +6,17 @@ web_node execution, AbstentionGate evaluation, and CitationEngine reference form
 
 from unittest.mock import MagicMock
 
-from src.ai.agent.abstention import AbstentionGate
-from src.ai.agent.citation import CitationEngine
-from src.ai.agent.contracts import (
+from backend.ai.agent.abstention import AbstentionGate
+from backend.ai.agent.citation import CitationEngine
+from backend.ai.agent.contracts import (
     EvidenceSourceType,
     IntentType,
     ToolExecutionStatus,
 )
-from src.ai.agent.graph import web_node
-from src.ai.agent.router import IntentRouter, route_next_step
-from src.ai.agent.state import AgentState
-from src.ai.agent.tools.web_search_tool import (
+from backend.ai.agent.graph import web_node
+from backend.ai.agent.router import IntentRouter, route_next_step
+from backend.ai.agent.state import AgentState
+from backend.ai.agent.tools.web_search_tool import (
     WebSearchResponse,
     WebSearchResultItem,
     WebSearchTool,
@@ -208,7 +208,7 @@ def test_citation_engine_formats_vn_bctc_citation() -> None:
 
 def test_canonicalize_timeline_preserves_web_search() -> None:
     """Verify canonicalize_timeline preserves 'Searching live web' without dropping it."""
-    from src.ai.agent.research_agent import canonicalize_timeline
+    from backend.ai.agent.research_agent import canonicalize_timeline
 
     raw_events = [
         {"step": "Understanding question", "status": "completed", "duration_ms": 10.0},

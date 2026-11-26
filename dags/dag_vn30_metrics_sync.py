@@ -26,12 +26,12 @@ with DAG(
 ) as dag:
     ingest_vn30_financials = BashOperator(
         task_id="ingest_vn30_financials",
-        bash_command="cd /opt/airflow && python -m src.cli ingest --vn",
+        bash_command="cd /opt/airflow && python -m pipelines.cli ingest --vn",
     )
 
     process_vn30_facts = BashOperator(
         task_id="process_vn30_facts",
-        bash_command="cd /opt/airflow && python -m src.cli process --vn",
+        bash_command="cd /opt/airflow && python -m pipelines.cli process --vn",
     )
 
     dbt_build_vn30_gold = BashOperator(

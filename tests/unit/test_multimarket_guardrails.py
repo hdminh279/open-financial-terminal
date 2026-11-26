@@ -10,28 +10,28 @@ from unittest.mock import MagicMock
 import duckdb
 import pytest
 
-from src.ai.agent.abstention import AbstentionGate
-from src.ai.agent.chart_engine import ChartEngine
-from src.ai.agent.citation import build_fiscal_period_notes, citation_node
-from src.ai.agent.contracts import (
+from backend.ai.agent.abstention import AbstentionGate
+from backend.ai.agent.chart_engine import ChartEngine
+from backend.ai.agent.citation import build_fiscal_period_notes, citation_node
+from backend.ai.agent.contracts import (
     AbstentionReason,
     EvidenceSourceType,
     IntentType,
     ToolExecutionStatus,
 )
-from src.ai.agent.graph import sql_node
-from src.ai.agent.router import (
+from backend.ai.agent.graph import sql_node
+from backend.ai.agent.router import (
     IntentRouter,
     has_anaphora_reference,
     is_realtime_news_query,
     should_attach_history,
 )
-from src.ai.agent.state import AgentState
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.agent.tools.financial_sql_tool import FinancialQueryInput, FinancialSQLTool
-from src.ai.llm.contracts import LLMResponse, TokenUsage
-from src.core.financial.response_templates import detect_query_language, render_template
-from src.core.financial.year_utils import is_shifted_fiscal_period
+from backend.ai.agent.state import AgentState
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.agent.tools.financial_sql_tool import FinancialQueryInput, FinancialSQLTool
+from backend.ai.llm.contracts import LLMResponse, TokenUsage
+from backend.core.financial.response_templates import detect_query_language, render_template
+from backend.core.financial.year_utils import is_shifted_fiscal_period
 
 # ---------------------------------------------------------------------------
 # Slice 1: Multi-Currency Repository, Tool & Chart Guardrail Tests
@@ -443,8 +443,8 @@ def test_multimarket_offline_all_20_scenarios_pass() -> None:
 
 def test_q1_to_q20_audit_fixes(tmp_path: Path) -> None:
     """Verify VN30 provenance URLs, 20-F/BCTC forms, ratio 4-decimal precision, macro news & FY footnote."""
-    from src.ai.agent.graph import _resolve_filing_form
-    from src.ai.agent.tools.financial_sql_tool import generate_edgar_url
+    from backend.ai.agent.graph import _resolve_filing_form
+    from backend.ai.agent.tools.financial_sql_tool import generate_edgar_url
 
     # 1. VN30 URL must point to VNDirect, never SEC.gov
     vn_url = generate_edgar_url(cik="VN:VCB", accession_number="7fd826ee8132b81c517412746ed8997a")
@@ -509,9 +509,9 @@ def test_q1_to_q20_audit_fixes(tmp_path: Path) -> None:
 
 def test_chat2_rag_table_compaction_form_filter_and_web_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify RAG table compaction preserves numbers, 10-K inference, and web_node error propagation."""
-    from src.ai.agent.graph import _compact_rag_chunk_text, _infer_rag_form, web_node
-    from src.ai.agent.tools.web_search_tool import WebSearchTool
-    from src.data.processing.table_processor import TableProcessor
+    from backend.ai.agent.graph import _compact_rag_chunk_text, _infer_rag_form, web_node
+    from backend.ai.agent.tools.web_search_tool import WebSearchTool
+    from pipelines.processing.table_processor import TableProcessor
 
     raw_table = (
         "[Financial Table]\n"
@@ -541,7 +541,7 @@ def test_chat2_rag_table_compaction_form_filter_and_web_error(monkeypatch: pytes
     assert _infer_rag_form("Doanh thu quý 2 10-Q của Apple", None, ["AAPL"]) is None
 
     # WebSearchTool error propagates to web_node as TOOL_FAILED
-    import src.ai.agent.tools.web_search_tool as wst
+    import backend.ai.agent.tools.web_search_tool as wst
 
     monkeypatch.setattr(wst, "DDGS", None)
     tool = WebSearchTool()
@@ -553,9 +553,9 @@ def test_chat2_rag_table_compaction_form_filter_and_web_error(monkeypatch: pytes
 
 def test_points_2_3_4_web_rss_cache_multiyear_and_vn30_expand(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify RSS fallback + TTL cache, LLM fiscal_years=[] preservation, and VN30 30-ticker expansion."""
-    import src.ai.agent.tools.web_search_tool as wst
-    from src.ai.agent.graph import sql_node
-    from src.ai.agent.tools.web_search_tool import WebSearchTool
+    import backend.ai.agent.tools.web_search_tool as wst
+    from backend.ai.agent.graph import sql_node
+    from backend.ai.agent.tools.web_search_tool import WebSearchTool
 
     # 1. Point 2: Google News RSS fallback when DDGS rate-limits + TTL cache hit
     mock_rss_xml = (
@@ -628,7 +628,7 @@ def test_points_2_3_4_web_rss_cache_multiyear_and_vn30_expand(monkeypatch: pytes
     class _CaptureSQLTool:
         def execute(self, q):
             captured_queries.append(q)
-            from src.ai.agent.tools.financial_sql_tool import FinancialQueryResponse
+            from backend.ai.agent.tools.financial_sql_tool import FinancialQueryResponse
 
             return FinancialQueryResponse(query=q, record_count=0, data=[])
 

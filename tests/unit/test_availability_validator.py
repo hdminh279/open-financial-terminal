@@ -9,12 +9,12 @@ Verifies:
 
 from datetime import date
 
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.agent.tools.financial_sql_tool import (
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.agent.tools.financial_sql_tool import (
     FinancialQueryInput,
     FinancialSQLTool,
 )
-from src.core.financial.availability_validator import (
+from backend.core.financial.availability_validator import (
     AvailabilityCode,
     FinancialAvailabilityValidator,
 )

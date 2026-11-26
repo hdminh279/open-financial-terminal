@@ -53,17 +53,17 @@ with DAG(
 ) as dag:
     ingest_sec_filings = BashOperator(
         task_id="ingest_sec_filings",
-        bash_command="cd /opt/airflow && python -m src.cli ingest --all --limit 4",
+        bash_command="cd /opt/airflow && python -m pipelines.cli ingest --all --limit 4",
     )
 
     process_sec_facts = BashOperator(
         task_id="process_sec_facts",
-        bash_command="cd /opt/airflow && python -m src.cli process --facts",
+        bash_command="cd /opt/airflow && python -m pipelines.cli process --facts",
     )
 
     process_sec_text_hive = BashOperator(
         task_id="process_sec_text_hive",
-        bash_command="cd /opt/airflow && python -m src.cli process --text",
+        bash_command="cd /opt/airflow && python -m pipelines.cli process --text",
     )
 
     check_dead_letter = PythonOperator(
@@ -73,7 +73,7 @@ with DAG(
 
     sync_qdrant_vectors = BashOperator(
         task_id="sync_qdrant_vectors",
-        bash_command="cd /opt/airflow && python -m src.cli index --sync --verify",
+        bash_command="cd /opt/airflow && python -m pipelines.cli index --sync --verify",
     )
 
     dbt_build_gold_marts = BashOperator(

@@ -5,14 +5,14 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from src.ai.embeddings.factory import EmbeddingFactory
-from src.ai.embeddings.fastembed_strategy import FastEmbedStrategy
+from backend.ai.embeddings.factory import EmbeddingFactory
+from backend.ai.embeddings.fastembed_strategy import FastEmbedStrategy
 
 
 class TestEmbeddingStrategyContract:
     """Verify abstract contracts and FastEmbedStrategy implementation."""
 
-    @patch("src.ai.embeddings.fastembed_strategy.TextEmbedding")
+    @patch("backend.ai.embeddings.fastembed_strategy.TextEmbedding")
     def test_fastembed_strategy_lazy_loading(self, mock_text_embedding_cls):
         """Ensure TextEmbedding is not loaded until an embed operation is requested."""
         strategy = FastEmbedStrategy(model_name="BAAI/bge-large-en-v1.5")
@@ -22,7 +22,7 @@ class TestEmbeddingStrategyContract:
         _ = strategy.dimension
         mock_text_embedding_cls.assert_called_once()
 
-    @patch("src.ai.embeddings.fastembed_strategy.TextEmbedding")
+    @patch("backend.ai.embeddings.fastembed_strategy.TextEmbedding")
     def test_embed_documents_batching(self, mock_text_embedding_cls):
         """Test document embedding correctly converts numpy arrays to float lists."""
         mock_instance = MagicMock()
@@ -46,7 +46,7 @@ class TestEmbeddingStrategyContract:
         strategy = FastEmbedStrategy()
         assert strategy.embed_documents([]) == []
 
-    @patch("src.ai.embeddings.fastembed_strategy.TextEmbedding")
+    @patch("backend.ai.embeddings.fastembed_strategy.TextEmbedding")
     def test_embed_query_success(self, mock_text_embedding_cls):
         """Test query embedding returns single 1D list."""
         mock_instance = MagicMock()

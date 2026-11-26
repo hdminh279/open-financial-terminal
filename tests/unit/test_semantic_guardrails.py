@@ -1,6 +1,6 @@
 """Unit tests for 4-Layer Financial Semantic Guardrails."""
 
-from src.core.financial.semantic_guardrails import (
+from backend.core.financial.semantic_guardrails import (
     FinancialOntology,
     FinancialSemanticValidator,
     SegmentType,

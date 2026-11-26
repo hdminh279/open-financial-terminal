@@ -14,14 +14,14 @@ Covers:
 11. Backward compatibility with ChartData and CitationNode.
 """
 
-from src.ai.agent.chart_engine import (
+from backend.ai.agent.chart_engine import (
     ChartEngine,
     TimeSeriesNormalizer,
 )
-from src.ai.agent.citation import citation_node
-from src.ai.agent.contracts import ChartType
-from src.ai.agent.router import IntentRouter
-from src.ai.agent.state import AgentState
+from backend.ai.agent.citation import citation_node
+from backend.ai.agent.contracts import ChartType
+from backend.ai.agent.router import IntentRouter
+from backend.ai.agent.state import AgentState
 
 # ---------------------------------------------------------------------------
 # 1. Router Chart Preference & Fallback Tests

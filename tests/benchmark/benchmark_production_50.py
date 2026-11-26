@@ -24,9 +24,9 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter
-from src.api.main import app
-from src.api.security import reset_rate_limiters
+from backend.ai.retrieval.retriever import HybridRetriever, RetrievalFilter
+from backend.main import app
+from backend.security import reset_rate_limiters
 from tests.benchmark.benchmark_retrieval import is_content_relevant, is_strict_item_match
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

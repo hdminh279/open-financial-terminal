@@ -8,19 +8,19 @@ from unittest.mock import MagicMock
 import duckdb
 import pytest
 
-from src.ai.agent.contracts import AgentRequest, IntentType, ToolExecutionStatus
-from src.ai.agent.graph import sql_node
-from src.ai.agent.research_agent import ResearchAgent
-from src.ai.agent.state import timeline_reducer
-from src.ai.agent.tools.duckdb_repository import (
+from backend.ai.agent.contracts import AgentRequest, IntentType, ToolExecutionStatus
+from backend.ai.agent.graph import sql_node
+from backend.ai.agent.research_agent import ResearchAgent
+from backend.ai.agent.state import timeline_reducer
+from backend.ai.agent.tools.duckdb_repository import (
     DatabaseExecutionError,
     DuckDBFinancialRepository,
 )
-from src.ai.agent.tools.financial_sql_tool import (
+from backend.ai.agent.tools.financial_sql_tool import (
     FinancialQueryInput,
     FinancialSQLTool,
 )
-from src.core.observability.telemetry import (
+from backend.core.observability.telemetry import (
     TelemetryLogger,
     sanitize_query,
 )
@@ -47,8 +47,8 @@ def test_timeline_reducer_parallel_accumulation() -> None:
 
 def test_mixed_research_parallel_fanout_timeline(monkeypatch: pytest.MonkeyPatch) -> None:
     """Validate that Mixed Research parallel execution records both tools without event loss."""
-    from src.ai.llm.contracts import LLMResponse
-    from src.ai.llm.deepseek_adapter import DeepSeekAdapter
+    from backend.ai.llm.contracts import LLMResponse
+    from backend.ai.llm.deepseek_adapter import DeepSeekAdapter
 
     # Force CI-like empty API key environment so this unit test never hits external network
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)

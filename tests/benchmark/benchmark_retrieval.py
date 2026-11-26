@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter
+from backend.ai.retrieval.retriever import HybridRetriever, RetrievalFilter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

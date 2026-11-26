@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from src.data.ingestion.rate_limiter import RateLimiter
+from backend.core.rate_limiter import RateLimiter
 
 
 def test_invalid_rate():

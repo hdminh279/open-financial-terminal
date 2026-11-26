@@ -3,8 +3,8 @@
 import hashlib
 from unittest.mock import MagicMock
 
-from src.data.ingestion.fetch_facts import FactsIngestionPipeline
-from src.data.storage.s3_storage import S3Storage
+from backend.core.storage.s3_storage import S3Storage
+from pipelines.ingestion.fetch_facts import FactsIngestionPipeline
 
 
 def test_verify_integrity_matching_hash():

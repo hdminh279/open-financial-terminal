@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.ai.agent.tools.web_search_tool import (
+from backend.ai.agent.tools.web_search_tool import (
     WebSearchResponse,
     WebSearchResultItem,
     WebSearchTool,
@@ -49,7 +49,7 @@ def test_search_empty_query(web_tool: WebSearchTool) -> None:
     assert res.results == []
 
 
-@patch("src.ai.agent.tools.web_search_tool.DDGS")
+@patch("backend.ai.agent.tools.web_search_tool.DDGS")
 def test_search_success(mock_ddgs_cls: MagicMock, web_tool: WebSearchTool) -> None:
     """Verify search successfully parses DDGS text outputs into structured models."""
     mock_ddgs_instance = MagicMock()
@@ -85,7 +85,7 @@ def test_search_success(mock_ddgs_cls: MagicMock, web_tool: WebSearchTool) -> No
     assert first.date == "2024-04-23"
 
 
-@patch("src.ai.agent.tools.web_search_tool.DDGS")
+@patch("backend.ai.agent.tools.web_search_tool.DDGS")
 def test_search_empty_results(mock_ddgs_cls: MagicMock, web_tool: WebSearchTool) -> None:
     """Verify search handles empty results from DDGS gracefully."""
     mock_ddgs_instance = MagicMock()
@@ -97,7 +97,7 @@ def test_search_empty_results(mock_ddgs_cls: MagicMock, web_tool: WebSearchTool)
     assert response.results == []
 
 
-@patch("src.ai.agent.tools.web_search_tool.DDGS")
+@patch("backend.ai.agent.tools.web_search_tool.DDGS")
 def test_search_exception_handled_gracefully(mock_ddgs_cls: MagicMock, web_tool: WebSearchTool) -> None:
     """Verify network exceptions or rate limits are caught and return empty results without crashing."""
     mock_ddgs_instance = MagicMock()
@@ -111,7 +111,7 @@ def test_search_exception_handled_gracefully(mock_ddgs_cls: MagicMock, web_tool:
 
 def test_search_when_ddgs_uninstalled(monkeypatch: pytest.MonkeyPatch, web_tool: WebSearchTool) -> None:
     """Verify graceful failure when DDGS library is absent."""
-    import src.ai.agent.tools.web_search_tool as wst
+    import backend.ai.agent.tools.web_search_tool as wst
 
     monkeypatch.setattr(wst, "DDGS", None)
 
@@ -129,7 +129,7 @@ def test_normalize_news_query_strips_conversational_filler() -> None:
     assert WebSearchTool._normalize_news_query("Latest breaking news about NVIDIA today") == "NVIDIA"
 
 
-@patch("src.ai.agent.tools.web_search_tool.DDGS")
+@patch("backend.ai.agent.tools.web_search_tool.DDGS")
 def test_news_query_prefers_rss_and_ddgs_news_over_text(mock_ddgs_cls: MagicMock) -> None:
     """Verify news-like queries prioritize dated RSS and ddgs.news() articles over generic ddgs.text()."""
     tool = WebSearchTool(timeout=2, max_retries=1, enable_rss_fallback=True)

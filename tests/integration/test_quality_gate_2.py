@@ -17,7 +17,7 @@ from decimal import Decimal
 
 import pytest
 
-from src.ai.agent.tools.financial_sql_tool import FinancialSQLTool
+from backend.ai.agent.tools.financial_sql_tool import FinancialSQLTool
 
 TICKERS = ["AAPL", "MSFT", "GOOGL"]
 YEARS = [2022, 2023, 2024]

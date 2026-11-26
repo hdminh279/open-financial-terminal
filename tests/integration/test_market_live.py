@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.data.market.contracts import Market, QuoteStatus
-from src.data.market.providers import FinnhubQuoteProvider, SSIQuoteProvider
-from src.data.market.service import QuoteService
+from backend.services.market.contracts import Market, QuoteStatus
+from backend.services.market.providers import FinnhubQuoteProvider, SSIQuoteProvider
+from backend.services.market.service import QuoteService
 
 
 @pytest.mark.live

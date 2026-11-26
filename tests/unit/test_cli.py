@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.cli import build_parser, main
+from pipelines.cli import build_parser, main
 
 
 def test_cli_parser_ingest_all():
@@ -57,7 +57,7 @@ def test_cli_parser_mutually_exclusive_ingest():
         parser.parse_args(["ingest", "--facts", "--filings"])
 
 
-@patch("src.cli.run_ingest")
+@patch("pipelines.cli.run_ingest")
 def test_cli_main_dispatches_ingest(mock_run_ingest):
     """Verify main dispatches to run_ingest."""
     mock_run_ingest.return_value = 0
@@ -66,7 +66,7 @@ def test_cli_main_dispatches_ingest(mock_run_ingest):
     mock_run_ingest.assert_called_once()
 
 
-@patch("src.cli.run_verify")
+@patch("pipelines.cli.run_verify")
 def test_cli_main_dispatches_verify(mock_run_verify):
     """Verify main dispatches to run_verify."""
     mock_run_verify.return_value = 0
@@ -85,7 +85,7 @@ def test_cli_parser_index():
     assert args.batch_size == 128
 
 
-@patch("src.cli.run_index")
+@patch("pipelines.cli.run_index")
 def test_cli_main_dispatches_index(mock_run_index):
     """Verify main dispatches to run_index."""
     mock_run_index.return_value = 0
@@ -104,7 +104,7 @@ def test_cli_parser_process():
     assert args.force is True
 
 
-@patch("src.cli.run_process")
+@patch("pipelines.cli.run_process")
 def test_cli_main_dispatches_process(mock_run_process):
     """Verify main dispatches to run_process."""
     mock_run_process.return_value = 0

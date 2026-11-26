@@ -6,14 +6,14 @@ Tests cover:
 3. LangGraph route_next_step conditional edge routing and parallel fan-out.
 """
 
-from src.ai.agent.contracts import (
+from backend.ai.agent.contracts import (
     ComparisonType,
     ExecutionStrategy,
     IntentType,
 )
-from src.ai.agent.router import IntentRouter, route_next_step
-from src.ai.agent.state import AgentState
-from src.core.financial.metric_registry import MetricRegistry
+from backend.ai.agent.router import IntentRouter, route_next_step
+from backend.ai.agent.state import AgentState
+from backend.core.financial.metric_registry import MetricRegistry
 
 
 def test_comparison_type_classification() -> None:

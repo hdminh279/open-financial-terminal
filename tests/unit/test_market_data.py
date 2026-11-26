@@ -1,24 +1,24 @@
 """Unit tests for market data contracts, providers, quote service, watchlist repository, and API routes."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.main import app
-from src.data.market.contracts import (
+from backend.main import app
+from backend.services.market.contracts import (
     AddWatchlistRequest,
     Market,
     QuoteStatus,
     StockQuote,
 )
-from src.data.market.providers import (
+from backend.services.market.providers import (
     FinnhubQuoteProvider,
     MockQuoteProvider,
     QuoteProviderFactory,
     SSIQuoteProvider,
 )
-from src.data.market.service import QuoteService, WatchlistRepository
+from backend.services.market.service import QuoteService, WatchlistRepository
 
 
 @pytest.fixture
@@ -54,10 +54,14 @@ class TestMarketContracts:
             )
 
     def test_add_watchlist_request_validation(self) -> None:
-        """Ensure AddWatchlistRequest enforces uppercase and non-empty ticker."""
+        """Ensure AddWatchlistRequest enforces uppercase, non-empty, and safe ticker characters."""
         req = AddWatchlistRequest(ticker="fpt")
         assert req.ticker == "FPT"
         assert req.market is None
+        with pytest.raises(ValueError):
+            AddWatchlistRequest(ticker="../evil")
+        with pytest.raises(ValueError):
+            AddWatchlistRequest(ticker="TOO_LONG_TICKER_NAME")
 
 
 class TestQuoteProviders:
@@ -202,7 +206,7 @@ class TestQuoteServiceAndRepository:
 
     def test_watchlist_repository_lifecycle(self) -> None:
         """Test WatchlistRepository add, remove, and duplicate handling in memory."""
-        from src.data.storage.s3_storage import S3Storage
+        from backend.core.storage.s3_storage import S3Storage
 
         mock_s3 = MagicMock(spec=S3Storage)
         mock_s3.object_exists.return_value = False
@@ -251,8 +255,8 @@ class TestWatchlistAPI:
     @pytest.fixture(autouse=True)
     def mock_backend_services(self) -> None:
         """Inject mock providers for lightning fast deterministic API tests."""
-        from src.api.routes import watchlist as wl_module
-        from src.core.financial.company_registry import load_company_catalog
+        from backend.core.financial.company_registry import load_company_catalog
+        from backend.deps import get_quote_service, get_watchlist_repository
 
         vn_tickers = {
             str(c["ticker"]).upper()
@@ -274,14 +278,16 @@ class TestWatchlistAPI:
         mock_quote_svc.get_quotes_batch.side_effect = lambda syms, **kwargs: [mock_quote_svc.get_quote(s) for s in syms]
 
         mock_s3 = MagicMock()
-        mock_s3.exists.return_value = False
+        mock_s3.object_exists.return_value = False
         repo = WatchlistRepository(s3_storage=mock_s3, quote_service=mock_quote_svc)
 
-        with (
-            patch.object(wl_module, "get_watchlist_repository", return_value=repo),
-            patch.object(wl_module, "get_quote_service", return_value=mock_quote_svc),
-        ):
+        app.dependency_overrides[get_watchlist_repository] = lambda: repo
+        app.dependency_overrides[get_quote_service] = lambda: mock_quote_svc
+        try:
             yield
+        finally:
+            app.dependency_overrides.pop(get_watchlist_repository, None)
+            app.dependency_overrides.pop(get_quote_service, None)
 
     def test_get_watchlist_endpoint(self, test_client: TestClient) -> None:
         """Test GET /api/watchlist returns valid response structure."""
@@ -311,7 +317,7 @@ class TestWatchlistAPI:
         assert not any(item["ticker"] == "TESTSYM" for item in del_data["items"])
 
     def test_get_quotes_endpoint(self, test_client: TestClient) -> None:
-        """Test GET /api/quotes with comma-separated symbols."""
+        """Test GET /api/quotes with comma-separated symbols and input guardrails."""
         resp = test_client.get("/api/quotes?tickers=AAPL,FPT")
         assert resp.status_code == 200
         data = resp.json()
@@ -319,6 +325,10 @@ class TestWatchlistAPI:
         tickers = {item["ticker"] for item in data}
         assert "AAPL" in tickers
         assert "FPT" in tickers
+
+        too_many = ",".join(f"T{i}" for i in range(26))
+        assert test_client.get(f"/api/quotes?tickers={too_many}").status_code == 400
+        assert test_client.get("/api/quotes?tickers=../bad").status_code == 400
 
     def test_get_watchlist_pagination_and_market_filter(self, test_client: TestClient) -> None:
         """Verify GET /api/watchlist paginates items cleanly and filters by market."""
@@ -390,7 +400,7 @@ def test_quote_service_non_blocking_rate_limit_and_lru_bound() -> None:
     """Verify QuoteService never blocks on exhausted tokens (returns SWR or ERROR) and bounds LRU cache."""
     import time as _time
 
-    from src.data.ingestion.rate_limiter import RateLimiter
+    from backend.core.rate_limiter import RateLimiter
 
     mock_provider = MagicMock()
     mock_provider.market = Market.US

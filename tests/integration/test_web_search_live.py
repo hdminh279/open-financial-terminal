@@ -6,7 +6,7 @@ Run explicitly with: uv run pytest tests/integration/test_web_search_live.py -m 
 
 import pytest
 
-from src.ai.agent.tools.web_search_tool import WebSearchTool
+from backend.ai.agent.tools.web_search_tool import WebSearchTool
 
 
 @pytest.mark.live

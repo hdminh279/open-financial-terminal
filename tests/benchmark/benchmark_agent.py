@@ -19,7 +19,7 @@ if not os.getenv("GOLD_STATEMENTS_PARQUET_PATH"):
 if not os.getenv("GOLD_RATIOS_PARQUET_PATH"):
     os.environ["GOLD_RATIOS_PARQUET_PATH"] = "tests/fixtures/gold/fct_financial_ratios.parquet"
 
-from src.ai.agent.research_agent import ResearchAgent
+from backend.ai.agent.research_agent import ResearchAgent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)

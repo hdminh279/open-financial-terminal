@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.financial.metric_registry import MetricRegistry
+from backend.core.financial.metric_registry import MetricRegistry
 
 
 @pytest.fixture(scope="module")
@@ -82,8 +82,8 @@ def test_gold_table_ssot_matches_gold_parquet_and_dbt_marts(registry: MetricRegi
 
     import duckdb
 
-    from src.ai.agent.chart_engine import POINT_IN_TIME_METRICS
-    from src.ai.agent.tools.financial_sql_tool import RATIO_METRICS, STATEMENT_METRICS
+    from backend.ai.agent.chart_engine import POINT_IN_TIME_METRICS
+    from backend.ai.agent.tools.financial_sql_tool import RATIO_METRICS, STATEMENT_METRICS
 
     assert set(registry.list_metrics(gold_table="statements")) == STATEMENT_METRICS
     assert set(registry.list_metrics(gold_table="ratios")) == RATIO_METRICS

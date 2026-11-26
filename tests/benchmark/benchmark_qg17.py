@@ -33,14 +33,14 @@ from unittest.mock import MagicMock, patch
 
 import duckdb
 
-from src.ai.agent.graph import build_agent_graph
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.agent.tools.financial_sql_tool import FinancialSQLTool
-from src.ai.agent.tools.web_search_tool import WebSearchResponse, WebSearchResultItem, WebSearchTool
-from src.ai.llm.contracts import ChatMessage, LLMResponse, TokenUsage
-from src.ai.llm.factory import LLMFactory
-from src.ai.retrieval.retriever import HybridRetriever, RetrievalResponse, RetrievedChunk
-from src.core.financial.response_templates import detect_query_language
+from backend.ai.agent.graph import build_agent_graph
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.agent.tools.financial_sql_tool import FinancialSQLTool
+from backend.ai.agent.tools.web_search_tool import WebSearchResponse, WebSearchResultItem, WebSearchTool
+from backend.ai.llm.contracts import ChatMessage, LLMResponse, TokenUsage
+from backend.ai.llm.factory import LLMFactory
+from backend.ai.retrieval.retriever import HybridRetriever, RetrievalResponse, RetrievedChunk
+from backend.core.financial.response_templates import detect_query_language
 
 DATASET_PATH = Path("tests/fixtures/eval/qg17_multimarket_questions.json")
 REPORT_OUTPUT_PATH = Path("docs/benchmarks/MULTIMARKET_EVAL_GATE.md")
@@ -596,11 +596,11 @@ def run_qg17_benchmark(mode: str = "offline", write_report: bool = True) -> list
 
                 t0 = time.perf_counter()
                 with (
-                    patch("src.ai.agent.router.LLMFactory.get_adapter", return_value=fake_llm),
-                    patch("src.ai.agent.nodes.citation_node.LLMFactory.get_adapter", return_value=fake_llm),
-                    patch("src.ai.agent.nodes.sql_node.get_sql_tool", return_value=sql_tool),
-                    patch("src.ai.agent.nodes.rag_node.get_retriever", return_value=mock_retriever),
-                    patch("src.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web),
+                    patch("backend.ai.agent.router.LLMFactory.get_adapter", return_value=fake_llm),
+                    patch("backend.ai.agent.nodes.citation_node.LLMFactory.get_adapter", return_value=fake_llm),
+                    patch("backend.ai.agent.nodes.sql_node.get_sql_tool", return_value=sql_tool),
+                    patch("backend.ai.agent.nodes.rag_node.get_retriever", return_value=mock_retriever),
+                    patch("backend.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web),
                 ):
                     final_state = graph.invoke(
                         {
@@ -621,7 +621,7 @@ def run_qg17_benchmark(mode: str = "offline", write_report: bool = True) -> list
             if case.get("mock_web_mode") == "empty":
                 mock_web = MagicMock(spec=WebSearchTool)
                 mock_web.search.return_value = WebSearchResponse(query=case["query"], total_found=0, results=[])
-                with patch("src.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web):
+                with patch("backend.ai.agent.nodes.web_node.get_web_tool", return_value=mock_web):
                     final_state = graph.invoke(
                         {
                             "query": case["query"],

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.data.ingestion.filing_resolver import FilingResolver
+from pipelines.ingestion.filing_resolver import FilingResolver
 
 
 @pytest.fixture

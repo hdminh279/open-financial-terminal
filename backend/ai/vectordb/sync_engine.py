@@ -1,0 +1,342 @@
+"""Corpus Synchronization Engine between Parquet Marts and Qdrant.
+
+Ensures Parquet remains the authoritative Single Source of Truth.
+Handles deterministic UUIDv5 mapping, stale-point cleanup, dual-vector generation
+(dense + sparse BM25), batch upserting, and count/hash integrity audits.
+"""
+
+import io
+import logging
+import os
+import random
+import uuid
+from pathlib import Path
+from typing import Any
+
+import pyarrow as pa
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
+from dotenv import load_dotenv
+from fastembed import SparseTextEmbedding
+from qdrant_client.http import models
+
+from backend.ai.embeddings.base import EmbeddingStrategy
+from backend.ai.embeddings.factory import EmbeddingFactory
+from backend.ai.vectordb.qdrant_client import QdrantStorage
+from backend.core.storage.s3_storage import S3Storage
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+class CorpusSyncEngine:
+    """Synchronizes text chunks from Gold Parquet lakehouse to Qdrant Vector DB."""
+
+    def __init__(
+        self,
+        qdrant_storage: QdrantStorage | None = None,
+        dense_engine: EmbeddingStrategy | None = None,
+        sparse_engine: SparseTextEmbedding | None = None,
+        s3_storage: S3Storage | None = None,
+    ) -> None:
+        """Initialize sync engine with storage and embedding adapters."""
+        self.qdrant = qdrant_storage or QdrantStorage()
+        self.dense_engine = dense_engine or EmbeddingFactory.create()
+        self.sparse_engine = sparse_engine or SparseTextEmbedding(model_name="Qdrant/bm25")
+        self.s3 = s3_storage or S3Storage()
+
+    @staticmethod
+    def chunk_id_to_uuid(chunk_id: str) -> str:
+        """Convert a deterministic SHA-256 chunk_id into a stable UUIDv5 string."""
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk_id))
+
+    @staticmethod
+    def _table_to_chunks(table: pa.Table) -> list[dict[str, Any]]:
+        """Convert a PyArrow table into list of chunk dictionaries."""
+        pydict = table.to_pydict()
+        keys = list(pydict.keys())
+        return [{k: pydict[k][i] for k in keys} for i in range(table.num_rows)]
+
+    def load_chunks_from_parquet(
+        self,
+        bucket: str = "sec-gold",
+        key: str = "chunks/text_chunks.parquet",
+        local_path: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Load text chunks from local Parquet, Hive partitions (chunks/ticker=*/chunks.parquet), or legacy Parquet."""
+        resolved_local = local_path or os.getenv("CHUNKS_PARQUET_LOCAL_PATH")
+        chunks: list[dict[str, Any]] = []
+
+        if resolved_local and os.path.isdir(resolved_local):
+            parquet_files = sorted(Path(resolved_local).rglob("*.parquet"))
+            logger.info("Loading chunks from %d local Parquet file(s) under %s", len(parquet_files), resolved_local)
+            for pf in parquet_files:
+                tbl = pq.read_table(pf)
+                if limit is not None and limit > 0:
+                    remaining = limit - len(chunks)
+                    if remaining <= 0:
+                        break
+                    tbl = tbl.slice(0, remaining)
+                chunks.extend(self._table_to_chunks(tbl))
+            return chunks
+
+        if resolved_local and os.path.isfile(resolved_local):
+            logger.info("Loading chunks directly from local Parquet: %s", resolved_local)
+            table = pq.read_table(resolved_local)
+            if limit is not None and limit > 0:
+                table = table.slice(0, limit)
+            return self._table_to_chunks(table)
+
+        # S3 Mode: Discover Hive-partitioned chunks/ticker=*/chunks.parquet and/or legacy chunks/text_chunks.parquet
+        all_keys = self.s3.list_objects(bucket=bucket, prefix="chunks/")
+        hive_keys = sorted(k for k in all_keys if k.startswith("chunks/ticker=") and k.endswith(".parquet"))
+        hive_tickers: set[str] = set()
+
+        for hkey in hive_keys:
+            logger.info("Downloading Hive chunk partition s3://%s/%s...", bucket, hkey)
+            parquet_bytes = self.s3.download_bytes(bucket=bucket, key=hkey)
+            tbl = pq.read_table(io.BytesIO(parquet_bytes))
+            if tbl.num_rows > 0 and "ticker" in tbl.column_names:
+                hive_tickers.update(str(t).upper() for t in tbl["ticker"].to_pylist() if t)
+            if limit is not None and limit > 0:
+                remaining = limit - len(chunks)
+                if remaining <= 0:
+                    break
+                tbl = tbl.slice(0, remaining)
+            chunks.extend(self._table_to_chunks(tbl))
+
+        # Backward compatibility: read legacy text_chunks.parquet for any tickers not superseded by Hive partitions
+        has_legacy = (key in all_keys) or (not all_keys)
+        if has_legacy and (limit is None or limit <= 0 or len(chunks) < limit):
+            logger.info("Downloading legacy chunks from MinIO s3://%s/%s...", bucket, key)
+            parquet_bytes = self.s3.download_bytes(bucket=bucket, key=key)
+            legacy_tbl = pq.read_table(io.BytesIO(parquet_bytes))
+            if hive_tickers and "ticker" in legacy_tbl.column_names and legacy_tbl.num_rows > 0:
+                mask = pc.invert(
+                    pc.is_in(
+                        pc.utf8_upper(legacy_tbl["ticker"]),
+                        value_set=pa.array(list(hive_tickers), type=pa.string()),
+                    )
+                )
+                legacy_tbl = legacy_tbl.filter(mask)
+            if limit is not None and limit > 0:
+                remaining = limit - len(chunks)
+                legacy_tbl = legacy_tbl.slice(0, max(0, remaining))
+            chunks.extend(self._table_to_chunks(legacy_tbl))
+
+        logger.info("Loaded %d chunks from Parquet source of truth.", len(chunks))
+        return chunks
+
+    def sync(
+        self,
+        bucket: str = "sec-gold",
+        key: str = "chunks/text_chunks.parquet",
+        local_path: str | None = None,
+        recreate: bool = False,
+        limit: int | None = None,
+        batch_size: int = 64,
+        create_snapshot_after: bool = False,
+    ) -> dict[str, Any]:
+        """Perform end-to-end synchronization: stale cleanup, embedding, and upsert."""
+        chunks = self.load_chunks_from_parquet(bucket=bucket, key=key, local_path=local_path, limit=limit)
+
+        if not chunks:
+            logger.warning("No chunks found to synchronize.")
+            return {"status": "SKIPPED", "total_parquet_chunks": 0, "upserted_count": 0}
+
+        # 1. Ensure collection and payload indexes exist
+        dense_dim = self.dense_engine.dimension
+        self.qdrant.create_collection(recreate=recreate, dense_dim=dense_dim)
+
+        # 2. Build mapping of valid Point IDs
+        parquet_point_ids: dict[str, dict[str, Any]] = {self.chunk_id_to_uuid(c["chunk_id"]): c for c in chunks}
+        valid_id_set = set(parquet_point_ids.keys())
+
+        # 3. Detect and purge stale points from Qdrant
+        existing_ids = self.qdrant.scroll_all_ids()
+        stale_ids = existing_ids - valid_id_set
+
+        if stale_ids:
+            logger.warning("Detected %d stale points in Qdrant not in Parquet. Purging...", len(stale_ids))
+            self.qdrant.delete_points(point_ids=list(stale_ids), wait=True)
+            existing_ids = existing_ids - stale_ids
+            logger.info("Successfully purged %d stale points.", len(stale_ids))
+        else:
+            logger.info("Zero stale points detected in Qdrant.")
+
+        # Incremental Resume: Filter out chunks that are already indexed in Qdrant
+        chunks_to_embed = [c for c in chunks if self.chunk_id_to_uuid(c["chunk_id"]) not in existing_ids]
+        already_indexed_count = len(chunks) - len(chunks_to_embed)
+        logger.info(
+            "%d chunks already indexed in Qdrant (skipped). %d remaining chunks to embed.",
+            already_indexed_count,
+            len(chunks_to_embed),
+        )
+
+        total_chunks = len(chunks_to_embed)
+        if total_chunks == 0:
+            logger.info("All %d chunks already synchronized in Qdrant.", len(chunks))
+            return {
+                "status": "SUCCESS",
+                "total_parquet_chunks": len(chunks),
+                "upserted_count": 0,
+                "already_indexed_count": already_indexed_count,
+                "stale_purged_count": len(stale_ids),
+                "qdrant_points_count": len(existing_ids),
+                "snapshot_name": None,
+            }
+
+        # 4. Batch embed and upsert remaining chunks
+        logger.info(
+            "Embedding and upserting %d remaining chunks in batches of %d...",
+            total_chunks,
+            batch_size,
+        )
+
+        upserted_count = 0
+        for start_idx in range(0, total_chunks, batch_size):
+            end_idx = min(start_idx + batch_size, total_chunks)
+            batch_chunks = chunks_to_embed[start_idx:end_idx]
+            batch_texts = [c["text"] for c in batch_chunks]
+
+            # Generate dense embeddings (BGE-M3 / FastEmbed)
+            dense_vectors = self.dense_engine.embed_documents(batch_texts, batch_size=batch_size)
+
+            # Generate sparse BM25 term vectors
+            sparse_vectors = list(self.sparse_engine.embed(batch_texts, batch_size=batch_size))
+
+            # Assemble Qdrant points with full 17 metadata fields in payload
+            points: list[models.PointStruct] = []
+            for chunk_data, d_vec, s_vec in zip(batch_chunks, dense_vectors, sparse_vectors, strict=True):
+                p_id = self.chunk_id_to_uuid(chunk_data["chunk_id"])
+
+                payload = {
+                    "chunk_id": str(chunk_data["chunk_id"]),
+                    "cik": str(chunk_data["cik"]),
+                    "ticker": str(chunk_data["ticker"]),
+                    "accession_number": str(chunk_data["accession_number"]),
+                    "form": str(chunk_data["form"]),
+                    "fiscal_year": int(chunk_data["fiscal_year"]),
+                    "filed_date": str(chunk_data["filed_date"]),
+                    "period_end": str(chunk_data["period_end"]),
+                    "part": chunk_data.get("part"),
+                    "item": str(chunk_data["item"]),
+                    "subsection": chunk_data.get("subsection"),
+                    "content_type": str(chunk_data["content_type"]),
+                    "chunk_index": int(chunk_data["chunk_index"]),
+                    "token_count": int(chunk_data["token_count"]),
+                    "text": str(chunk_data["text"]),
+                    "source_url": str(chunk_data["source_url"]),
+                    "source_content_hash": str(chunk_data["source_content_hash"]),
+                }
+
+                points.append(
+                    models.PointStruct(
+                        id=p_id,
+                        vector={
+                            "dense": d_vec,
+                            "bm25": models.SparseVector(
+                                indices=s_vec.indices.tolist(),
+                                values=s_vec.values.tolist(),
+                            ),
+                        },
+                        payload=payload,
+                    )
+                )
+
+            is_last_batch = end_idx >= total_chunks
+            self.qdrant.upsert_points(points=points, wait=is_last_batch)
+            upserted_count += len(points)
+            logger.info(
+                "Sync progress: %d/%d new chunks indexed (overall in Qdrant: %d/%d)...",
+                upserted_count,
+                total_chunks,
+                already_indexed_count + upserted_count,
+                len(chunks),
+            )
+
+        # 5. Optional snapshot creation
+        snapshot_name: str | None = None
+        if create_snapshot_after:
+            snapshot_name = self.qdrant.create_snapshot()
+
+        final_info = self.qdrant.get_collection_info()
+        return {
+            "status": "SUCCESS",
+            "total_parquet_chunks": len(chunks),
+            "upserted_count": upserted_count,
+            "already_indexed_count": already_indexed_count,
+            "stale_purged_count": len(stale_ids),
+            "qdrant_points_count": final_info["points_count"],
+            "snapshot_name": snapshot_name,
+        }
+
+    def verify_integrity(
+        self,
+        bucket: str = "sec-gold",
+        key: str = "chunks/text_chunks.parquet",
+        local_path: str | None = None,
+        sample_size: int = 50,
+    ) -> dict[str, Any]:
+        """Perform comprehensive integrity checks between Parquet and Qdrant."""
+        chunks = self.load_chunks_from_parquet(bucket=bucket, key=key, local_path=local_path)
+        parquet_count = len(chunks)
+
+        qdrant_ids = self.qdrant.scroll_all_ids()
+        qdrant_count = len(qdrant_ids)
+
+        parquet_point_ids = {self.chunk_id_to_uuid(c["chunk_id"]): c for c in chunks}
+        valid_id_set = set(parquet_point_ids.keys())
+
+        # Check 1: Count match
+        counts_match = parquet_count == qdrant_count
+
+        # Check 2: Stale check
+        stale_count = len(qdrant_ids - valid_id_set)
+        missing_count = len(valid_id_set - qdrant_ids)
+
+        # Check 3: Sample hash verification
+        sampled_count = min(sample_size, parquet_count)
+        sampled_uuids = random.sample(list(valid_id_set), sampled_count)
+
+        # Fetch records from Qdrant by Point IDs
+        fetched_points = self.qdrant.client.retrieve(
+            collection_name=self.qdrant.collection_name,
+            ids=sampled_uuids,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        hashes_matched = 0
+        discrepancies: list[str] = []
+
+        for pt in fetched_points:
+            pt_id = str(pt.id)
+            parquet_chunk = parquet_point_ids.get(pt_id)
+            if not parquet_chunk:
+                discrepancies.append(f"Point {pt_id} not found in Parquet mapping.")
+                continue
+
+            qdrant_hash = pt.payload.get("source_content_hash")
+            expected_hash = parquet_chunk["source_content_hash"]
+
+            if qdrant_hash == expected_hash:
+                hashes_matched += 1
+            else:
+                discrepancies.append(f"Hash mismatch for {pt_id}: Qdrant='{qdrant_hash}' vs Parquet='{expected_hash}'")
+
+        is_passed = counts_match and (stale_count == 0) and (missing_count == 0) and (len(discrepancies) == 0)
+
+        report = {
+            "status": "PASSED" if is_passed else "FAILED",
+            "counts_match": counts_match,
+            "parquet_count": parquet_count,
+            "qdrant_count": qdrant_count,
+            "stale_count": stale_count,
+            "missing_count": missing_count,
+            "sampled_audited": sampled_count,
+            "hashes_matched": hashes_matched,
+            "discrepancies": discrepancies,
+        }
+        return report

@@ -14,8 +14,8 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.agent.tools.financial_sql_tool import (
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.agent.tools.financial_sql_tool import (
     FinancialMetricRecord,
     FinancialQueryInput,
     FinancialQueryResponse,

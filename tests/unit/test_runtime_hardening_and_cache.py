@@ -9,23 +9,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.ai.agent.contracts import (
+from backend.ai.agent.contracts import (
     AgentResponse,
     IntentType,
     ToolExecutionResult,
     ToolExecutionStatus,
 )
-from src.ai.agent.research_agent import ResearchAgent, TTLQueryCache
-from src.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
-from src.ai.agent.tools.financial_sql_tool import FinancialMetricRecord, FinancialQueryInput, FinancialQueryResponse
-from src.ai.vectordb.qdrant_client import QdrantStorage
-from src.api.chat_history import ChatHistoryManager, validate_session_id
-from src.api.deps import get_chat_history, get_duckdb_repository
-from src.api.main import app
-from src.api.security import reset_rate_limiters
-from src.core.financial.semantic_guardrails import FinancialSemanticValidator
-from src.data.market.service import WatchlistRepository
-from src.data.storage.s3_storage import S3Storage
+from backend.ai.agent.research_agent import ResearchAgent, TTLQueryCache
+from backend.ai.agent.tools.duckdb_repository import DuckDBFinancialRepository
+from backend.ai.agent.tools.financial_sql_tool import FinancialMetricRecord, FinancialQueryInput, FinancialQueryResponse
+from backend.ai.vectordb.qdrant_client import QdrantStorage
+from backend.core.financial.semantic_guardrails import FinancialSemanticValidator
+from backend.core.storage.s3_storage import S3Storage
+from backend.deps import get_chat_history, get_duckdb_repository
+from backend.main import app
+from backend.security import reset_rate_limiters
+from backend.services.chat_history import ChatHistoryManager, validate_session_id
+from backend.services.market.service import WatchlistRepository
 
 
 @pytest.fixture(autouse=True)
@@ -43,10 +43,13 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
     monkeypatch.setenv("QDRANT_URL", "http://qdrant:6333")
     monkeypatch.setenv("QDRANT_HOST_LOCAL", "localhost")
 
-    with patch("src.data.storage.s3_storage.boto3.client") as mock_boto:
+    with patch("backend.core.storage.s3_storage.boto3.client") as mock_boto:
         storage = S3Storage()
         assert storage.endpoint_url == "http://minio:9000"
         assert mock_boto.call_args.kwargs["endpoint_url"] == "http://minio:9000"
+        cfg = mock_boto.call_args.kwargs["config"]
+        assert cfg.connect_timeout == 3
+        assert cfg.read_timeout == 10
 
     mock_conn = MagicMock()
     DuckDBFinancialRepository(
@@ -60,7 +63,7 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
     assert "SECRET 'prod''secret'" in executed_sql
     assert "SET GLOBAL s3_" not in executed_sql
 
-    with patch("src.ai.vectordb.qdrant_client.QdrantClient") as mock_qdrant:
+    with patch("backend.ai.vectordb.qdrant_client.QdrantClient") as mock_qdrant:
         QdrantStorage()
         assert mock_qdrant.call_args.kwargs["host"] == "qdrant"
         assert mock_qdrant.call_args.kwargs["port"] == 6333
@@ -68,7 +71,7 @@ def test_prod_env_resolves_container_service_endpoints(monkeypatch: pytest.Monke
 
 def test_duckdb_prod_s3_requires_credentials_and_rejects_unsafe_literals(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify DuckDB fails fast in prod without S3 credentials and rejects control characters in SQL literals."""
-    from src.ai.agent.tools.duckdb_repository import _sql_literal
+    from backend.ai.agent.tools.duckdb_repository import _sql_literal
 
     assert _sql_literal("a'b") == "'a''b'"
     for bad in ("abc\x00def", "abc\ndef", "abc\rdef"):
@@ -93,8 +96,8 @@ def test_metrics_route_reflects_dynamic_ticker_catalog_changes() -> None:
     try:
         client = TestClient(app)
         with (
-            patch("src.api.routes.metrics.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
-            patch("src.ai.agent.tools.financial_sql_tool.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
+            patch("backend.routes.metrics.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
+            patch("backend.ai.agent.tools.financial_sql_tool.get_supported_tickers", return_value={"AAPL", "DYNCO"}),
         ):
             sample_resp = FinancialQueryResponse(
                 query=FinancialQueryInput(tickers=["DYNCO"], metrics=["revenues"]),
@@ -114,13 +117,13 @@ def test_metrics_route_reflects_dynamic_ticker_catalog_changes() -> None:
                 ],
                 execution_time_ms=1.5,
             )
-            with patch("src.api.routes.metrics.FinancialSQLTool.execute", return_value=sample_resp):
+            with patch("backend.routes.metrics.FinancialSQLTool.execute", return_value=sample_resp):
                 resp = client.get("/api/metrics?ticker=DYNCO&metric=revenues")
         assert resp.status_code == 200
         assert resp.json()["tickers"] == ["DYNCO"]
 
         # Once removed from the catalog, the same ticker must be rejected immediately
-        with patch("src.api.routes.metrics.get_supported_tickers", return_value={"AAPL"}):
+        with patch("backend.routes.metrics.get_supported_tickers", return_value={"AAPL"}):
             rejected = client.get("/api/metrics?ticker=DYNCO&metric=revenues")
         assert rejected.status_code == 400
         assert "Unsupported ticker" in rejected.json()["detail"]
@@ -215,7 +218,7 @@ def test_metrics_endpoint_uses_real_currency_form_and_sanitizes_prod_errors(
             ],
             execution_time_ms=4.2,
         )
-        with patch("src.api.routes.metrics.FinancialSQLTool.execute", return_value=sample_resp):
+        with patch("backend.routes.metrics.FinancialSQLTool.execute", return_value=sample_resp):
             resp = client.get("/api/metrics?ticker=FPT&metrics=revenues&metrics=revenue_growth_yoy")
         assert resp.status_code == 200
         records = {r["metric_name"]: r for r in resp.json()["records"]}
@@ -224,7 +227,7 @@ def test_metrics_endpoint_uses_real_currency_form_and_sanitizes_prod_errors(
         assert records["revenue_growth_yoy"]["unit"] == "Ratio"
 
         monkeypatch.setenv("APP_ENV", "prod")
-        with patch("src.api.routes.metrics.FinancialSQLTool.execute", side_effect=RuntimeError("secret_bucket_path")):
+        with patch("backend.routes.metrics.FinancialSQLTool.execute", side_effect=RuntimeError("secret_bucket_path")):
             err_resp = client.get("/api/metrics?ticker=FPT&metric=revenues")
         assert err_resp.status_code == 500
         assert "secret_bucket_path" not in err_resp.json()["detail"]

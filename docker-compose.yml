@@ -12,7 +12,9 @@ services:
       - minio
       - qdrant
     volumes:
-      - ./src:/app/src
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./pipelines:/app/pipelines
       - ./tests:/app/tests
       - ./configs:/app/configs
       - ./transform/:/app/transform
@@ -22,7 +24,7 @@ services:
     working_dir: /app
     stdin_open: true
     tty: true
-    command: uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src --reload-dir /app/configs
+    command: uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/backend --reload-dir /app/frontend --reload-dir /app/configs
 
   minio:
     image: minio/minio:latest

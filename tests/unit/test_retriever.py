@@ -6,8 +6,8 @@ import pytest
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-from src.ai.retrieval.reranker import FlashRankReranker
-from src.ai.retrieval.retriever import HybridRetriever, RetrievalFilter, RetrievedChunk
+from backend.ai.retrieval.reranker import FlashRankReranker
+from backend.ai.retrieval.retriever import HybridRetriever, RetrievalFilter, RetrievedChunk
 
 
 @pytest.fixture
@@ -215,7 +215,7 @@ class TestHybridRetriever:
 
     def test_rag_node_multi_entity_fan_out(self):
         """Test that rag_node fans out retrieval when state has multiple tickers."""
-        from src.ai.agent.graph import rag_node
+        from backend.ai.agent.graph import rag_node
 
         mock_retriever = MagicMock()
         mock_resp = MagicMock()

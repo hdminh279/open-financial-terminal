@@ -20,7 +20,8 @@ x-airflow-common: &airflow-common
     HF_HOME: /opt/airflow/models/huggingface
   volumes:
     - ./dags:/opt/airflow/dags
-    - ./src:/opt/airflow/src:ro
+    - ./backend:/opt/airflow/backend:ro
+    - ./pipelines:/opt/airflow/pipelines:ro
     - ./configs:/opt/airflow/configs:ro
     - ./transform:/opt/airflow/transform
     - ./data:/opt/airflow/data

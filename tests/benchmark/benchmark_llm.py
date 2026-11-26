@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 load_dotenv()
 
-from src.ai.llm.contracts import ChatMessage, TokenUsage
-from src.ai.llm.factory import LLMFactory
+from backend.ai.llm.contracts import ChatMessage, TokenUsage
+from backend.ai.llm.factory import LLMFactory
 
 logger = logging.getLogger("benchmark_llm")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

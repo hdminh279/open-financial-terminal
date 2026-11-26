@@ -5,17 +5,17 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.ai.agent.citation import CitationEngine, citation_node, sanitize_answer_formatting
-from src.ai.agent.contracts import (
+from backend.ai.agent.citation import CitationEngine, citation_node, sanitize_answer_formatting
+from backend.ai.agent.contracts import (
     ActivityTimelineStep,
     AgentResponse,
     Citation,
     EvidenceSourceType,
     IntentType,
 )
-from src.api.chat_history import ChatHistoryManager
-from src.api.deps import get_chat_history, get_research_agent
-from src.api.main import app
+from backend.deps import get_chat_history, get_research_agent
+from backend.main import app
+from backend.services.chat_history import ChatHistoryManager
 
 
 def test_sanitize_answer_formatting_removes_dividers_and_header_brackets() -> None:
@@ -148,7 +148,7 @@ def test_query_persists_activity_timeline_and_ui_serves_terminal_components(
         execution_time_ms=155.4,
     )
 
-    from src.api.security import verify_signed_user_id
+    from backend.security import verify_signed_user_id
 
     app.dependency_overrides[get_chat_history] = lambda: mgr
     app.dependency_overrides[get_research_agent] = lambda: mock_agent
